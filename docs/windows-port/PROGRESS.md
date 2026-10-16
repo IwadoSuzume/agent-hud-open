@@ -67,10 +67,31 @@ Warning baseline (Swift 6.4.1 toolchain and SDK, not the port's): `WinSDK.swiftm
 broken by a context change` (repeated per compile job); `'strerror' is deprecated` in `MCP/MCPStdio.swift` (shared
 code, Windows CRT only).
 
-## Next steps
+## Next steps (resume here)
 
-1. Round 2 of M0: port-tester (G1 on the new head, G6, G8) and port-reviewer; then tag `port-M0-approved`.
-2. M1: Windows branch of `Package.swift` (Support only), `.github/workflows/windows.yml` (drafted, untracked).
+1. M0 round 2: reviewer **APPROVE** (non-blocking notes below); tester round 2 was waiting on the macOS CI run for
+   `990426e` — read it (`GET …/actions/runs?branch=windows-port&event=workflow_dispatch`, head `990426e`) and the report
+   `reports/M0-tests-2.md` if written. If G1 is success: `git tag port-M0-approved 990426e`, push the tag to `fork`.
+2. M1: Windows branch of `Package.swift` (Support only) + `.github/workflows/windows.yml` (draft in the worktree).
+3. Development continues in the worktree `%LOCALAPPDATA%genthud-dev\wt` (branch `spike-m0`, ASCII path, builds in
+   place with `--scratch-path %LOCALAPPDATA%genthud-dev\wtbuild`). State at commit `284fc05`: Support tests 9/9
+   pass on Windows (golden samples, NIST vectors); Windows platform tests 30/34 pass — the overlapped-I/O count fix
+   (NamedPipes read/write, ChildProcess reader) is applied but not yet re-run; still to fix two test mistakes:
+   `InstanceLockWindowsTests.testOnlyARunningHolderCountsAsRunning` (release the claim in a `do {}` block before
+   rewriting the file) and `ChildProcessWindowsTests.testLines…` (`set /p` exits 1: end the command with `&exit /b 0`).
+
+## M0 round-2 non-blocking notes (to fold in at M1/M3)
+
+- D-007: `%LOCALAPPDATA%` can itself be non-ASCII; the build script needs an ASCII per-user fallback with an
+  owner-only DACL. PORTING_PLAN §3: "8 not replaced" → 10. ADR-001: 20 guards remain after D-006; 16 files with
+  `os(Windows)` branches (18 counting the two import-only files).
+- D-018: override every `UserDefaults.set` overload the stores call; test that a round trip writes no `.plist`.
+- D-021: verify after G3 that no `AgentHUDTests.*.plist` appears in the real `%LOCALAPPDATA%`.
+- D-010: `pipe.key` created with `CREATE_NEW` and an explicit owner-only DACL, never logged; unreadable → fall back.
+- D-023: `ReplaceFileW` on the link's final target; a first write uses a non-replacing move.
+- D-011: keep the `.bat`/`.cmd` check (after trimming dots/spaces) in addition to the `MZ` check.
+- D-020: the boundary rule runs on macOS too — accept and note, or run it only in the Windows CI.
+- PROGRESS gate snippet: rename `$profile` (PowerShell automatic variable) to `$testProfile`.
 
 ## Known issues / TODO
 
