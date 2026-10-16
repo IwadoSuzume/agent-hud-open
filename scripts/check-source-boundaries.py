@@ -36,7 +36,8 @@ for name in sorted(set(filter(None, paths))):
     if path.is_symlink() and not path.resolve().is_relative_to(ROOT):
         failures.append(f"{name}: symlink points outside the package")
     try:
-        content = path.read_text()
+        # UTF-8 on every platform: Windows' default code page fails on, and so skips, most UTF-8 files.
+        content = path.read_text(encoding="utf-8")
     except UnicodeDecodeError:
         continue
     patterns = secret_patterns + (service_patterns if path.suffix in {".swift", ".sh", ".plist", ".yml"} else [])
@@ -49,16 +50,17 @@ bundled = "Sources/AgentHUDDesktop/Resources/THIRD_PARTY_NOTICES.txt"
 if (ROOT / "THIRD_PARTY_NOTICES.txt").read_bytes() != (ROOT / bundled).read_bytes():
     failures.append(f"{bundled}: differs from THIRD_PARTY_NOTICES.txt; copy the root file over it")
 
-manifest = (ROOT / "Package.swift").read_text()
+manifest = (ROOT / "Package.swift").read_text(encoding="utf-8")
 if re.search(r"\.package\s*\(", manifest):
     failures.append("Package.swift: review external package dependencies before including them")
 
 # Verify ignore rules without creating any secret-shaped files.
 ignored = [".env", "signing/local.env", "config/service.local.json", "AuthKey_example.p8", "certificate.p12",
            "account.key", "development.mobileprovision", "build/Agent HUD Open.app/Contents/Info.plist", ".build/ignore-check/AgentHUDOpen"]
+# Bytes, so that no platform writes the line ends as CR LF, which git would read as part of each path.
 result = subprocess.run(["git", "check-ignore", "--stdin"], cwd=ROOT,
-                        input="\n".join(ignored)+"\n", text=True, capture_output=True)
-missing = set(ignored) - set(result.stdout.splitlines())
+                        input=("\n".join(ignored)+"\n").encode(), capture_output=True)
+missing = set(ignored) - set(result.stdout.decode().splitlines())
 failures.extend(f".gitignore: missing rule for {name}" for name in sorted(missing))
 
 if failures:
