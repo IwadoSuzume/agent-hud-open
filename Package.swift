@@ -1,6 +1,20 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
+#if os(Windows)
+// The community Windows port (docs/windows-port). Its targets join this branch milestone by milestone, as they build
+// on Windows: Support first. AgentHUDDesktop and the macOS application are AppKit and SwiftUI, and are not built here.
+let package = Package(
+    name: "AgentHUDOpen",
+    products: [
+        .library(name: "AgentHUDSupport", targets: ["AgentHUDSupport"]),
+    ],
+    targets: [
+        .target(name: "AgentHUDSupport", swiftSettings: [.swiftLanguageMode(.v6)]),
+        .testTarget(name: "AgentHUDSupportTests", dependencies: ["AgentHUDSupport"]),
+    ]
+)
+#else
 let package = Package(
     name: "AgentHUDOpen",
     platforms: [.macOS(.v14)],
@@ -21,3 +35,4 @@ let package = Package(
         .testTarget(name: "AgentHUDDesktopTests", dependencies: ["AgentHUDDesktop"]),
     ]
 )
+#endif

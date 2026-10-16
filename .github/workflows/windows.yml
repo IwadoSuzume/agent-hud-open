@@ -1,0 +1,94 @@
+name: Windows port
+
+# The community Windows port's checks (docs/windows-port). The macOS workflow, ci.yml, is unchanged.
+on:
+  push:
+    branches: [windows-port]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Pinned toolchain: the installer's SHA-256 and its Authenticode signer are checked before it runs.
+  SWIFT_VERSION: 6.4.1
+  SWIFT_INSTALLER_URL: https://download.swift.org/swift-6.4.1-release/windows10/swift-6.4.1-RELEASE/swift-6.4.1-RELEASE-windows10.exe
+  SWIFT_INSTALLER_SHA256: 9382E14919EEAE5E7B5DBFE0575452FE2154178E089A595C8B44D03960D91D59
+
+jobs:
+  swift:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Check source boundaries
+        run: python scripts/check-source-boundaries.py
+
+      - name: System SQLite version
+        # ADR-003: the port reads SQLite through the system's winsqlite3; its version follows the image's OS build.
+        run: |
+          Add-Type -TypeDefinition @'
+          using System; using System.Runtime.InteropServices;
+          public static class WinSqlite {
+            [DllImport("winsqlite3.dll", CallingConvention = CallingConvention.Winapi)] public static extern IntPtr sqlite3_libversion();
+          }
+          '@
+          "winsqlite3 " + [Runtime.InteropServices.Marshal]::PtrToStringAnsi([WinSqlite]::sqlite3_libversion())
+          [Environment]::OSVersion.VersionString
+
+      - name: Cache the Swift installer
+        id: installer
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\swift-installer
+          key: swift-installer-${{ env.SWIFT_VERSION }}-${{ env.SWIFT_INSTALLER_SHA256 }}
+
+      - name: Download the Swift installer
+        if: steps.installer.outputs.cache-hit != 'true'
+        run: |
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\swift-installer" | Out-Null
+          Invoke-WebRequest -Uri $env:SWIFT_INSTALLER_URL -OutFile "$env:RUNNER_TEMP\swift-installer\swift.exe"
+
+      - name: Verify and install Swift
+        run: |
+          $installer = "$env:RUNNER_TEMP\swift-installer\swift.exe"
+          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash
+          if ($hash -ne $env:SWIFT_INSTALLER_SHA256) { throw "Swift installer hash $hash does not match the pinned one" }
+          $signature = Get-AuthenticodeSignature $installer
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Apple Inc\.') {
+            throw "Swift installer signature is $($signature.Status) by $($signature.SignerCertificate.Subject)"
+          }
+          $process = Start-Process -FilePath $installer -ArgumentList '/quiet', '/norestart', '/log', "$env:RUNNER_TEMP\swift-install.log" -Wait -PassThru
+          if ($process.ExitCode -ne 0 -and $process.ExitCode -ne 3010) {
+            Get-Content "$env:RUNNER_TEMP\swift-install.log" -Tail 50
+            throw "Swift installer exited with $($process.ExitCode)"
+          }
+          # The installer sets the user's and the machine's environment; hand it to the following steps.
+          foreach ($scope in 'Machine', 'User') {
+            foreach ($entry in [Environment]::GetEnvironmentVariables($scope).GetEnumerator()) {
+              if ($entry.Name -eq 'Path') {
+                $entry.Value -split ';' | Where-Object { $_ -match 'Swift' } | ForEach-Object { $_ | Out-File $env:GITHUB_PATH -Encoding utf8 -Append }
+              } elseif ($entry.Name -eq 'SDKROOT') {
+                "SDKROOT=$($entry.Value)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+              }
+            }
+          }
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Resolve the Windows package graph
+        run: swift package dump-package | Out-Null
+
+      - name: Compile a smoke package
+        # Proves the toolchain, the Windows SDK and the linker work on the runner before the port's own targets do.
+        run: |
+          $smoke = "$env:RUNNER_TEMP\smoke"
+          New-Item -ItemType Directory -Force "$smoke\Sources\Smoke" | Out-Null
+          Set-Content "$smoke\Package.swift" "// swift-tools-version: 6.0`nimport PackageDescription`nlet package = Package(name: `"Smoke`", targets: [.executableTarget(name: `"Smoke`")])"
+          Set-Content "$smoke\Sources\Smoke\main.swift" "import Foundation`nimport WinSDK`nprint(`"smoke`", GetCurrentProcessId() > 0)"
+          swift run --package-path $smoke Smoke

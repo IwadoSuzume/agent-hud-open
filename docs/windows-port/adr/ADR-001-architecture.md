@@ -13,12 +13,14 @@ core and writing a native Windows shell, and asks M0 to prove or refute it with 
 1. **AgentHUDSupport compiles** with one change, the guarded CryptoKit import (ADR-004). Build: 11 s.
 2. **AgentHUDCore compiles** after:
    - 27 guarded imports (26 in Core: `Darwin`, `os`, `os.log`, `Network`, `Security`, `CoreServices`, `CryptoKit`;
-     1 in Support), plus `FoundationNetworking` in 2 files and `Observation` in 1 (harmless on macOS);
+     1 in Support; 20 remain once D-006 leaves the replaced files unedited), plus `FoundationNetworking` in 2 files
+     and `Observation` in 1 (harmless on macOS);
    - **6 files** replaced wholesale on Windows through `exclude:` in the Windows branch of `Package.swift`
      (`System/UnixSocket`, `System/UnixSocketListener`, `System/ChildProcess`, `System/FileChangeMonitor`,
      `System/InstanceLock`, `Providers/Codex/CodexDesktopIPC`), each by a Windows file of the same API in
      `Sources/AgentHUDCore/Platform/Windows`;
-   - `#if os(Windows)` branches in **18 shared files**, each around one statement or one function;
+   - `#if os(Windows)` branches in **16 shared files** (18 counting the two whose only change is an import), each
+     around one statement or one function;
    - two Windows-only system modules: `SQLite3` over `winsqlite3` (ADR-003) and `CWinHTTP` over `winhttp`.
    Every item is listed with its handling and milestone in PORTING_PLAN.md §1–§4. No error required changing business
    logic.

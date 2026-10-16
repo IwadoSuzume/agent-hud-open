@@ -4,19 +4,19 @@ Read this first when resuming (TASK.md, top). Update after every step.
 
 ## Status
 
-- **Current milestone:** M0 — reconnaissance and decisions (review round 2)
+- **Current milestone:** M1 — Windows CI skeleton (in review)
 - **Branch:** `windows-port`, pushed to the fork `IwadoSuzume/agent-hud-open` (created 2026-10-16 for CI; upstream
   `jazzenchen/agent-hud-open` is never pushed to, no PR is opened).
 - **Spike branch:** `spike-m0` (commit `809e047`, local only): the full spike, Core + tests building and running on
   Windows. Milestones M1–M5 re-apply it in reviewed steps; do not merge it.
-- **Last approved tag:** none yet
+- **Last approved tag:** `port-M0-approved` (`990426e`)
 
 ## Milestones
 
 | Milestone | State | Start commit | Approved tag | Notes |
 | --- | --- | --- | --- | --- |
-| M0 Reconnaissance & decisions | approved | `c258093` (upstream main) | — | round 1: tests ALL_PASS (G1 run 38969577715 success, G6 pass); review CHANGES_REQUESTED (4 blocking, all doc gaps) → fixed |
-| M1 Windows CI skeleton | todo | | | |
+| M0 Reconnaissance & decisions | approved 2026-10-16 | `c258093` (upstream main) | `port-M0-approved` (`990426e`) | round 1: tests ALL_PASS (G1 run 38969577715 success, G6 pass); review CHANGES_REQUESTED (4 blocking, all doc gaps) → fixed |
+| M1 Windows CI skeleton | review | `703ae2e` | — | windows.yml, Windows manifest branch (Support) |
 | M2 Support cross-platform | todo | | | |
 | M3 Core platform layer | todo | | | |
 | M4 Providers | todo | | | |
@@ -46,9 +46,9 @@ $env:SDKROOT = "$env:LOCALAPPDATA\Programs\Swift\Platforms\6.4.1\Windows.platfor
 $build = "$env:LOCALAPPDATA\agenthud-dev\build"
 Set-Location "$env:LOCALAPPDATA\agenthud-dev\src"
 # for tests only:
-$profile = "$env:LOCALAPPDATA\agenthud-dev\testprofile"; Remove-Item -Recurse -Force $profile -ErrorAction SilentlyContinue
-New-Item -ItemType Directory "$profile\Roaming", "$profile\Local" | Out-Null
-$env:APPDATA = "$profile\Roaming"; $env:LOCALAPPDATA_REAL = $env:LOCALAPPDATA; $env:LOCALAPPDATA = "$profile\Local"
+$testProfile = "$env:LOCALAPPDATA\agenthud-dev\testprofile"; Remove-Item -Recurse -Force $testProfile -ErrorAction SilentlyContinue
+New-Item -ItemType Directory "$testProfile\Roaming", "$testProfile\Local" | Out-Null
+$env:APPDATA = "$testProfile\Roaming"; $env:LOCALAPPDATA_REAL = $env:LOCALAPPDATA; $env:LOCALAPPDATA = "$testProfile\Local"
 ```
 
 `swift test` prints its results only when it ends (~2 min for Core); redirect it from `cmd /c "… > log 2>&1"`, because

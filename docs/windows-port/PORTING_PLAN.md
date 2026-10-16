@@ -36,7 +36,7 @@ functions only.
 
 | Files | Import | Handling | Milestone |
 | --- | --- | --- | --- |
-| 13 files (8 not replaced) | `Darwin` | `#if canImport(Darwin)` in the files not replaced; CRT names come through Foundation on Windows | M3 S |
+| 13 files (10 not replaced) | `Darwin` | `#if canImport(Darwin)` in the files not replaced; CRT names come through Foundation on Windows | M3 S |
 | `DemoStage` | `os` | guarded; `OSAllocatedUnfairLock` shim (`PosixCompat.swift`) | M3 S |
 | `PermissionRequests`, `MCPAppChannel` | `Network` | guarded; `NWConnection` is `PipeConnection` on Windows (`NamedPipes.swift`) | M3/M5 S |
 | `CopilotClient`, `ProviderHTTP` | `Security` | guarded; Credential Manager / WinHTTP | M4 S |
