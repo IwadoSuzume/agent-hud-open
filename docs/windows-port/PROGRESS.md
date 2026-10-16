@@ -15,7 +15,7 @@ Read this first when resuming (TASK.md, top). Update after every step.
 
 | Milestone | State | Start commit | Approved tag | Notes |
 | --- | --- | --- | --- | --- |
-| M0 Reconnaissance & decisions | review 2 | `c258093` (upstream main) | — | round 1: tests ALL_PASS (G1 run 38969577715 success, G6 pass); review CHANGES_REQUESTED (4 blocking, all doc gaps) → fixed |
+| M0 Reconnaissance & decisions | approved | `c258093` (upstream main) | — | round 1: tests ALL_PASS (G1 run 38969577715 success, G6 pass); review CHANGES_REQUESTED (4 blocking, all doc gaps) → fixed |
 | M1 Windows CI skeleton | todo | | | |
 | M2 Support cross-platform | todo | | | |
 | M3 Core platform layer | todo | | | |
