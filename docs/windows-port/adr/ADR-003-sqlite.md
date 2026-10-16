@@ -43,10 +43,22 @@ Option 1. `Package.swift` declares, **on Windows only**, a `systemLibrary` targe
 `<winsqlite/winsqlite3.h>`). Because the module carries the same name as the macOS SDK module, no Swift file changes:
 `import SQLite3` resolves to the SDK on macOS and to `winsqlite3` on Windows.
 
-The ledger checks `sqlite3_libversion_number() >= 3038000` once when it opens on Windows; below that it reports the
-ledger as unavailable with a notice (the application then runs without history, as it does when the ledger cannot be
-opened on macOS) rather than failing queries one by one. If this check fires on supported systems in practice, option
-2 is the fallback and needs a new ADR.
+On Windows, both the ledger (`SQLiteConnection`) and the read-only reader of clients' databases (`ReadOnlySQLite`,
+whose Cursor query uses `json_extract`) check `sqlite3_libversion_number() >= 3038000` before use; below that the
+ledger is unavailable with a notice (the application then runs without history, as it does when the ledger cannot
+be opened on macOS) and a client database read fails as a failed read of that source, never of another. The Windows
+CI job logs `sqlite3_libversion()` of its image, and the version on Windows 10 22H2 is recorded in SUPPORT_MATRIX.md
+when one is available to test on. If the check fires on supported systems in practice, option 2 is the fallback and
+needs a new ADR.
+
+`winsqlite3` also differs from the macOS SQLite on one point that matters (spike, PORTING_PLAN.md §8.1): a read-only
+connection to a WAL database whose `-wal`/`-shm` files are gone creates them, where macOS refuses. `ReadOnlySQLite`
+therefore opens such a database as immutable from the start on Windows, so that reading never writes into a client's
+folder (M3).
+
+Evidence the choice works: in the spike `UsageLedgerTests`, `HermesProviderTests`, `ZCodeProviderTests` and
+`OpenAgentProviderTests` passed against `winsqlite3`; `LedgerFileStoreTests`, `OpenClawProviderTests` and
+`TencentBuddyProviderTests` passed but for one case each, under investigation (PORTING_PLAN.md §8).
 
 ## Consequences
 

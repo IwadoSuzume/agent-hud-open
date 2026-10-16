@@ -47,7 +47,10 @@ Use **WPF on .NET 10** (`net10.0-windows`, `UseWPF`, `UseWindowsForms` only for 
 - No NuGet package in the shipped application. Interop with `user32`, `dwmapi`, `shell32` through `DllImport`
   declarations written in the project.
 - Test project only: `Microsoft.NET.Test.Sdk`, `MSTest.TestAdapter`, `MSTest.TestFramework` (MIT, Microsoft), never
-  shipped; recorded in DECISIONS.md and THIRD_PARTY_NOTICES.txt.
+  shipped; they will be recorded in DECISIONS.md and THIRD_PARTY_NOTICES.txt when the test project is added (M7).
+- The scores above rest on the frameworks' documented capabilities, not on a prototype; M7 starts with the riskiest
+  part, a topmost, non-activating, per-pixel transparent, click-through window per monitor, and revisits this ADR if
+  WPF cannot do it.
 
 ## Consequences
 
