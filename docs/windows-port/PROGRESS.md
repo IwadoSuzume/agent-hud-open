@@ -69,12 +69,11 @@ code, Windows CRT only).
 
 ## Next steps (resume here)
 
-1. M0 round 2: reviewer **APPROVE** (non-blocking notes below); tester round 2 was waiting on the macOS CI run for
-   `990426e` — read it (`GET …/actions/runs?branch=windows-port&event=workflow_dispatch`, head `990426e`) and the report
-   `reports/M0-tests-2.md` if written. If G1 is success: `git tag port-M0-approved 990426e`, push the tag to `fork`.
+1. M0 is **approved**: tag `port-M0-approved` on `990426e` (reviewer round 2 APPROVE; tester round 2
+   ALL_PASS, G1 run 38971749789 success, report `reports/M0-tests-2.md`).
 2. M1: Windows branch of `Package.swift` (Support only) + `.github/workflows/windows.yml` (draft in the worktree).
-3. Development continues in the worktree `%LOCALAPPDATA%genthud-dev\wt` (branch `spike-m0`, ASCII path, builds in
-   place with `--scratch-path %LOCALAPPDATA%genthud-dev\wtbuild`). State at commit `284fc05`: Support tests 9/9
+3. Development continues in the worktree `%LOCALAPPDATA%\agenthud-dev\wt` (branch `spike-m0`, ASCII path, builds in
+   place with `--scratch-path %LOCALAPPDATA%\agenthud-dev\wtbuild`). State at commit `284fc05`: Support tests 9/9
    pass on Windows (golden samples, NIST vectors); Windows platform tests 30/34 pass — the overlapped-I/O count fix
    (NamedPipes read/write, ChildProcess reader) is applied but not yet re-run; still to fix two test mistakes:
    `InstanceLockWindowsTests.testOnlyARunningHolderCountsAsRunning` (release the claim in a `do {}` block before
