@@ -49,7 +49,7 @@ public enum ClaudeSessionOrigins {
     /// Hooks have no controlling TTY of their own. Verify their nearest host and use only its inherited iTerm identity.
     public static func record(data: Data, now: Date = Date(), directory: URL = directory,
                               environment: [String: String] = ProcessInfo.processInfo.environment,
-                              home: URL = FileManager.default.homeDirectoryForCurrentUser) throws {
+                              home: URL = UserHome.directory) throws {
         let executables = Set(ClaudeEngineLocator.candidates(home: home, path: environment["PATH"] ?? "")
             .map { $0.resolvingSymlinksInPath().path })
         let ancestors = HookProcessOrigins.ancestors()
@@ -147,7 +147,7 @@ public enum ClaudeSessionOrigins {
 
     /// Installs origin callbacks beside the user's hooks without changing other settings or completion handlers.
     public static func configure(enabled: Bool, executable: URL,
-                                 home: URL = FileManager.default.homeDirectoryForCurrentUser,
+                                 home: URL = UserHome.directory,
                                  environment: [String: String] = ProcessInfo.processInfo.environment,
                                  directory: URL = directory) throws {
         let configuration = ClaudeSubscription.directory(home: home, environment: environment).appendingPathComponent("settings.json")

@@ -12,37 +12,37 @@ public enum PiSessionObserver {
     }
 
     /// Pi's directory exists once Pi has run.
-    static func isAvailable(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    static func isAvailable(home: URL = UserHome.directory,
                             environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
         FileManager.default.fileExists(atPath: OpenAgentPaths(home: home, environment: environment).pi.path)
     }
 
     /// Adapter setup is independent of the user's live-status presentation preference.
-    public static func configureIfAvailable(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func configureIfAvailable(home: URL = UserHome.directory,
                                             environment: [String: String] = ProcessInfo.processInfo.environment) throws {
         guard isAvailable(home: home, environment: environment) else { return }
         try configure(enabled: true, home: home, environment: environment)
     }
 
-    public static func isInstalled(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func isInstalled(home: URL = UserHome.directory,
                                    environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
         file(OpenAgentPaths(home: home, environment: environment)).isCurrent
     }
 
-    public static func configure(enabled: Bool, home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func configure(enabled: Bool, home: URL = UserHome.directory,
                                  environment: [String: String] = ProcessInfo.processInfo.environment) throws {
         try file(OpenAgentPaths(home: home, environment: environment)).configure(enabled: enabled)
     }
 
     /// Whether the extension is in place, for Pi's settings.
-    public static func fileState(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func fileState(home: URL = UserHome.directory,
                                  environment: [String: String] = ProcessInfo.processInfo.environment) -> ClientObserverFile {
         file(OpenAgentPaths(home: home, environment: environment)).state
     }
 
     /// The Pi version Pi last recorded, when it predates `agent_settled`: that Pi reports a run but never its completion.
     /// Pi records its version when an interactive session opens on a fresh install or after an update.
-    public static func unsupportedVersion(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func unsupportedVersion(home: URL = UserHome.directory,
                                           environment: [String: String] = ProcessInfo.processInfo.environment) -> String? {
         let url = OpenAgentPaths(home: home, environment: environment).pi.appendingPathComponent("settings.json")
         guard let version = (try? ProviderFiles.json(url))?["lastChangelogVersion"].stringValue, version.first?.isNumber == true,

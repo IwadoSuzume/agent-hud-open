@@ -15,7 +15,7 @@ public struct CodexAppServerClient: Sendable {
     public func fetch() async throws -> CodexRateLimits {
         var environment = ProcessInfo.processInfo.environment
         environment["CODEX_HOME"] = dataDirectory.path
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let home = UserHome.directory.path
         environment["PATH"] = "\(home)/.bun/bin:\(home)/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + (environment["PATH"] ?? "")
         let server = try ChildProcess(executable, ["app-server", "--listen", "stdio://"], environment: environment,
                                       directory: FileManager.default.temporaryDirectory, input: true, stdoutLimit: 8 * 1024 * 1024)

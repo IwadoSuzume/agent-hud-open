@@ -1,5 +1,7 @@
 import AgentHUDSupport
+#if canImport(Darwin)
 import Darwin
+#endif
 import Foundation
 import XCTest
 @testable import AgentHUDCore
@@ -99,18 +101,25 @@ final class MCPStdioTests: XCTestCase {
         close(inbound.write)
         // What this process had printed and not yet written must not land among the answers.
         fflush(nil)
+        #if !os(Windows)
         let found = signal(SIGPIPE, SIG_DFL)
+        #endif
         let status = redirecting(STDIN_FILENO, to: inbound.read) {
             redirecting(STDOUT_FILENO, to: outbound.write) { HookEntry.handle(arguments: ["/tmp/hud", "--mcp"]) }
         }
+        #if !os(Windows)
         let left = signal(SIGPIPE, found)
+        #endif
         close(inbound.read)
         close(outbound.write)
         let output = FileHandle(fileDescriptor: outbound.read, closeOnDealloc: true).readDataToEndOfFile()
 
         XCTAssertEqual(status, 0, "the command ran, and ended with its input")
+        #if !os(Windows)
+        // Windows raises no signal for a pipe whose reader went away.
         XCTAssertEqual(unsafeBitCast(left, to: Int.self), unsafeBitCast(SIG_IGN, to: Int.self),
                        "a client that went away ends the process through a failed write, not a signal")
+        #endif
         let text = String(decoding: output, as: UTF8.self)
         XCTAssertTrue(text.hasSuffix("\n"))
         let messages = try text.split(separator: "\n").map { try JSONValue.parse(Data($0.utf8)) }
@@ -172,7 +181,9 @@ final class MCPStdioTests: XCTestCase {
     func testTheLoopEndsOnceNobodyReadsItsAnswers() throws {
         let inbound = try pipe(), outbound = try pipe()
         // The process ignores the signal a closed pipe raises; here only this descriptor does.
+        #if !os(Windows)
         XCTAssertEqual(fcntl(outbound.write, F_SETNOSIGPIPE, 1), 0)
+        #endif
         close(outbound.read)
         let bytes = Array((#"{"jsonrpc":"2.0","id":1,"method":"ping"}"# + "\n" + #"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_panel"}}"# + "\n").utf8)
         XCTAssertEqual(write(inbound.write, bytes, bytes.count), bytes.count)

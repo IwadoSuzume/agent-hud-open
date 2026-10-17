@@ -51,7 +51,7 @@ enum AgentAPIServiceDiscovery {
         }
     }
 
-    static func discover(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    static func discover(home: URL = UserHome.directory,
                          environment env: [String: String] = ProcessInfo.processInfo.environment) -> [AgentService] {
         let paths = OpenAgentPaths(home: home, environment: env)
         var services: [AgentService] = []

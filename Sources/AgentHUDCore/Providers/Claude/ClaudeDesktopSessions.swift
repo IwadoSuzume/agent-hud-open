@@ -19,7 +19,7 @@ public actor ClaudeDesktopSessions {
         locations = [Location(url: codeRoot, cowork: false)] + (coworkRoot.map { [Location(url: $0, cowork: true)] } ?? [])
     }
 
-    public nonisolated static func defaultRoots(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> [URL] {
+    public nonisolated static func defaultRoots(home: URL = UserHome.directory) -> [URL] {
         let base = home.appendingPathComponent("Library/Application Support/Claude", isDirectory: true)
         return ["claude-code-sessions", "local-agent-mode-sessions"].map { base.appendingPathComponent($0, isDirectory: true) }
     }

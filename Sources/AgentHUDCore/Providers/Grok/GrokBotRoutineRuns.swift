@@ -24,7 +24,7 @@ actor GrokBotRoutineRuns {
 
     /// - directory: Grok Bot's persistence folder, whose roster lists the bots to ask about.
     /// - fileURL: where the runs are kept across launches; nil keeps them in memory.
-    init(directory: URL = GrokBotSessions.roots(home: FileManager.default.homeDirectoryForCurrentUser, environment: [:])[0],
+    init(directory: URL = GrokBotSessions.roots(home: UserHome.directory, environment: [:])[0],
          fileURL: URL? = nil, clock: @escaping @Sendable () -> Date = { Date() }) {
         self.directory = directory; self.fileURL = fileURL; self.clock = clock
         if let data = fileURL.flatMap({ try? Data(contentsOf: $0) }),

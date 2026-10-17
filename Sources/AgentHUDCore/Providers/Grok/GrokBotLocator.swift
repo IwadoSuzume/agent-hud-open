@@ -2,7 +2,7 @@ import Foundation
 
 /// Grok Bot is a desktop client with a data directory separate from Grok CLI and Cursor.
 public enum GrokBotLocator {
-    public static func isInstalled(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func isInstalled(home: URL = UserHome.directory,
                                    applicationURLs: [URL]? = nil) -> Bool {
         let data = home.appendingPathComponent("Library/Application Support/Grok Bot", isDirectory: true)
         var directory: ObjCBool = false

@@ -88,20 +88,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .build
-          key: swift-build-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift') }}-${{ github.sha }}
-          restore-keys: swift-build-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift') }}-
+          # One entry per toolchain and manifest, so the 2 GB installer entry is not evicted by a build per commit.
+          key: swift-build-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift') }}
 
       - name: Build (release)
         run: swift build -c release
 
       - name: Test
-        # In a temporary profile: tests must not write the runner's real APPDATA or LOCALAPPDATA (DECISIONS.md D-021).
-        run: |
-          $profileRoot = "$env:RUNNER_TEMP\testprofile"
-          New-Item -ItemType Directory -Force "$profileRoot\Roaming", "$profileRoot\Local" | Out-Null
-          $env:APPDATA = "$profileRoot\Roaming"
-          $env:LOCALAPPDATA = "$profileRoot\Local"
-          swift test
+        # In a temporary profile, with the registered skips (scripts/windows/skipped-tests.txt, SKIPPED_TESTS.md).
+        run: scripts/windows/test.ps1
 
       - name: Compile a smoke package
         # Proves the toolchain, the Windows SDK and the linker work on the runner before the port's own targets do.

@@ -1,5 +1,8 @@
 import AgentHUDSupport
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import SQLite3
 import XCTest
 @testable import AgentHUDCore

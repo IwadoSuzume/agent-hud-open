@@ -89,7 +89,7 @@ public enum CompletionHooks {
         HookInstaller(configuration: source.configuration(home: home), arguments: arguments(source))
     }
 
-    public static func isInstalled(_ source: Source, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
+    public static func isInstalled(_ source: Source, home: URL = UserHome.directory) -> Bool {
         guard let object = try? installer(source, home: home).read() else { return false }
         return source.format.isActive(in: object)
     }
@@ -100,7 +100,7 @@ public enum CompletionHooks {
     /// Points every Agent HUD handler of the client's stop hook at `executable`, whichever copy wrote it
     /// (`HookCommand`), or with `enabled` false takes them all out, leaving every other hook in the file alone.
     public static func configure(_ source: Source, enabled: Bool, executable: URL,
-                                 home: URL = FileManager.default.homeDirectoryForCurrentUser) throws {
+                                 home: URL = UserHome.directory) throws {
         try installer(source, home: home).configure(enabled: enabled, executable: executable) {
             try source.format.updating($0, command: $1)
         }

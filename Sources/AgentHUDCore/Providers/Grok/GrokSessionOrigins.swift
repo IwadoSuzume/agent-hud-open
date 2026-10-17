@@ -1,19 +1,26 @@
+#if canImport(Darwin)
 import Darwin
+#endif
 import Foundation
 
 /// Grok's live registry owns the exact session-to-PID link. Resolve only an interactive native process with one
 /// registered session, so revealing its existing iTerm pane cannot land on another conversation in the pager.
 public enum GrokSessionOrigins {
     public static var dataDirectory: URL {
-        GrokSessions.directory(home: FileManager.default.homeDirectoryForCurrentUser, environment: ProcessInfo.processInfo.environment)
+        GrokSessions.directory(home: UserHome.directory, environment: ProcessInfo.processInfo.environment)
     }
 
     public static func read(sessionIDs: Set<String>, dataDirectory: URL = GrokSessionOrigins.dataDirectory)
         -> [String: SessionNavigationTarget] {
         guard !sessionIDs.isEmpty,
               let data = try? Data(contentsOf: dataDirectory.appendingPathComponent("active_sessions.json")) else { return [:] }
+        #if os(Windows)
+        // Revealing a session's terminal is not supported on Windows (docs/windows-port/SUPPORT_MATRIX.md).
+        return [:]
+        #else
         return targets(in: data, sessionIDs: sessionIDs, uid: getuid(),
                        process: CodexTerminalOrigins.processIdentity, arguments: CodexTerminalOrigins.argumentsData)
+        #endif
     }
 
     private struct ActiveSession: Decodable {

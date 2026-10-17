@@ -138,6 +138,15 @@ final class LogFiles {
         guard accepts(url) else { return }
         let listed = names.contains { $0.listed == path }
             || (!skips(url) && !url.lastPathComponent.hasPrefix(".") && reachable(url.deletingLastPathComponent().path) != nil)
+        #if os(Windows)
+        let values = WindowsFiles.attributes(path)
+        if listed, let values, values.isRegularFile {
+            add(path, File(modified: values.modified, size: values.size))
+        } else if !listed || values == nil {
+            files.removeValue(forKey: path)
+        }
+        return
+        #endif
         if listed, let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey, .isRegularFileKey]),
            values.isRegularFile == true, let modified = values.contentModificationDate, let size = values.fileSize {
             add(path, File(modified: modified, size: size))
@@ -183,7 +192,8 @@ final class LogFiles {
     /// The path as the listing names it, or nil outside every root.
     private func canonical(_ path: String) -> String? {
         for root in names {
-            for alias in root.aliases where path == alias || path.hasPrefix(alias + "/") {
+            for alias in root.aliases where PathCase.folded(path) == PathCase.folded(alias)
+                || PathCase.folded(path).hasPrefix(PathCase.folded(alias) + "/") {
                 return root.listed + path.dropFirst(alias.count)
             }
         }
@@ -238,13 +248,33 @@ final class LogFiles {
         @discardableResult
         mutating func add(_ url: URL) -> Bool {
             var isDirectory: ObjCBool = false
+            #if os(Windows)
+            // A file a client holds exclusively does not exist for Foundation on Windows.
+            guard let found = WindowsFiles.attributes(url.path) else { return true }
+            isDirectory = ObjCBool(!found.isRegularFile)
+            #else
             guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { return true }
+            #endif
             guard isDirectory.boolValue else {
                 // A root can name one file; a new URL does not answer from values cached by an earlier listing.
                 let file = URL(fileURLWithPath: url.path)
                 if accepts(file) { list(file) }
                 return true
             }
+            #if os(Windows)
+            // Foundation's enumerator on Windows leaves out a file a client holds exclusively, and its skipDescendants()
+            // also passes over the directory's later siblings: the file system's own records are walked instead.
+            var stopped = false
+            gaps.unreadable += WindowsFiles.walk(url) { entry in
+                visited += 1
+                guard visited <= limit else { gaps.truncated = true; stopped = true; return nil }
+                if skips(entry.url) { return false }
+                // Asked of every entry, as the enumerator's loop asks it; only a file is kept.
+                if accepts(entry.url), !entry.isDirectory { files[entry.url.path] = File(modified: entry.modified, size: entry.size) }
+                return true
+            }
+            return !stopped
+            #else
             var unreadable = 0
             defer { gaps.unreadable += unreadable }
             guard let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: Self.keys, options: [.skipsHiddenFiles], errorHandler: { _, _ in
@@ -261,9 +291,17 @@ final class LogFiles {
                 if accepts(url) { list(url) }
             }
             return true
+            #endif
         }
 
         private mutating func list(_ url: URL) {
+            #if os(Windows)
+            // Foundation opens the file for its values on Windows, which fails while a client holds it exclusively: the
+            // file system's own record is read instead, so a log that cannot be read is still listed, as on macOS.
+            guard let values = WindowsFiles.attributes(url.path) else { gaps.unreadable += 1; return }
+            if values.isRegularFile { files[url.path] = File(modified: values.modified, size: values.size) }
+            return
+            #endif
             guard let values = try? url.resourceValues(forKeys: Set(Self.keys)), let modified = values.contentModificationDate,
                   let size = values.fileSize, values.isRegularFile != nil else { gaps.unreadable += 1; return }
             if values.isRegularFile == true { files[url.path] = File(modified: modified, size: size) }

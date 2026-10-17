@@ -5,7 +5,7 @@ struct PiCodexClient: Sendable {
     let directory: URL
     var http = ProviderHTTP()
 
-    static var directory: URL { OpenAgentPaths(home: FileManager.default.homeDirectoryForCurrentUser, environment: ProcessInfo.processInfo.environment).pi }
+    static var directory: URL { OpenAgentPaths(home: UserHome.directory, environment: ProcessInfo.processInfo.environment).pi }
 
     func fetch(now: Date = Date()) async throws -> CodexRateLimits? {
         let file = directory.appendingPathComponent("auth.json")

@@ -1,4 +1,8 @@
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import AgentHUDSupport
+#endif
 import XCTest
 @testable import AgentHUDCore
 

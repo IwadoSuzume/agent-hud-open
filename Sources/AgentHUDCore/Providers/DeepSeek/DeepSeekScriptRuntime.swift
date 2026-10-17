@@ -11,7 +11,7 @@ struct DeepSeekScriptRuntime: Sendable, Equatable {
     /// The desktop app's name; its bundle identifier is set per build, so the app is looked for by name.
     static let desktopName = "DeepSeek Harness"
     static let applicationFolders = [URL(fileURLWithPath: "/Applications"),
-                                     FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")]
+                                     UserHome.directory.appendingPathComponent("Applications")]
 
     static func node(path: String = ProcessInfo.processInfo.environment["PATH"] ?? "") -> Self? {
         DeepSeekLocator.nodeExecutable(path: path).map { Self(executable: $0, environment: [:]) }

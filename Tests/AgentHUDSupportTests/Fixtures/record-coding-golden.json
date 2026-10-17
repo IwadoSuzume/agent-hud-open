@@ -1,5 +1,5 @@
 {
-  "about": "Golden samples for RecordCoding and the portable digests (docs/windows-port/adr/ADR-004-sha256.md). Digests were computed with Python's hashlib; the same tests check them against CryptoKit on macOS and against the portable implementation on Windows.",
+  "about": "Golden samples for RecordCoding and the portable digests (docs/windows-port/adr/ADR-004-sha256.md). Digests were computed with Python's hashlib, and equal the published examples (FIPS 180-2 appendices, RFC 6455 section 1.3); the same tests check them against CryptoKit on macOS and against the portable implementation on Windows.",
   "recordHashes": [
     {
       "components": [],

@@ -141,7 +141,7 @@ public struct PermissionRequest: Identifiable, Equatable, Sendable {
     /// prompt would, so it is recognized rather than read.
     public var context: String? {
         guard let raw = path ?? cwd, !raw.isEmpty else { return nil }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let home = UserHome.directory.path
         return raw.hasPrefix(home) ? "~" + raw.dropFirst(home.count) : raw
     }
 

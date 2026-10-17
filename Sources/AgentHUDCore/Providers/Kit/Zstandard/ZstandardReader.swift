@@ -29,7 +29,12 @@ final class ZstandardReader {
     }
 
     init(url: URL) throws {
+        #if os(Windows)
+        // Binary, so the C runtime translates no line ends, by its UTF-16 path, and not inherited by child processes.
+        descriptor = WindowsFiles.openForReading(url.path)
+        #else
         descriptor = open(url.path, O_RDONLY | O_CLOEXEC)
+        #endif
         guard descriptor >= 0 else {
             input.deallocate(); output.deallocate()
             throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
@@ -186,7 +191,11 @@ final class ZstandardReader {
             inputStart = 0
         }
         while inputEnd < count, !fileEnded {
+            #if os(Windows)
+            let length = Int(_read(descriptor, input + inputEnd, UInt32(Self.inputCapacity - inputEnd)))
+            #else
             let length = Darwin.read(descriptor, input + inputEnd, Self.inputCapacity - inputEnd)
+            #endif
             if length < 0 {
                 if errno == EINTR { continue }
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)

@@ -4,7 +4,7 @@ Read this first when resuming (TASK.md, top). Update after every step.
 
 ## Status
 
-- **Current milestone:** M3 — Core platform layer (in progress)
+- **Current milestone:** M3 — Core platform layer (in review)
 - **Branch:** `windows-port`, pushed to the fork `IwadoSuzume/agent-hud-open` (created 2026-10-16 for CI; upstream
   `jazzenchen/agent-hud-open` is never pushed to, no PR is opened).
 - **Spike branch:** `spike-m0` (commit `809e047`, local only): the full spike, Core + tests building and running on
@@ -18,7 +18,7 @@ Read this first when resuming (TASK.md, top). Update after every step.
 | M0 Reconnaissance & decisions | approved 2026-10-16 | `c258093` (upstream main) | `port-M0-approved` (`990426e`) | round 1: tests ALL_PASS (G1 run 38969577715 success, G6 pass); review CHANGES_REQUESTED (4 blocking, all doc gaps) → fixed |
 | M1 Windows CI skeleton | approved 2026-10-16 | `703ae2e` | `port-M1-approved` (`ffc8dba`) | round 1: tests ALL_PASS (Windows run 38982139136, macOS run 38982141982), review APPROVE |
 | M2 Support cross-platform | approved 2026-10-17 | `ffc8dba` | `port-M2-approved` (`887c949`) | round 1: tests ALL_PASS (Windows run 39000065894, macOS run 39000074546: 2086 XCTest + 10 swift-testing incl. `portableDigestsEqualCryptoKit`), review APPROVE |
-| M3 Core platform layer | todo | | | |
+| M3 Core platform layer | review | `08bbc4a` | — | Core and its tests on Windows: 1294 pass, 9 runtime skips, 36 listed skips, 10 excluded files, 0 failures |
 | M4 Providers | todo | | | |
 | M5 Hooks & MCP | todo | | | |
 | M6 Engine & UI protocol | todo | | | |
@@ -58,7 +58,7 @@ PowerShell's `*>` holds everything until the process exits too.
 | --- | --- | --- |
 | G1 macOS | GitHub Actions `Source checks` (`ci.yml`) dispatched on `windows-port` in the fork (`POST /repos/IwadoSuzume/agent-hud-open/actions/workflows/ci.yml/dispatches {"ref":"windows-port"}`), read with `GET /repos/IwadoSuzume/agent-hud-open/actions/runs?branch=windows-port&event=workflow_dispatch`; jobs `test`, `app`, `macos` must be `success` for the milestone's head commit | every milestone (runs listed in the milestone table) |
 | G2 Windows build | `swift build -c release --scratch-path $build` (warnings compared with the baseline below); `dotnet build windows\AgentHUD.sln -c Release` from M7; the `Windows port` workflow (`windows.yml`) | M1 (CI), M2+ |
-| G3 Windows tests | `swift test --scratch-path $build` in the temporary profile; every exclusion and runtime skip in SKIPPED_TESTS.md | M2 (Support), M3+ (Core) |
+| G3 Windows tests | `scripts\windows\test.ps1 -ScratchPath $build -Log $env:TEMP\g3.log` (temporary profile, registered skips, batches, preference cleanup); every exclusion, listed skip and runtime skip in SKIPPED_TESTS.md | M2 (Support), M3+ (Core) |
 | G4 determinism | `RecordCodingGoldenTests` (Support), on Windows and in the macOS CI | M2+ |
 | G5 UI | `dotnet test windows\AgentHUD.Tests`; snapshot smoke test | M7+ |
 | G6 boundaries | `python scripts\check-source-boundaries.py` | every milestone |
@@ -69,17 +69,13 @@ code, Windows CRT only).
 
 ## Next steps (resume here)
 
-1. M2 approved (`port-M2-approved`). Its non-blocking notes go into M3: `PortableSHA256`/`PortableSHA1` to `package`
-   access, a seeded generator in the CryptoKit cross-check, the `.build` cache key without the commit, a PORTING_PLAN
-   §1 line for the root `Info.plist`, the fixture's note that the values equal the published examples.
-2. M3 (Core platform layer): bring the Core work over from the worktree `%LOCALAPPDATA%\agenthud-dev\wt` (branch
-   `spike-m0`, ASCII path; builds there with `--scratch-path %LOCALAPPDATA%\agenthud-dev\wtbuild`). Already done there:
-   the replaced macOS files restored to upstream (D-006), `UserHome` seam over 43 files (D-020), `WindowsFolders`
-   absolute-existing checks (D-008), `SettingsFile` (D-018), per-user pipe key (D-010), ChildProcess scalar quoting and
-   batch/PE checks (D-011), overlapped-I/O count fix; Windows platform tests 9+13+5+5+6+6 pass. Still to do for M3:
-   `ReadOnlySQLite` WAL/immutable and the SQLite version check (D-003), case-insensitive path comparisons (D-023),
-   the boundary rule for home reads (D-020), SKIPPED_TESTS.md, the M3 failures of PORTING_PLAN §8, the Core steps in
-   `windows.yml`.
+1. M3 review round 1: port-tester (G1, G2 incl. the Windows workflow's Core build and test, G3 through
+   `scripts/windows/test.ps1`, G4, G6, G8) and port-reviewer on `08bbc4a...HEAD`; then tag `port-M3-approved`.
+2. M4 (providers): SUPPORT_MATRIX research per client; D-019 executables/PATH; a scripted fake-engine executable for
+   the Claude/Codex/Antigravity/MCP-client tests; Windows locators; DeepSeek observer test server on Winsock; Copilot
+   `hostsFile` on Windows; then remove their entries from `skipped-tests.txt`.
+3. The spike worktree `%LOCALAPPDATA%\agenthud-dev\wt` (branch `spike-m0`) is no longer needed for Core: M3 put its
+   state on `windows-port`. New work happens on `windows-port` through the junction `%LOCALAPPDATA%\agenthud-dev\src`.
 
 ## Known issues / TODO
 

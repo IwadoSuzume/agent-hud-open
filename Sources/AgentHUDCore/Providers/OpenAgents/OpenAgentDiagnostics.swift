@@ -3,7 +3,7 @@ import Foundation
 /// Local-only diagnostic: no account requests, settings writes, transcript text, or credentials in output.
 public enum OpenAgentDiagnostics {
     public static func localSummary() async -> String {
-        let store = OpenAgentLocalStore(paths: .init(home: FileManager.default.homeDirectoryForCurrentUser, environment: ProcessInfo.processInfo.environment))
+        let store = OpenAgentLocalStore(paths: .init(home: UserHome.directory, environment: ProcessInfo.processInfo.environment))
         let since = Date().addingTimeInterval(-7 * 86400)
         var result = await store.index(since: since), rounds = 1
         while result.indexing != nil && rounds < 40 {

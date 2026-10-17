@@ -9,19 +9,19 @@ enum ClaudeSubscription {
 
     /// Claude Code's configuration directory: `CLAUDE_CONFIG_DIR`, else `~/.claude`. The account profile and the hooks
     /// written into its settings both follow it.
-    static func directory(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    static func directory(home: URL = UserHome.directory,
                           environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
         configDirectory(environment) ?? home.appendingPathComponent(".claude", isDirectory: true)
     }
 
     /// Inside a configured directory, beside the default one.
     static var accountProfileURL: URL {
-        (configDirectory() ?? FileManager.default.homeDirectoryForCurrentUser).appendingPathComponent(".claude.json")
+        (configDirectory() ?? UserHome.directory).appendingPathComponent(".claude.json")
     }
 
     /// `ClientHome.key` of the Claude Code configuration directory this app reads.
     static var home: String {
-        let home = FileManager.default.homeDirectoryForCurrentUser
+        let home = UserHome.directory
         return ClientHome.key(directory(home: home), defaultDirectory: home.appendingPathComponent(".claude", isDirectory: true))
     }
 

@@ -56,7 +56,7 @@ actor OpenAgentUsageProvider: UsageProvider, LedgerRecording {
         }
     }
     static func standard(ledger: UsageLedger, persistHistory: Bool = true) -> OpenAgentUsageProvider {
-        let paths = OpenAgentPaths(home: FileManager.default.homeDirectoryForCurrentUser, environment: ProcessInfo.processInfo.environment)
+        let paths = OpenAgentPaths(home: UserHome.directory, environment: ProcessInfo.processInfo.environment)
         let local = OpenAgentLocalStore(paths: paths)
         return .init(credentials: { OpenAgentCredentials.discover() }, sessions: { await local.index(since: $0) },
             fetchQuota: { try await OpenAgentQuotaClient().fetch($0, now: $1) },

@@ -11,29 +11,29 @@ public enum OpenCodeSessionObserver {
     }
 
     /// OpenCode's data directory exists once OpenCode has run.
-    static func isAvailable(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    static func isAvailable(home: URL = UserHome.directory,
                             environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
         FileManager.default.fileExists(atPath: OpenAgentPaths(home: home, environment: environment).openCode.path)
     }
 
-    public static func configureIfAvailable(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func configureIfAvailable(home: URL = UserHome.directory,
                                             environment: [String: String] = ProcessInfo.processInfo.environment) throws {
         guard isAvailable(home: home, environment: environment) else { return }
         try configure(enabled: true, home: home, environment: environment)
     }
 
-    public static func isInstalled(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func isInstalled(home: URL = UserHome.directory,
                                    environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
         file(OpenAgentPaths(home: home, environment: environment)).isCurrent
     }
 
-    public static func configure(enabled: Bool, home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func configure(enabled: Bool, home: URL = UserHome.directory,
                                  environment: [String: String] = ProcessInfo.processInfo.environment) throws {
         try file(OpenAgentPaths(home: home, environment: environment)).configure(enabled: enabled)
     }
 
     /// Whether the plugin is in place, for OpenCode's settings.
-    public static func fileState(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func fileState(home: URL = UserHome.directory,
                                  environment: [String: String] = ProcessInfo.processInfo.environment) -> ClientObserverFile {
         file(OpenAgentPaths(home: home, environment: environment)).state
     }

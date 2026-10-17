@@ -3,8 +3,13 @@ import Foundation
 /// Application-owned caches and local usage history.
 public enum AppSupport {
     public static var directory: URL {
+        #if os(Windows)
+        // `%APPDATA%\Agent HUD Open` (docs/windows.md#storage).
+        let base = WindowsFolders.roamingAppData
+        #else
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+            ?? UserHome.directory.appendingPathComponent("Library/Application Support")
+        #endif
         return base.appendingPathComponent(directoryName(of: .main), isDirectory: true)
     }
 

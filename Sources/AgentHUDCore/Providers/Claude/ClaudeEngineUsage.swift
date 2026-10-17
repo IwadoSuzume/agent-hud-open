@@ -87,7 +87,7 @@ public struct ClaudeEngineUsageClient: Sendable {
 
     private func environment() -> [String: String] {
         var environment = ProcessInfo.processInfo.environment
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let home = UserHome.directory.path
         environment["PATH"] = "\(home)/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
         environment["CLAUDE_CODE_ENTRYPOINT"] = "agent-hud"
         return environment

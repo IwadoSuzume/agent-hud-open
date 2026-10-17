@@ -3,7 +3,9 @@ import CryptoKit
 #else
 import AgentHUDSupport
 #endif
+#if canImport(Darwin)
 import Darwin
+#endif
 import Foundation
 
 /// Reads the running daemon's thread-owned TUI MCP endpoint. Codex 0.160 publishes it through
@@ -13,6 +15,10 @@ public enum CodexDaemonOriginTransport {
                                       timeout: TimeInterval = 3) async -> [String: URL] {
         let ids = threadIDs.filter { UUID(uuidString: $0) != nil }
         guard !ids.isEmpty, timeout.isFinite, timeout > 0 else { return [:] }
+        #if os(Windows)
+        // The daemon's control socket is not read on Windows (docs/windows-port/SUPPORT_MATRIX.md, "Session jump").
+        return [:]
+        #else
         return await Task.detached(priority: .utility) { () -> [String: URL] in
             let path = dataDirectory.appendingPathComponent("app-server-control/app-server-control.sock").path
             guard let socket = try? DaemonOriginSocket(path: path, timeout: timeout) else { return [:] }
@@ -42,6 +48,7 @@ public enum CodexDaemonOriginTransport {
             } catch { }
             return origins
         }.value
+        #endif
     }
 
     public static func tuiHTTPOrigin(threadID: String, dataDirectory: URL = CodexLocator.dataDirectory,
@@ -60,6 +67,7 @@ public enum CodexDaemonOriginTransport {
     }
 }
 
+#if !os(Windows)
 /// The daemon control socket carries RFC 6455 frames, rather than the stdio client's JSON lines.
 private final class DaemonOriginSocket {
     private let descriptor: Int32
@@ -227,3 +235,4 @@ private final class DaemonOriginSocket {
 
     private enum Failure: Error { case unavailable, protocolError, timeout }
 }
+#endif

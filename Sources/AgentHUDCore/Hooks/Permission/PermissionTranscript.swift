@@ -60,7 +60,11 @@ final class PermissionTranscriptWatch: @unchecked Sendable {
 
     private let queue = DispatchQueue(label: "app.agenthud.permission.transcript")
     private let handle: FileHandle
+    #if os(Windows)
+    private let source: DispatchSourceTimer
+    #else
     private let source: DispatchSourceFileSystemObject
+    #endif
     private var transcript: PermissionTranscript
     private var partial = Data()
     private var done = false
@@ -74,8 +78,15 @@ final class PermissionTranscriptWatch: @unchecked Sendable {
         self.handle = handle
         self.settled = settled
         transcript = PermissionTranscript(tool: tool, input: payload["tool_input"])
+        #if os(Windows)
+        // Windows has no file events for an open handle: the record is read again every quarter second, which reads
+        // only what was appended since.
+        source = DispatchSource.makeTimerSource(queue: queue)
+        source.schedule(deadline: .now() + 0.25, repeating: 0.25)
+        #else
         source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: handle.fileDescriptor,
                                                            eventMask: [.extend, .write], queue: queue)
+        #endif
 
         // The line a read from inside it cuts is older than any call worth finding. Results already in the record belong
         // to earlier calls, so they settle nothing here.

@@ -133,7 +133,7 @@ public struct LiveSession: Hashable, Codable, Sendable, Identifiable {
     /// The working directory with the home folder written as `~`, or the project's name where only that is known.
     public var displayPath: String? {
         guard let workingDirectory else { return terminal }
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let home = UserHome.directory.path
         if workingDirectory == home { return "~" }
         return workingDirectory.hasPrefix(home + "/") ? "~" + workingDirectory.dropFirst(home.count) : workingDirectory
     }

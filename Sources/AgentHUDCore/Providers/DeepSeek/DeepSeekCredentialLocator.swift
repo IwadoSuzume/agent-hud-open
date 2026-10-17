@@ -11,7 +11,7 @@ enum DeepSeekCredentialLocator {
 
     /// A CLI install's package, run by Node or else by the desktop app; otherwise the desktop app's own, which sits in
     /// its `app.asar` with every other package its runtime ships, side by side, and loads only in its Electron.
-    static func locate(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    static func locate(home: URL = UserHome.directory,
                        path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
                        applications: [URL] = DeepSeekScriptRuntime.applicationFolders) -> Harness {
         let desktop = DeepSeekScriptRuntime.desktopApplication(in: applications)
@@ -25,7 +25,7 @@ enum DeepSeekCredentialLocator {
         return Harness(module: nil, runtime: DeepSeekScriptRuntime.node(path: path))
     }
 
-    static func module(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL? {
+    static func module(home: URL = UserHome.directory) -> URL? {
         var roots = ["/opt/homebrew/lib/node_modules", "/usr/local/lib/node_modules"].map { URL(fileURLWithPath: $0) }
         roots.append(home.appendingPathComponent(".bun/install/global/node_modules"))
         let cache = home.appendingPathComponent(".npm/_npx")

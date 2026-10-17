@@ -13,7 +13,17 @@ final class ReadOnlySQLite {
 
     init(_ url: URL) throws {
         let path = url.path
+        #if os(Windows)
+        // Windows' winsqlite3 makes the -wal and -shm files of a WAL database whose writer removed them, where the
+        // macOS SQLite refuses to: such a database is read as immutable from the start, so that reading never writes
+        // into a client's folder (docs/windows-port/PORTING_PLAN.md §8.1).
+        guard WindowsSQLite.isSupported else { throw ProviderFailure.local }
+        var opened = WindowsSQLite.isWALWithoutItsFiles(path) ? (handle: nil, result: SQLITE_CANTOPEN)
+            : Self.begin(path, flags: SQLITE_OPEN_READONLY)
+        var immutable: (path: String, signature: [Int])?
+        #else
         var opened = Self.begin(path, flags: SQLITE_OPEN_READONLY), immutable: (path: String, signature: [Int])?
+        #endif
         if opened.result == SQLITE_CANTOPEN, let signature = Self.signature(path),
            !["-wal", "-journal"].contains(where: { FileManager.default.fileExists(atPath: path + $0) }) {
             opened = Self.begin(URL(fileURLWithPath: path).absoluteString + "?immutable=1", flags: SQLITE_OPEN_READONLY | SQLITE_OPEN_URI)
@@ -47,9 +57,13 @@ final class ReadOnlySQLite {
 
     /// Device, inode, size and modification time, which any write to the file or its replacement changes.
     private static func signature(_ path: String) -> [Int]? {
+        #if os(Windows)
+        return WindowsFiles.signature(path)
+        #else
         var info = stat()
         guard stat(path, &info) == 0 else { return nil }
         return [Int(info.st_dev), Int(truncatingIfNeeded: info.st_ino), Int(info.st_size), info.st_mtimespec.tv_sec, info.st_mtimespec.tv_nsec]
+        #endif
     }
 
     deinit {

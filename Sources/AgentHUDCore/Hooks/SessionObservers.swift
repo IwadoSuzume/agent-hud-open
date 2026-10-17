@@ -6,7 +6,7 @@ public enum SessionObservers {
     /// or, with `enabled` false, takes them all out, whichever copy of Agent HUD wrote them. Every other entry in the
     /// clients' files is left alone.
     public static func configure(executable: URL, enabled: Bool,
-                                 home: URL = FileManager.default.homeDirectoryForCurrentUser) {
+                                 home: URL = UserHome.directory) {
         if enabled { installObservers(home: home) } else {
             do { try PiSessionObserver.configure(enabled: false, home: home) }
             catch { NSLog("[AgentHUD] Pi observer setup failed: %@", error.localizedDescription) }
@@ -43,7 +43,7 @@ public enum SessionObservers {
     /// The vendors whose observer lives in the client's own directory — Pi's extension, OpenCode's plugin — where that
     /// directory exists. It appears the first time the client runs, so a directory new since the last look is a client
     /// run for the first time while the host was open.
-    public static func observedClients(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Set<String> {
+    public static func observedClients(home: URL = UserHome.directory) -> Set<String> {
         var vendors: Set<String> = []
         if PiSessionObserver.isAvailable(home: home) { vendors.insert("Pi") }
         if OpenCodeSessionObserver.isAvailable(home: home) { vendors.insert("OpenCode") }
@@ -51,7 +51,7 @@ public enum SessionObservers {
     }
 
     /// Adds the observer of every client whose directory exists, as start-up does with client hooks on.
-    public static func installObservers(home: URL = FileManager.default.homeDirectoryForCurrentUser) {
+    public static func installObservers(home: URL = UserHome.directory) {
         do { try PiSessionObserver.configureIfAvailable(home: home) }
         catch { NSLog("[AgentHUD] Pi observer setup failed: %@", error.localizedDescription) }
         do { try OpenCodeSessionObserver.configureIfAvailable(home: home) }

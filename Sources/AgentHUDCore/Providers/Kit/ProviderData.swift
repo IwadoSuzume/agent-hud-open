@@ -43,7 +43,7 @@ public enum AdditionalSource: String, CaseIterable, Sendable {
         }
     }
 
-    public func isInstalled(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
+    public func isInstalled(home: URL = UserHome.directory) -> Bool {
         let paths: [String]
         switch self {
         case .cursor: paths = ["Library/Application Support/Cursor/User/globalStorage/state.vscdb", "Applications/Cursor.app"]

@@ -10,7 +10,7 @@ public enum OpenAgentSource: String, CaseIterable, Sendable {
         self == .glm ? L10n.text("国内 / 国际 Coding Plan，按计费池去重", "China / Global Coding Plan, grouped by billing pool")
             : L10n.text("本地会话与用量；共享供应商额度只计一次", "Local sessions and usage; shared provider quota counted once")
     }
-    public func isInstalled(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public func isInstalled(home: URL = UserHome.directory,
                             environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
         if self == .glm { return OpenAgentCredentials.discover(home: home, environment: environment).contains { $0.pool.provider == "GLM" } }
         return OpenAgentPaths(home: home, environment: environment).roots(for: self).contains { FileManager.default.fileExists(atPath: $0.path) }

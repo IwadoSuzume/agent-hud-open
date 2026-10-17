@@ -23,7 +23,7 @@ public actor ClaudeTranscriptStore {
 
     /// Claude Code writes to `~/.claude/projects`; newer builds may use the XDG config directory instead.
     public static var defaultRoots: [URL] {
-        let home = FileManager.default.homeDirectoryForCurrentUser
+        let home = UserHome.directory
         return [
             home.appendingPathComponent(".claude/projects", isDirectory: true),
             home.appendingPathComponent(".config/claude/projects", isDirectory: true),

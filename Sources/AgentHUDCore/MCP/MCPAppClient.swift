@@ -1,4 +1,6 @@
+#if canImport(Darwin)
 import Darwin
+#endif
 import Foundation
 
 /// The `--mcp` process's side of the channel to the running application: one connection per tool call, which sends
@@ -39,6 +41,7 @@ enum MCPAppClient {
         return AppSupport.directoryName(of: bundle) == dataDirectoryName
     }
 
+    #if !os(Windows)
     static func call(_ request: MCPToolRequest, socket path: String, timeout: TimeInterval = timeout) -> Answer {
         guard let descriptor = UnixSocket.connect(to: path) else { return .notRunning }
         defer { close(descriptor) }
@@ -79,4 +82,5 @@ enum MCPAppClient {
             guard reply.count <= replyLimit else { return nil }
         }
     }
+    #endif
 }

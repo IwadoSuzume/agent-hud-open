@@ -173,6 +173,7 @@ struct AntigravityClient: Sendable {
     }
 }
 
+#if !os(Windows)
 /// Runs only fixed system inspection tools. Output (including CSRF tokens) stays in memory and is never logged.
 enum ProviderCommand {
     static func run(_ executable: String, _ arguments: [String]) async throws -> String {
@@ -182,3 +183,4 @@ enum ProviderCommand {
         return String(decoding: output.stdout, as: UTF8.self)
     }
 }
+#endif

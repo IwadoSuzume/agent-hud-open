@@ -8,8 +8,8 @@ public enum ClientHome {
 
     /// Empty for the client's default directory, otherwise a hash of the resolved path.
     public static func key(_ directory: URL, defaultDirectory: URL) -> String {
-        let path = directory.standardizedFileURL.resolvingSymlinksInPath().path
-        return path == defaultDirectory.standardizedFileURL.resolvingSymlinksInPath().path ? "" : RecordCoding.hash([path])
+        let path = PathCase.folded(directory.standardizedFileURL.resolvingSymlinksInPath().path)
+        return path == PathCase.folded(defaultDirectory.standardizedFileURL.resolvingSymlinksInPath().path) ? "" : RecordCoding.hash([path])
     }
 
     /// The directory `variable` moves a client's files to, without the whitespace around it; nil when the variable is

@@ -80,7 +80,7 @@ enum OpenAgentCredentials {
               let expiry = json["exp"].numberValue else { return nil }
         return Date(timeIntervalSince1970: expiry)
     }
-    static func discover(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    static func discover(home: URL = UserHome.directory,
                          environment env: [String: String] = ProcessInfo.processInfo.environment,
                          now: Date = Date()) -> [OpenAgentCredential] {
         let paths = OpenAgentPaths(home: home, environment: env)

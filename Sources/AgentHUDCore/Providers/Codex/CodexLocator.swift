@@ -2,7 +2,7 @@ import Foundation
 
 public enum CodexLocator {
     public static var dataDirectory: URL {
-        dataDirectory(home: FileManager.default.homeDirectoryForCurrentUser)
+        dataDirectory(home: UserHome.directory)
     }
 
     static func dataDirectory(home: URL, environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
@@ -14,7 +14,7 @@ public enum CodexLocator {
 
     /// Prefer the self-contained Desktop engine; GUI PATH often cannot run npm's node shim. The app is looked for under
     /// its known names, then wherever Launch Services has it under its bundle ID, whatever it is called now.
-    public static func candidates(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func candidates(home: URL = UserHome.directory,
                                   applications: URL = URL(fileURLWithPath: "/Applications"),
                                   path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
                                   registered: [URL] = VendorCatalog.applications("Codex")) -> [URL] {
@@ -22,7 +22,7 @@ public enum CodexLocator {
     }
 
     /// The same order as `candidates`, asking Launch Services only when no app sits under a known name.
-    public static func find(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func find(home: URL = UserHome.directory,
                             applications: URL = URL(fileURLWithPath: "/Applications"),
                             path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
                             registered: @autoclosure () -> [URL] = VendorCatalog.applications("Codex")) -> URL? {

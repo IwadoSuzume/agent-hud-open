@@ -3,7 +3,7 @@ import Foundation
 /// SHA-256 (FIPS 180-4) without CryptoKit, for platforms that have none. Record ids must be identical on every machine,
 /// so the macOS tests compare it with CryptoKit byte for byte and both platforms check the NIST vectors
 /// (docs/windows-port/adr/ADR-004-sha256.md).
-public enum PortableSHA256 {
+package enum PortableSHA256 {
     private static let k: [UInt32] = [
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
         0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
@@ -16,7 +16,7 @@ public enum PortableSHA256 {
     ]
 
     /// The 32-byte digest of `data`.
-    public static func digest<D: DataProtocol>(_ data: D) -> [UInt8] {
+    package static func digest<D: DataProtocol>(_ data: D) -> [UInt8] {
         var h: [UInt32] = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]
         var w = [UInt32](repeating: 0, count: 64)
         PortableDigestBlocks.forEachBlock(of: data) { block in
@@ -45,9 +45,9 @@ public enum PortableSHA256 {
 
 /// SHA-1 (FIPS 180-4) without CryptoKit, only for protocols that require it, such as a WebSocket handshake's
 /// `Sec-WebSocket-Accept` (RFC 6455). Never used for identities.
-public enum PortableSHA1 {
+package enum PortableSHA1 {
     /// The 20-byte digest of `data`.
-    public static func digest<D: DataProtocol>(_ data: D) -> [UInt8] {
+    package static func digest<D: DataProtocol>(_ data: D) -> [UInt8] {
         var h: [UInt32] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0]
         var w = [UInt32](repeating: 0, count: 80)
         PortableDigestBlocks.forEachBlock(of: data) { block in

@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(Security)
 import Security
+#endif
 
 // Credential order and request headers follow Tokscale usage/copilot.rs (MIT); quota fields are informed by CodexBar CopilotUsageFetcher (MIT).
 struct CopilotClient: Sendable {
@@ -108,7 +110,7 @@ struct CopilotClient: Sendable {
 /// The GitHub CLI sign-in, read in memory only.
 struct CopilotCredentials: Sendable {
     var environment = ProcessInfo.processInfo.environment
-    var home = FileManager.default.homeDirectoryForCurrentUser
+    var home = UserHome.directory
     var keychain: @Sendable (String) -> String? = { CopilotCredentials.genericPassword(service: $0) }
     var file: @Sendable (URL) -> String? = { url in
         guard (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0 <= 1024 * 1024 else { return nil }
@@ -154,6 +156,7 @@ struct CopilotCredentials: Sendable {
         return trimmed?.isEmpty == false ? trimmed : nil
     }
 
+    #if !os(Windows)
     static func genericPassword(service: String) -> String? {
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
                                     kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
@@ -161,4 +164,5 @@ struct CopilotCredentials: Sendable {
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
         return String(data: data, encoding: .utf8)
     }
+    #endif
 }

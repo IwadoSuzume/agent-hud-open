@@ -358,7 +358,11 @@ final class UsageCollector {
                 let resolved = String(cString: real)
                 return path == resolved ? [path] : [path, resolved]
             }
-            if paths.contains(where: { path in prefixes.contains { path == $0 || path.hasPrefix($0 + "/") } }) {
+            let folded = prefixes.map(PathCase.folded)
+            if paths.contains(where: { path in
+                let path = PathCase.folded(path)
+                return folded.contains { path == $0 || path.hasPrefix($0 + "/") }
+            }) {
                 owners.insert(source.name)
             }
         }

@@ -1,4 +1,6 @@
+#if canImport(Darwin)
 import Darwin
+#endif
 import Foundation
 
 /// A daemon thread's `codex_tui` MCP endpoint belongs to its terminal frontend, even when the daemon's own environment
@@ -65,6 +67,7 @@ public enum CodexTerminalOrigins {
         return result
     }
 
+    #if !os(Windows)
     private static func listenerTargets(ports: Set<UInt16>) -> [UInt16: SessionNavigationTarget] {
         let uid = getuid()
         let bytes = proc_listpids(UInt32(PROC_UID_ONLY), uid, nil, 0)
@@ -129,4 +132,5 @@ public enum CodexTerminalOrigins {
         data.count = size
         return data
     }
+    #endif
 }

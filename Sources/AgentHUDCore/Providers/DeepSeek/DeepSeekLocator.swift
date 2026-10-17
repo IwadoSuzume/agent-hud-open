@@ -3,7 +3,7 @@ import Foundation
 public enum DeepSeekLocator {
     public static var dataDirectory: URL { dataDirectory(environment: ProcessInfo.processInfo.environment) }
 
-    public static func dataDirectory(environment: [String: String], home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+    public static func dataDirectory(environment: [String: String], home: URL = UserHome.directory) -> URL {
         guard let path = ClientHome.variable("DSH_HOME", in: environment) else {
             return home.appendingPathComponent(".dsh", isDirectory: true)
         }

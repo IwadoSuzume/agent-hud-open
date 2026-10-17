@@ -2,9 +2,9 @@ import Foundation
 
 // Protocol reference: CodexBar GrokCreditsProxyFetcher/GrokAuth (MIT), pinned in THIRD_PARTY_NOTICES.txt.
 struct GrokClient: Sendable {
-    var home = GrokSessions.directory(home: FileManager.default.homeDirectoryForCurrentUser, environment: ProcessInfo.processInfo.environment)
+    var home = GrokSessions.directory(home: UserHome.directory, environment: ProcessInfo.processInfo.environment)
     var http = ProviderHTTP()
-    var botDirectory = GrokBotSessions.roots(home: FileManager.default.homeDirectoryForCurrentUser, environment: [:])[0]
+    var botDirectory = GrokBotSessions.roots(home: UserHome.directory, environment: [:])[0]
     var clock: @Sendable () -> Date = { Date() }
     var readBot: (@Sendable () async throws -> ProviderQuota?)? = nil
     /// User-confirmed links between the Bot cache slot and the CLI account. Stored ids contain no credentials.

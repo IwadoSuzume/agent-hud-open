@@ -6,7 +6,7 @@ import Foundation
 /// `~/Library/Application Support/Claude/claude-code/<version>/<build>/claude.app`, which comes last, so a Mac with only
 /// the desktop app still has an engine and a CLI install is preferred wherever there is one.
 public enum ClaudeEngineLocator {
-    public static func candidates(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    public static func candidates(home: URL = UserHome.directory,
                                   path: String = ProcessInfo.processInfo.environment["PATH"] ?? "") -> [URL] {
         cli(home: home, path: path) + desktop(home: home)
     }
@@ -23,7 +23,7 @@ public enum ClaudeEngineLocator {
         return list + newestFirst(in: versions) + Executables.onPath("claude", path: path)
     }
 
-    public static func find(home: URL = FileManager.default.homeDirectoryForCurrentUser, fileManager: FileManager = .default,
+    public static func find(home: URL = UserHome.directory, fileManager: FileManager = .default,
                             path: String = ProcessInfo.processInfo.environment["PATH"] ?? "") -> URL? {
         Executables.first(candidates(home: home, path: path), fileManager: fileManager)
     }

@@ -224,7 +224,7 @@ public enum DemoData {
 
     /// - stage: a playing script decides which sessions run and when the others ended; without one the first two run.
     public static func sessions(now: Date, stage: DemoStage? = nil) -> [LiveSession] {
-        let usage = sessionUsage(now: now), home = FileManager.default.homeDirectoryForCurrentUser.path
+        let usage = sessionUsage(now: now), home = UserHome.directory.path
         return plans.map { plan in
             let last = plan.lastActivity(now)
             var start = plan.start(now), end: Date? = plan.running ? nil : last

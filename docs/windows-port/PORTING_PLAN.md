@@ -5,7 +5,9 @@ milestone. Built from the M0 spike (`spike-m0`, commit `809e047`): every compile
 Swift 6.4.1 for Windows, the runtime differences found while doing it, and the gaps the M0 review found by grep.
 
 Status: **S** the code exists in the spike and is re-applied, with its tests, in the milestone named; **N** new work in
-that milestone; **U** compiled out on Windows, the feature reported unsupported (SUPPORT_MATRIX.md).
+that milestone; **U** compiled out on Windows, the feature reported unsupported (SUPPORT_MATRIX.md). Since M3 all
+of §1–§4 is on `windows-port`: rows marked M3 are done with their tests; rows marked M4/M5 have their code in M3
+(it is needed to compile, D-030) and get their behaviour finished and tested in that milestone.
 
 Conventions (DECISIONS.md D-006): a macOS file replaced on Windows stays untouched — not even its imports are edited —
 and is listed in `windowsReplaced` in `Package.swift`; its Windows twin with the same API is
@@ -23,6 +25,8 @@ functions only.
 | Non-ASCII repository path breaks the test DLL link | build through a per-user ASCII junction (D-007); CI paths are ASCII; `scripts/build-windows.ps1` makes the junction itself | M1, M8 N |
 | Boundary check read files in the system code page and fed CR LF to `git check-ignore` on Windows | fixed in M0 (UTF-8, bytes) | M0 ✅ |
 | Toolchain warnings (`WinSDK` `wchar_t` modularization; `strerror` deprecated in `MCPStdio`) | the warning baseline in PROGRESS.md | M1 |
+| Swift Build on Windows writes a test resource bundle's `Info.plist` into the package root | `/Info.plist` in `.gitignore` | M2 ✅ |
+| `swift test --skip` on the whole suite exceeds Windows' command-line limit | batches in `scripts/windows/test.ps1` (D-029) | M3 ✅ |
 
 ## 2. AgentHUDSupport
 

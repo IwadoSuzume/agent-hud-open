@@ -44,6 +44,12 @@ for name in sorted(set(filter(None, paths))):
     for pattern in patterns:
         if re.search(pattern, content):
             failures.append(f"{name}: prohibited source content ({pattern})")
+    # Core reads the home folder through UserHome, which honours USERPROFILE on Windows (docs/windows-port D-020).
+    if (name.startswith("Sources/AgentHUDCore/") and path.suffix == ".swift"
+            and name != "Sources/AgentHUDCore/System/UserHome.swift"
+            and not name.startswith("Sources/AgentHUDCore/Platform/Windows/")
+            and "homeDirectoryForCurrentUser" in content):
+        failures.append(f"{name}: read the home folder through UserHome.directory")
 
 # The notices the application carries are the ones the repository publishes.
 bundled = "Sources/AgentHUDDesktop/Resources/THIRD_PARTY_NOTICES.txt"

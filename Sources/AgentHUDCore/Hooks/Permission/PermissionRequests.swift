@@ -1,6 +1,9 @@
 import AgentHUDSupport
 import Foundation
+import Observation
+#if canImport(Network)
 import Network
+#endif
 
 /// A failure whose description can go into the log as it is: its case and any reason the client gave, never an answer
 /// or what a request is about.

@@ -24,8 +24,9 @@ messages = [b"", b"abc", b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopn
 websocket = b"dGhlIHNhbXBsZSBub25jZQ==258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 fixture = {
     "about": "Golden samples for RecordCoding and the portable digests (docs/windows-port/adr/ADR-004-sha256.md). "
-             "Digests were computed with Python's hashlib; the same tests check them against CryptoKit on macOS and "
-             "against the portable implementation on Windows.",
+             "Digests were computed with Python's hashlib, and equal the published examples (FIPS 180-2 appendices, "
+             "RFC 6455 section 1.3); the same tests check them against CryptoKit on macOS and against the portable "
+             "implementation on Windows.",
     "recordHashes": [{"components": c, "hash": rc_hash(c)} for c in ids],
     "sha256": [{"utf8": m.decode(), "hex": hashlib.sha256(m).hexdigest()} for m in messages]
     + [{"repeat": "a", "count": 1_000_000, "hex": hashlib.sha256(b"a" * 1_000_000).hexdigest()}],

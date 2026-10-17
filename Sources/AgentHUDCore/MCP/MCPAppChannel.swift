@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(Network)
 import Network
+#endif
 
 /// The application's side of the channel MCP tool calls arrive on: a socket named `mcp.sock` in the data directory,
 /// which the `--mcp` process a client started connects to once per call. Each request is handed to `handler` on the

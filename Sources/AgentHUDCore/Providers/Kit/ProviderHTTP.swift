@@ -1,5 +1,10 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+#if canImport(Security)
 import Security
+#endif
 
 /// Credential-bearing requests never follow redirects or use the shared cookie/cache stores.
 struct ProviderHTTP: Sendable {
@@ -19,6 +24,7 @@ struct ProviderHTTP: Sendable {
         return try ProviderJSON.read(await send(request))
     }
 
+    #if !os(Windows)
     private static func requestData(_ request: URLRequest) async throws -> Data {
         let config = URLSessionConfiguration.ephemeral
         config.httpShouldSetCookies = false
@@ -53,6 +59,7 @@ struct ProviderHTTP: Sendable {
             } else { completionHandler(.performDefaultHandling, nil) }
         }
     }
+    #endif
 }
 
 struct ProviderHTTPError: LocalizedError, Sendable {

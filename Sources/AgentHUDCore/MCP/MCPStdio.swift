@@ -1,4 +1,6 @@
+#if canImport(Darwin)
 import Darwin
+#endif
 import Foundation
 
 /// The `--mcp` command: the process an agent's client starts to reach Agent HUD's tools, and keeps for as long as it
@@ -19,8 +21,10 @@ enum MCPStdio {
 
     /// Serves standard input until it ends and returns the process's exit status.
     static func run() -> Int32 {
+        #if !os(Windows)
         // A client that went away must end the process through a failed write, not a signal.
         signal(SIGPIPE, SIG_IGN)
+        #endif
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let socket = MCPAppChannel.socketPath()
         let directoryName = AppSupport.directoryName(of: .main)
@@ -36,10 +40,17 @@ enum MCPStdio {
         var lines = MCPLineBuffer()
         var buffer = [UInt8](repeating: 0, count: 64 * 1024)
         while true {
+            #if os(Windows)
+            // The C runtime's descriptors over a client's pipes block and are never interrupted.
+            let count = Int(_read(input, &buffer, UInt32(buffer.count)))
+            #else
             let count = read(input, &buffer, buffer.count)
+            #endif
             if count < 0 {
+                #if !os(Windows)
                 if errno == EINTR { continue }
                 if errno == EAGAIN, becomesReady(input, for: POLLIN) { continue }
+                #endif
                 FileHandle.standardError.write(Data("agent-hud mcp: standard input failed: \(String(cString: strerror(errno)))\n".utf8))
                 return 1
             }
@@ -60,18 +71,24 @@ enum MCPStdio {
             bytes.append(0x0A)
             var written = 0
             while written < bytes.count {
+                #if os(Windows)
+                let count = Int(bytes.withUnsafeBytes { _write(output, $0.baseAddress! + written, UInt32(bytes.count - written)) })
+                guard count >= 0 else { return false }
+                #else
                 let count = bytes.withUnsafeBytes { Darwin.write(output, $0.baseAddress! + written, bytes.count - written) }
                 if count < 0 {
                     if errno == EINTR { continue }
                     if errno == EAGAIN, becomesReady(output, for: POLLOUT) { continue }
                     return false
                 }
+                #endif
                 written += count
             }
         }
         return true
     }
 
+    #if !os(Windows)
     /// Waits until a descriptor a client left non-blocking can be read or written again.
     private static func becomesReady(_ descriptor: Int32, for event: Int32) -> Bool {
         var waiting = pollfd(fd: descriptor, events: Int16(event), revents: 0)
@@ -82,6 +99,7 @@ enum MCPStdio {
             return false
         }
     }
+    #endif
 }
 
 /// Cuts the bytes a stream delivers into its lines, however the reads fall. A line longer than `limit` keeps its

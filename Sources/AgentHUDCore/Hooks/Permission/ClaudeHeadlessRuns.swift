@@ -16,7 +16,7 @@ import Foundation
 enum ClaudeHeadlessRuns {
     /// Whether the engine that started this hook process is such a run.
     static func current(environment: [String: String] = ProcessInfo.processInfo.environment,
-                        home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
+                        home: URL = UserHome.directory) -> Bool {
         // Attended sessions, nearly every request, need no look at the process tree.
         guard environment["CLAUDE_CODE_SESSION_ATTENDED"] == "0" else { return false }
         let executables = Set(ClaudeEngineLocator.candidates(home: home, path: environment["PATH"] ?? "")

@@ -68,8 +68,8 @@ public actor CodexUsageProvider: UsageProvider, LedgerRecording {
     public static func standard(ledger: UsageLedger, persistent: Bool = true) -> CodexUsageProvider {
         let directory = CodexLocator.dataDirectory
         let pi = PiCodexClient(directory: PiCodexClient.directory)
-        let nativeHome = ClientHome.key(directory, defaultDirectory: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex", isDirectory: true))
-        let piHome = "pi:" + ClientHome.key(pi.directory, defaultDirectory: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".pi/agent"))
+        let nativeHome = ClientHome.key(directory, defaultDirectory: UserHome.directory.appendingPathComponent(".codex", isDirectory: true))
+        let piHome = "pi:" + ClientHome.key(pi.directory, defaultDirectory: UserHome.directory.appendingPathComponent(".pi/agent"))
         let cached = persistent ? (try? Data(contentsOf: AppSupport.directory.appendingPathComponent("last-usage-report.json"))) : nil
         let initial = cached.flatMap { try? JSONDecoder().decode(UsageReport.self, from: $0) }?.accounts?["Codex"] ?? []
         try? CodexSessionOrigins.prepare()

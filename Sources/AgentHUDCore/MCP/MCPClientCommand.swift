@@ -40,7 +40,7 @@ package enum MCPClientCommand {
     /// Runs `executable` with `arguments` and says how it went; nil status when it could not start or ran out of
     /// `timeout`.
     package static func run(_ executable: URL, _ arguments: [String], timeout: TimeInterval = timeout) async -> MCPCommandResult {
-        let home = FileManager.default.homeDirectoryForCurrentUser
+        let home = UserHome.directory
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = "\(home.path)/.bun/bin:\(home.path)/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:"
             + (environment["PATH"] ?? "")

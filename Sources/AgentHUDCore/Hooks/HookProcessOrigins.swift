@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(Darwin)
 import Darwin
+#endif
 
 /// Kernel-reported callback ancestry shared by local origin hooks; process environments are never decoded.
 enum HookProcessOrigins {
@@ -10,6 +12,7 @@ enum HookProcessOrigins {
         var bundleIdentifier: String? = nil
     }
 
+    #if !os(Windows)
     static func ancestors() -> [Ancestor] {
         var pid = getppid(), seen: Set<pid_t> = [], result: [Ancestor] = []
         while pid > 1, result.count < 16, seen.insert(pid).inserted {
@@ -43,6 +46,7 @@ enum HookProcessOrigins {
         data.count = size
         return processArguments(data)
     }
+    #endif
 
     /// KERN_PROCARGS2 puts the executable, argv, then environment in one buffer. Stop after argv; never decode environment.
     static func processArguments(_ data: Data) -> [String]? {

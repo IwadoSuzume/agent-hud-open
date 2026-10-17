@@ -1,4 +1,6 @@
+#if canImport(Darwin)
 import Darwin
+#endif
 import Foundation
 
 /// The quota a running `agy` prints for `agy -p /usage`. agy's own language server answers only requests carrying a CSRF

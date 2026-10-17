@@ -1,5 +1,7 @@
 import AgentHUDSupport
+#if canImport(Darwin)
 import Darwin
+#endif
 import Foundation
 
 /// The `--permission-hook` side: a short-lived process the client starts and then waits on.
@@ -15,6 +17,11 @@ public enum PermissionHookClient {
     public static let sourceKey = "_agentHUDSource"
 
     public static func run(source: PermissionHooks.Source) {
+        #if os(Windows)
+        // Everything up to the wait is bounded: a client that forgot to close its pipe, or a pipe that will not
+        // accept, must not hold the client here. Windows raises no signal for a pipe whose reader went away.
+        let watchdog = HookWatchdog(seconds: 5)
+        #else
         // A HUD that stops reading must never raise a signal in the client's hook process.
         signal(SIGPIPE, SIG_IGN)
         signal(SIGALRM) { _ in _exit(0) }
@@ -22,6 +29,7 @@ public enum PermissionHookClient {
         // Everything up to the wait is bounded: a client that forgot to close its pipe, or a socket that will not
         // accept, must not hold the client here.
         alarm(5)
+        #endif
         let input = FileHandle.standardInput.readDataToEndOfFile()
         guard let payload = tagged(input, source: source) else { return }
         // A run with no one else to ask denies the request itself once this hook returns; holding it only stalls its script.
@@ -29,9 +37,14 @@ public enum PermissionHookClient {
         guard let socket = UnixSocket.connect(to: PermissionRequests.socketPath) else { return }
         defer { close(socket) }
         guard UnixSocket.send(socket, payload) else { return }
+        #if os(Windows)
+        // The request was one message, which the HUD reads whole.
+        watchdog.cancel()
+        #else
         // Half-close so the HUD sees the whole request and knows no more is coming.
         shutdown(socket, SHUT_WR)
         alarm(0)
+        #endif
 
         // Answered in the client's own dialog, the call shows up settled in the session record while this hook is
         // still waiting; leaving without an answer then takes the request off the HUD.

@@ -16,7 +16,7 @@ public enum CompactionHooks {
         func configuration(home: URL) -> URL { ClaudeSubscription.directory(home: home).appendingPathComponent("settings.json") }
 
         /// Whether the client is here at all. A machine without it keeps its home untouched.
-        func isInstalled(home: URL = FileManager.default.homeDirectoryForCurrentUser, fileManager: FileManager = .default) -> Bool {
+        func isInstalled(home: URL = UserHome.directory, fileManager: FileManager = .default) -> Bool {
             switch self {
             case .claude: AttentionHooks.Source.claude.isInstalled(home: home, fileManager: fileManager)
             }
@@ -109,7 +109,7 @@ public enum CompactionHooks {
 
     static func ownsCommand(_ command: String?, source: Source) -> Bool { HookCommand.runs(command, arguments: arguments(source)) }
 
-    public static func isActive(_ source: Source, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> Bool {
+    public static func isActive(_ source: Source, home: URL = UserHome.directory) -> Bool {
         guard let object = try? configuration(source, home: home) else { return false }
         return !commands(in: object, source: source).isEmpty
     }
@@ -122,7 +122,7 @@ public enum CompactionHooks {
     /// with `enabled` false takes them all out, leaving every other hook in the file alone. An unrecognized layout throws
     /// rather than being rewritten.
     public static func configure(_ source: Source, enabled: Bool, executable: URL,
-                                 home: URL = FileManager.default.homeDirectoryForCurrentUser) throws {
+                                 home: URL = UserHome.directory) throws {
         try installer(source, home: home).configure(enabled: enabled, executable: executable, updating: {
             try updating($0, source: source, command: $1)
         }, willWrite: {

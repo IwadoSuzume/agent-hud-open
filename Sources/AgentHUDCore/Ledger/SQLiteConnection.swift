@@ -43,6 +43,12 @@ final class SQLiteConnection {
 
     /// `nil` opens a private in-memory database.
     init(url: URL?) throws {
+        #if os(Windows)
+        // The ledger's queries use SQLite's JSON functions, which the system's winsqlite3 has from 3.38 on (ADR-003).
+        guard WindowsSQLite.isSupported else {
+            throw Failure(code: SQLITE_ERROR, message: "the system SQLite \(WindowsSQLite.version) predates 3.38")
+        }
+        #endif
         if let url { try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true) }
         var opened: OpaquePointer?
         let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX

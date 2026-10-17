@@ -8,7 +8,7 @@ actor AdditionalLocalStore {
     init(source: AdditionalSource, roots: [URL]? = nil) {
         self.source = source
         let layout = source.layout
-        let roots = roots ?? layout?.roots(home: FileManager.default.homeDirectoryForCurrentUser, environment: ProcessInfo.processInfo.environment) ?? []
+        let roots = roots ?? layout?.roots(home: UserHome.directory, environment: ProcessInfo.processInfo.environment) ?? []
         self.roots = roots
         files = WholeFileStore(listings: layout.map { layout in
             [.init(name: source.vendor, files: LogFiles(roots: roots, watchesChanges: false, limit: 20000, skips: { layout.skips($0) }, accepts: { layout.accepts($0) }),

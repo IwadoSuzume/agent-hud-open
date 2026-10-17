@@ -78,7 +78,7 @@ package enum MCPClient: String, CaseIterable, Sendable, Identifiable {
     /// The client's command on this Mac, at the places its installers use and then on `path`; nil when it has none.
     /// Codex's own app carries one, which comes first. Claude Code's desktop app keeps an engine of its own, which is
     /// not a command a person runs and is passed over.
-    package func executable(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    package func executable(home: URL = UserHome.directory,
                            applications: URL = URL(fileURLWithPath: "/Applications"),
                            path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
                            registered: @autoclosure () -> [URL] = VendorCatalog.applications("Codex")) -> URL? {
@@ -90,7 +90,7 @@ package enum MCPClient: String, CaseIterable, Sendable, Identifiable {
 
     /// The file the client keeps its servers in: Claude Code's `.claude.json`, beside its configuration directory
     /// where `CLAUDE_CONFIG_DIR` moves it, else in the home folder; Codex's `config.toml` in `CODEX_HOME`, else `~/.codex`.
-    package func configurationURL(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    package func configurationURL(home: URL = UserHome.directory,
                                  environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
         switch self {
         case .claudeCode:
@@ -102,7 +102,7 @@ package enum MCPClient: String, CaseIterable, Sendable, Identifiable {
 
     /// Whether the client's configuration has a server named `agent-hud`, read and never written. A file that is
     /// missing or cannot be read has none.
-    package func hasServer(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    package func hasServer(home: URL = UserHome.directory,
                           environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
         let url = configurationURL(home: home, environment: environment)
         guard let data = try? Data(contentsOf: url) else { return false }

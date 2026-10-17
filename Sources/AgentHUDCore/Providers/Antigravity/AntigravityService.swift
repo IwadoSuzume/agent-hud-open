@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(Darwin)
 import Darwin
+#endif
 
 /// Antigravity's already-running local services. Credentials stay in memory and are sent only to loopback.
 enum AntigravityService {
@@ -31,7 +33,7 @@ enum AntigravityService {
 
     /// Whether Antigravity or agy is on this Mac: one of its apps, or a folder either keeps its data in. Without one
     /// there is no service to look for, so the user's processes are not listed at all.
-    static func isPresent(home: URL = FileManager.default.homeDirectoryForCurrentUser,
+    static func isPresent(home: URL = UserHome.directory,
                           environment: [String: String] = ProcessInfo.processInfo.environment,
                           applications: URL = URL(fileURLWithPath: "/Applications", isDirectory: true)) -> Bool {
         let places = AntigravitySessions.installPaths.map { home.appendingPathComponent($0) }

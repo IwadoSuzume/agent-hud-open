@@ -79,13 +79,27 @@ private func hex(_ bytes: some Sequence<UInt8>) -> String { bytes.map { String(f
 #if canImport(CryptoKit)
 /// On macOS the portable digests are compared with CryptoKit over every padding boundary and beyond.
 @Test func portableDigestsEqualCryptoKit() {
-    var generator = SystemRandomNumberGenerator()
+    // A fixed seed, so a failing message can be made again; the failure names its length and draw.
+    var generator = SplitMix64(seed: 0x4147_454E_5448_5544)
     for length in 0...300 {
-        for _ in 0..<7 {
+        for draw in 0..<7 {
             let message = Data((0..<length).map { _ in UInt8.random(in: 0...255, using: &generator) })
-            #expect(PortableSHA256.digest(message) == Array(CryptoKit.SHA256.hash(data: message)), "SHA-256, \(length) bytes")
-            #expect(PortableSHA1.digest(message) == Array(Insecure.SHA1.hash(data: message)), "SHA-1, \(length) bytes")
+            #expect(PortableSHA256.digest(message) == Array(CryptoKit.SHA256.hash(data: message)), "SHA-256, \(length) bytes, draw \(draw)")
+            #expect(PortableSHA1.digest(message) == Array(Insecure.SHA1.hash(data: message)), "SHA-1, \(length) bytes, draw \(draw)")
         }
+    }
+}
+
+/// SplitMix64 (Steele, Lea and Flood, 2014): a small seeded generator for reproducible test input.
+private struct SplitMix64: RandomNumberGenerator {
+    var state: UInt64
+    init(seed: UInt64) { state = seed }
+    mutating func next() -> UInt64 {
+        state &+= 0x9E37_79B9_7F4A_7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
     }
 }
 #endif

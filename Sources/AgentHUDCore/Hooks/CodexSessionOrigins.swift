@@ -69,7 +69,7 @@ public enum CodexSessionOrigins {
 
     /// Add both origin callbacks beside existing Codex hooks. Only this handler's commands are updated or removed.
     public static func configure(enabled: Bool, executable: URL,
-                                 home: URL = FileManager.default.homeDirectoryForCurrentUser,
+                                 home: URL = UserHome.directory,
                                  environment: [String: String] = ProcessInfo.processInfo.environment,
                                  directory: URL = directory) throws {
         let configuration = CodexLocator.dataDirectory(home: home, environment: environment).appendingPathComponent("hooks.json")
