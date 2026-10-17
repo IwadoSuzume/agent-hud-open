@@ -92,7 +92,8 @@ jobs:
           key: swift-build-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift') }}
 
       - name: Build (release)
-        run: swift build -c release
+        # Tried again only when Swift Build reports a file in use (DECISIONS.md D-032).
+        run: scripts/windows/build.ps1 -c release
 
       - name: Test
         # In a temporary profile, with the registered skips (scripts/windows/skipped-tests.txt, SKIPPED_TESTS.md).

@@ -56,29 +56,21 @@ try {
     $ErrorActionPreference = 'Continue'
     if ($Log) { Set-Content -LiteralPath $Log -Value '' -Encoding utf8 }
     # Runs swift with the arguments, writing its output to the console and the log; its exit status is left in
-    # $script:code (a function's return value would collect the output too), and $script:busy says whether it reported
-    # a file another process held.
+    # $script:code (a function's return value would collect the output too).
     function Invoke-Swift([string[]] $arguments) {
-        $script:busy = $false
         & swift @arguments 2>&1 | ForEach-Object {
             $line = "$_"
             Write-Host $line
-            if ($line -match 'being used by another process') { $script:busy = $true }
             if ($Log) { Add-Content -LiteralPath $Log -Value $line -Encoding utf8 }
         }
         $script:code = $LASTEXITCODE
     }
-    # The tests are built once, before any batch runs. Swift Build on Windows can fail to touch a test bundle whose
-    # Info.plist another of its tasks still holds open ("being used by another process", DECISIONS.md D-032): only then
-    # is the build tried again, up to three times in all, and no test runs without one.
-    $build = @('build', '--build-tests') + $(if ($ScratchPath) { @('--scratch-path', $ScratchPath) } else { @() })
-    $status = 1
-    foreach ($attempt in 1..3) {
-        Invoke-Swift $build
-        $status = $script:code
-        if ($status -eq 0 -or -not $script:busy) { break }
-        Write-Host "swift build --build-tests hit a file in use (attempt $attempt of 3)"
-    }
+    # The tests are built once, before any batch runs, by build.ps1, which tries again only when Swift Build reports a
+    # file in use (DECISIONS.md D-032); no test runs without a build.
+    $build = @('--build-tests') + $(if ($ScratchPath) { @('--scratch-path', $ScratchPath) } else { @() })
+    $buildLog = if ($Log) { @('-Log', $Log) } else { @() }
+    & (Join-Path $here 'build.ps1') @buildLog @build
+    $status = $LASTEXITCODE
     if ($status -eq 0) {
         foreach ($batch in $batches) {
             Invoke-Swift ($common + @('--skip-build') + $batch)
