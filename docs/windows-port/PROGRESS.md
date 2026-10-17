@@ -4,12 +4,12 @@ Read this first when resuming (TASK.md, top). Update after every step.
 
 ## Status
 
-- **Current milestone:** M3 — Core platform layer (in review)
+- **Current milestone:** M4 — Providers (implementation; M5 hooks started in the worktree)
 - **Branch:** `windows-port`, pushed to the fork `IwadoSuzume/agent-hud-open` (created 2026-10-16 for CI; upstream
   `jazzenchen/agent-hud-open` is never pushed to, no PR is opened).
 - **Spike branch:** `spike-m0` (commit `809e047`, local only): the full spike, Core + tests building and running on
   Windows. Milestones M1–M5 re-apply it in reviewed steps; do not merge it.
-- **Last approved tag:** `port-M2-approved` (`887c949`); earlier `port-M1-approved` (`ffc8dba`), `port-M0-approved` (`990426e`)
+- **Last approved tag:** `port-M3-approved` (`da470d9`); earlier `port-M2-approved` (`887c949`), `port-M1-approved` (`ffc8dba`), `port-M0-approved` (`990426e`)
 
 ## Milestones
 
@@ -18,7 +18,7 @@ Read this first when resuming (TASK.md, top). Update after every step.
 | M0 Reconnaissance & decisions | approved 2026-10-16 | `c258093` (upstream main) | `port-M0-approved` (`990426e`) | round 1: tests ALL_PASS (G1 run 38969577715 success, G6 pass); review CHANGES_REQUESTED (4 blocking, all doc gaps) → fixed |
 | M1 Windows CI skeleton | approved 2026-10-16 | `703ae2e` | `port-M1-approved` (`ffc8dba`) | round 1: tests ALL_PASS (Windows run 38982139136, macOS run 38982141982), review APPROVE |
 | M2 Support cross-platform | approved 2026-10-17 | `ffc8dba` | `port-M2-approved` (`887c949`) | round 1: tests ALL_PASS (Windows run 39000065894, macOS run 39000074546: 2086 XCTest + 10 swift-testing incl. `portableDigestsEqualCryptoKit`), review APPROVE |
-| M3 Core platform layer | review (round 3) | `08bbc4a` | — | round 2 (`dd38fc8`): tests FAILURES (Windows run 39005191736: the D-032 retry built on attempt 2, then 4 tests failed on the runner only — the built-in Administrator's SID written as SDDL's `LA`, the runner's 8.3 `RUNNER~1` temporary path), macOS run 39005199779 success, review CHANGES_REQUESTED (that failure only) → test helpers compare the SDDL alias and resolve the fixture's final path; test.ps1's `-Filter` batch fixed and its retry limited to a file in use; WindowsFoldersTests' warnings fixed; D-021/D-033 notes. Round 1 (`c8dca6e`): tests FAILURES (Windows run 39003222984 failed in Swift Build's bundle Touch before any test ran; D-006 broken by one line of `InstanceLock.swift`; 9 warnings over the baseline), macOS run 39003224306 success, review CHANGES_REQUESTED (the same 2 blocking) → fixed: D-032 build-first, D-006 restored and exempted, port warnings fixed and upstream-line warnings baselined (D-033), plus the review's non-blocking items (pipe acceptor logs and reports a stop, header CR/LF refused, pipe key owner checked, PlatformGapsTests) |
+| M3 Core platform layer | approved 2026-10-17 | `08bbc4a` | `port-M3-approved` (`da470d9`) | round 3 (`da470d9`): tests ALL_PASS (Windows run 39006576859: Core 1310 executed, 1301 passed, 9 skipped, 0 failed; macOS run 39006577913: 2086 XCTest + 10 swift-testing; local G2 warnings equal the baseline; D-006 holds), review APPROVE (3 non-blocking: an 8.3 short-path SessionProject case, D-032 wording, test.ps1 header — done on the M4 branch; the tester's 3 G8 doc notes fixed with the approval). Round 2 (`dd38fc8`): tests FAILURES (Windows run 39005191736: the D-032 retry built on attempt 2, then 4 tests failed on the runner only — the built-in Administrator's SID written as SDDL's `LA`, the runner's 8.3 `RUNNER~1` temporary path), macOS run 39005199779 success, review CHANGES_REQUESTED (that failure only) → test helpers compare the SDDL alias and resolve the fixture's final path; test.ps1's `-Filter` batch fixed and its retry limited to a file in use; WindowsFoldersTests' warnings fixed; D-021/D-033 notes. Round 1 (`c8dca6e`): tests FAILURES (Windows run 39003222984 failed in Swift Build's bundle Touch before any test ran; D-006 broken by one line of `InstanceLock.swift`; 9 warnings over the baseline), macOS run 39003224306 success, review CHANGES_REQUESTED (the same 2 blocking) → fixed: D-032 build-first, D-006 restored and exempted, port warnings fixed and upstream-line warnings baselined (D-033), plus the review's non-blocking items (pipe acceptor logs and reports a stop, header CR/LF refused, pipe key owner checked, PlatformGapsTests) |
 | M4 Providers | todo | | | |
 | M5 Hooks & MCP | todo | | | |
 | M6 Engine & UI protocol | todo | | | |
@@ -73,15 +73,19 @@ deprecated` in `Providers/Antigravity/AntigravityCLI.swift`; `result of call to 
 
 ## Next steps (resume here)
 
-1. M3 review round 2 on `08bbc4a...HEAD` (the round-1 fixes): port-tester and port-reviewer; a green Windows run is
-   required; then tag `port-M3-approved`.
-2. M4 (providers): SUPPORT_MATRIX research per client; D-019 executables/PATH; a scripted fake-engine executable for
-   the Claude/Codex/Antigravity/MCP-client tests; Windows locators; DeepSeek observer test server on Winsock; Copilot
-   `hostsFile` on Windows; then remove their entries from `skipped-tests.txt`.
-3. M4 work in progress in the worktree `%LOCALAPPDATA%\agenthud-dev\wt`, branch `m4-work` (from `c8dca6e`; rebase it
-   on `windows-port` once M3 is approved): `Executables` on Windows (D-019 central filter), `WindowsCodex` npm engine
-   places, the fake engine `Tests/WindowsFakeEngine` with `Tests/AgentHUDCoreTests/Support/TestEngine.swift`, the
-   provider tests converted to it, `ProviderEnginesWindowsTests`.
+1. M4 (providers) is implemented in the worktree `%LOCALAPPDATA%genthud-dev\wt`, branch `m4-work` (WIP commits
+   `46b00ad`, `3b8f0bb`, `1c7aad3` on `da470d9`): D-019 `Executables` on Windows, `WindowsCodex` npm engine places, the
+   fake engine `Tests/WindowsFakeEngine` + `TestEngine`/`TestNode` (D-034), child environments keep `SystemRoot` (D-035),
+   `PlatformSupport` (D-036), the DeepSeek observer host on Winsock, SUPPORT_MATRIX with sources. Last local G3 on it:
+   1344 passed, 1 failure since fixed (Copilot `hosts.yml` on Windows); release build warnings equal the baseline.
+   To do: squash into one M4 commit on `windows-port`, full G3, push, CI (Windows + macOS), tester, reviewer, tag.
+2. M5 (hooks & MCP) started on branch `m5-work` (from `m4-work`): per-client Windows hook forms (D-037 to write:
+   Claude Code / Qoder exec form, Copilot `exec`, Codex `%ComSpec% /C`, CodeBuddy Git Bash, Qwen `"shell":
+   "powershell"`, Cursor unsupported — sources: Claude Code *Hooks* docs, GitHub *CLI hooks reference*, Qoder *Hooks*
+   docs, openai/codex `codex-rs/hooks/src/engine/command_runner.rs` @ `ce0323f`, CodeBuddy *Hooks reference*,
+   QwenLM/qwen-code `hookRunner.ts`/`shell-utils.ts` @ `fa02030`), `HookCommand+Windows.swift`, `HookInstaller`
+   seam, `isTransient` on Windows; then ACL-keeping writes (D-023), MCP stdio and pipes, the hook engine executable,
+   end-to-end tests.
 
 ## Known issues / TODO
 
