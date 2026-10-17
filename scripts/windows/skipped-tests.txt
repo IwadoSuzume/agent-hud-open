@@ -16,6 +16,8 @@ CodexProviderTests/testClientPerformsHandshakeWithoutStartingSession
 CodexProviderTests/testLocatorFindsTheAppUnderItsBundleIDWhateverItIsCalled
 CodexProviderTests/testLocatorPrefersTheDesktopEngineWhereCurrentBuildsKeepIt
 CodexProviderTests/testLocatorWorksWithoutDesktopOrWithoutCLI
+MCPClientTests/testAClientIsFoundWhereItsCommandIsInstalled
+MCPClientTests/testACommandRunsFromTheHomeFolderAndIsStoppedWhenItTakesTooLong
 ClaudeEngineTests/testLocatorFallsBackToTheDesktopAppsEngine
 
 # Clients and desktop apps no source places on Windows (D-036, SUPPORT_MATRIX): Antigravity, ZCode, WorkBuddy, Grok Bot
@@ -42,8 +44,6 @@ DeepSeekDesktopTests/testWithoutACLIInstallTheDesktopAppSuppliesThePackageAndIts
 # Approvals (M5): swift-corelibs' URLSessionWebSocketTask ends a quiet stream on Windows; M5 gives the observer a
 # WinHTTP WebSocket.
 DeepSeekQuestionObserverTests/testCancellingIdleWebSocketClosesTheConnectionWithoutAHostFrame
-MCPClientTests/testAClientIsFoundWhereItsCommandIsInstalled
-MCPClientTests/testACommandRunsFromTheHomeFolderAndIsStoppedWhenItTakesTooLong
 
 # Hooks and MCP (M5): POSIX permission bits, macOS bundle paths in the instance lock.
 ClientHooksTests/testASettingsFileKeptAsALinkIsWrittenWhereItLeadsAndKeepsItsPermissions

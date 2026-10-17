@@ -112,7 +112,7 @@ final class ClaudeEngineTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("agenthud-engine-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let fake = dir.appendingPathComponent("claude")
-        try? TestEngine.write([.sleep(30)], to: fake)
+        _ = try? TestEngine.write([.sleep(30)], to: fake)
         let client = ClaudeEngineUsageClient(executable: fake, workingDirectory: dir, timeout: 1)
         do {
             _ = try await client.fetch()
