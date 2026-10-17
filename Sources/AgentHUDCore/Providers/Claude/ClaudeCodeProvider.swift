@@ -60,8 +60,13 @@ public struct ClaudeCodeProvider: UsageProvider, LedgerRecording {
             home: ClaudeSubscription.home,
             sessionOriginsDirectory: ClaudeSessionOrigins.directory,
             compactionsDirectory: CompactionHooks.directory,
-            desktopSessions: PlatformSupport.supportsDesktopApps ? ClaudeDesktopSessions() : nil
+            desktopSessions: standardDesktopSessions
         )
+    }
+
+    /// The desktop app's Code sessions, where this platform reads them (`PlatformSupport.supportsDesktopApps`).
+    static var standardDesktopSessions: ClaudeDesktopSessions? {
+        PlatformSupport.supportsDesktopApps ? ClaudeDesktopSessions() : nil
     }
 
     public var watchedDirectories: [URL]? {

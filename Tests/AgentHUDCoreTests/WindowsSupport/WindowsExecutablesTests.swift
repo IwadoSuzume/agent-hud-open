@@ -58,12 +58,16 @@ final class WindowsExecutablesTests: XCTestCase {
         for path in ["/opt/homebrew/bin/node", "/Applications", "/usr/local/bin/claude"] {
             XCTAssertFalse(WindowsFolders.isAbsolute(URL(fileURLWithPath: path).path), path)
         }
-        let systemRoot = try XCTUnwrap(Win32.environment("SystemRoot"))
-        let whoami = URL(fileURLWithPath: systemRoot).appendingPathComponent("System32/whoami.exe")
-        try XCTSkipUnless(FileManager.default.fileExists(atPath: whoami.path), "no whoami.exe")
-        XCTAssertNotNil(WindowsExecutables.program(whoami), "the drive-qualified spelling is a program")
-        // The same program spelled from the current drive's root, as `/Windows/System32/whoami` would be on macOS.
-        let rootRelative = String(whoami.path.drop { $0 != "/" && $0 != "\\" })
+        // A real program, and the current directory on its drive, so that its driveless spelling reaches the same file
+        // whichever drive the tests started on (the checkout is on D: in CI).
+        let folder = try directory()
+        let tool = try program("bin/tool.exe", in: folder)
+        XCTAssertNotNil(WindowsExecutables.program(tool), "the drive-qualified spelling is a program")
+        let started = FileManager.default.currentDirectoryPath
+        XCTAssertTrue(FileManager.default.changeCurrentDirectoryPath(folder.path))
+        defer { _ = FileManager.default.changeCurrentDirectoryPath(started) }
+        // The same program spelled from the current drive's root, as `/opt/homebrew/bin/node` is on macOS.
+        let rootRelative = String(tool.path.drop { $0 != "/" && $0 != "\\" })
         XCTAssertTrue(FileManager.default.fileExists(atPath: rootRelative), "the driveless spelling reaches the same file: \(rootRelative)")
         XCTAssertNil(WindowsExecutables.program(URL(fileURLWithPath: rootRelative)), rootRelative)
         XCTAssertNil(Executables.first([URL(fileURLWithPath: rootRelative), URL(fileURLWithPath: String(rootRelative.dropLast(4)))]))

@@ -95,6 +95,10 @@ deprecated` in `Providers/Antigravity/AntigravityCLI.swift`; `result of call to 
 
 ## Known issues / TODO
 
+- `FileChangeMonitorWindowsTests.testAWatchedDirectoryThatGoesAwayAsksForAFullScan` failed once in a local G3 run
+  (2026-10-17, M4 round 3) while three other builds and a tester's G3 ran on the machine; it passed 3 of 3 alone and
+  has not failed in CI. Watch for it; its `eventually` wait is the place to look.
+
 - Spike test failures to fix are listed in PORTING_PLAN.md §8.
 - An empty folder `E:\src` is left from the first junction (the tools may not remove a drive's top-level folder).
 - Non-blocking review items from M0 round 1 are folded into DECISIONS.md (D-006…D-023) and PORTING_PLAN.md rows;

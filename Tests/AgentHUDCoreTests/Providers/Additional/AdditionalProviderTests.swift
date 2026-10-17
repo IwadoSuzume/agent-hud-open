@@ -238,8 +238,14 @@ final class AdditionalProviderTests: XCTestCase, @unchecked Sendable {
         }
         let parsed = try CursorClient.parseEvents(rows, account: "a")
         let named = await CursorClient(database: url, agentFolder: agent).named(parsed, account: "a")
+        #if os(Windows)
+        // No source places the agent CLI's folder on Windows: only the editor's names are used (SUPPORT_MATRIX, D-036).
+        XCTAssertEqual(named.sessions.map(\.title), ["Cursor · acp", "Cursor · cli", "Cursor · elsewher", "Cursor · empty", "Codebase tour"],
+                       "the agent CLI's title is not read on Windows; the editor's still is")
+        #else
         XCTAssertEqual(named.sessions.map(\.title), ["Feishu round one", "Cursor · cli", "Cursor · elsewher", "Cursor · empty", "Codebase tour"],
                        "a chat still called New Agent, or run elsewhere, keeps its placeholder")
+        #endif
     }
 
     private actor Requests {

@@ -55,7 +55,7 @@ the same requests the macOS build makes, over WinHTTP: D-014), **Approvals** (pe
    for a GLM key (D-036).
 8. Cursor's agent CLI keeps its chats and ACP sessions in `~/.cursor` on macOS; no source places them on Windows, so
    session names there come from the editor's database alone.
-9. No source gives the shell Cursor runs a hook's command in on Windows (its docs name none; D-037, M5).
+9. No source gives the shell Cursor runs a hook's command in on Windows (its docs name none); M5 gives it no hook there.
 
 ## Executables (D-019)
 

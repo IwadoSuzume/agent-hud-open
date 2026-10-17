@@ -86,8 +86,50 @@ final class ProviderPathsWindowsTests: XCTestCase {
         XCTAssertFalse(CodexLocator.candidates(home: home, applications: home.appendingPathComponent("Applications"), path: "", registered: []).contains { $0.path.contains(".app") })
         XCTAssertFalse(GrokBotLocator.isInstalled(home: home))
         XCTAssertFalse(GrokLocalSessions.roots(home: home, environment: [:]).contains { $0.path.contains("Grok Bot") })
-        let watched = ClaudeCodeProvider.standard(ledger: .inMemory(), persistent: false).watchedDirectories ?? []
-        XCTAssertFalse(watched.contains { $0.path.contains("Library/Application Support/Claude") }, "the desktop app's Code sessions are not watched")
+        XCTAssertNil(ClaudeCodeProvider.standardDesktopSessions, "the desktop app's Code sessions are neither read nor watched")
+    }
+
+    /// GrokBotQuotaTests' and GrokBotRoutineRunsTests' cases on Windows: a Grok Bot cache with a quota and a roster is
+    /// there, and none of it is used.
+    func testGrokBotsCacheIsNeverAskedOnWindows() async throws {
+        let fixture = try GrokBotCacheFixture()
+        addTeardownBlock { try? FileManager.default.removeItem(at: fixture.directory) }
+        let usage: [String: Any] = ["percentUsed": 0.5, "nextResetMs": fixture.milliseconds(3600), "isSandTrial": false,
+                                    "hasNonZeroIncludedLimit": true, "isTeamSeat": false, "onDemand": NSNull(), "grokPlanLabel": "SuperGrok"]
+        try fixture.write(["kind": "present", "selectedTeamId": NSNull(), "expiresAtMs": fixture.milliseconds(23 * 3600),
+                           "reading": ["readAtMs": fixture.milliseconds(-3600), "usage": usage]],
+                          key: GrokBotCache.quotaKey(account: fixture.account), schema: 2)
+        _ = try fixture.writeRoster()
+        XCTAssertNotNil(try GrokBotQuota.read(in: fixture.directory, now: fixture.now), "the fixture is a quota macOS reads")
+
+        // The CLI is not signed in: on macOS the Bot's cached quota answers; here the CLI's failure stands.
+        let cli = try directory()
+        do {
+            let quota = try await GrokClient(home: cli, botDirectory: fixture.directory).fetch()
+            XCTAssertNotEqual(quota.client, "Grok Bot")
+        } catch {}
+
+        final class Calls: @unchecked Sendable { var count = 0 }
+        let calls = Calls()
+        let runs = GrokBotRoutineRuns(directory: fixture.directory, clock: { fixture.now })
+        await runs.refresh(billed: ["cursor-account:billing:fixture-agent", "cursor-account:billing:sand-subagent-run-a"]) { _ in
+            calls.count += 1
+            return .object([:])
+        }
+        XCTAssertEqual(calls.count, 0, "no routine run is asked about")
+    }
+
+    /// Places used on macOS that no source gives on Windows: Kimi's older folder, Bun's global folder.
+    func testUnsourcedFoldersAreNotRead() throws {
+        let home = try directory()
+        let kimi = OpenAgentPaths(home: home, environment: [:]).roots(for: .kimi).map(\.path)
+        XCTAssertFalse(kimi.contains { $0.contains(".kimi/sessions") && !$0.contains(".kimi-code") }, "\(kimi)")
+        XCTAssertTrue(kimi.contains { $0.contains(".kimi-code") })
+
+        let planted = home.appendingPathComponent(".bun/install/global/node_modules").appendingPathComponent(DeepSeekCredentialLocator.package)
+        try FileManager.default.createDirectory(at: planted.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("module.exports = {}".utf8).write(to: planted)
+        XCTAssertNil(DeepSeekCredentialLocator.module(home: home), "a module under Bun's folder is never loaded")
     }
 
     func testCursorIsReadFromItsRoamingFolder() {
