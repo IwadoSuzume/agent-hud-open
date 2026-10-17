@@ -20,8 +20,8 @@ MCPClientTests/testAClientIsFoundWhereItsCommandIsInstalled
 MCPClientTests/testACommandRunsFromTheHomeFolderAndIsStoppedWhenItTakesTooLong
 ClaudeEngineTests/testLocatorFallsBackToTheDesktopAppsEngine
 
-# Clients and desktop apps no source places on Windows (D-036, SUPPORT_MATRIX): Antigravity, ZCode, WorkBuddy, Grok Bot
-# and Cursor's agent CLI folder are never read there; ProviderPathsWindowsTests checks that they are absent.
+# Clients and desktop apps no source places on Windows (D-036, SUPPORT_MATRIX): Antigravity, ZCode and Grok Bot are never
+# read there; ProviderPathsWindowsTests checks that they are absent.
 AdditionalProviderTests/testAntigravityDirectoryScanExcludesSummariesAndKeepsConversationLayouts
 GrokBotQuotaTests/testFailedCLIUsesBotCacheAndUnlinkedCLIKeepsItsAccount
 GrokBotRoutineRunsTests/testRunsSurviveARelaunchAndLeaveWithTheLedgerRetention

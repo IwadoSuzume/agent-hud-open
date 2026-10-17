@@ -65,7 +65,7 @@ final class WindowsExecutablesTests: XCTestCase {
         XCTAssertNotNil(WindowsExecutables.program(tool), "the drive-qualified spelling is a program")
         let started = FileManager.default.currentDirectoryPath
         XCTAssertTrue(FileManager.default.changeCurrentDirectoryPath(folder.path))
-        defer { _ = FileManager.default.changeCurrentDirectoryPath(started) }
+        defer { XCTAssertTrue(FileManager.default.changeCurrentDirectoryPath(started), "the current directory is restored") }
         // The same program spelled from the current drive's root, as `/opt/homebrew/bin/node` is on macOS.
         let rootRelative = String(tool.path.drop { $0 != "/" && $0 != "\\" })
         XCTAssertTrue(FileManager.default.fileExists(atPath: rootRelative), "the driveless spelling reaches the same file: \(rootRelative)")

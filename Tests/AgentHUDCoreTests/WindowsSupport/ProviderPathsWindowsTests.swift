@@ -104,13 +104,18 @@ final class ProviderPathsWindowsTests: XCTestCase {
 
         // The CLI is not signed in: on macOS the Bot's cached quota answers; here the CLI's failure stands.
         let cli = try directory()
+        var client = GrokClient(home: cli, botDirectory: fixture.directory)
+        client.clock = { fixture.now }
         do {
-            let quota = try await GrokClient(home: cli, botDirectory: fixture.directory).fetch()
-            XCTAssertNotEqual(quota.client, "Grok Bot")
-        } catch {}
+            let quota = try await client.fetch()
+            XCTFail("the Bot's cache answered for the CLI: \(quota.client)")
+        } catch {
+            XCTAssertEqual(error as? UsageProviderError, ProviderFailure.login("Grok CLI"), "the CLI's own failure stands")
+        }
 
         final class Calls: @unchecked Sendable { var count = 0 }
         let calls = Calls()
+        XCTAssertEqual(GrokBotSessions.agentIDs(in: fixture.directory), [fixture.agent], "the roster is there to be seen")
         let runs = GrokBotRoutineRuns(directory: fixture.directory, clock: { fixture.now })
         await runs.refresh(billed: ["cursor-account:billing:fixture-agent", "cursor-account:billing:sand-subagent-run-a"]) { _ in
             calls.count += 1
