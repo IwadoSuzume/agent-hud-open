@@ -18,7 +18,7 @@ Read this first when resuming (TASK.md, top). Update after every step.
 | M0 Reconnaissance & decisions | approved 2026-10-16 | `c258093` (upstream main) | `port-M0-approved` (`990426e`) | round 1: tests ALL_PASS (G1 run 38969577715 success, G6 pass); review CHANGES_REQUESTED (4 blocking, all doc gaps) → fixed |
 | M1 Windows CI skeleton | approved 2026-10-16 | `703ae2e` | `port-M1-approved` (`ffc8dba`) | round 1: tests ALL_PASS (Windows run 38982139136, macOS run 38982141982), review APPROVE |
 | M2 Support cross-platform | approved 2026-10-17 | `ffc8dba` | `port-M2-approved` (`887c949`) | round 1: tests ALL_PASS (Windows run 39000065894, macOS run 39000074546: 2086 XCTest + 10 swift-testing incl. `portableDigestsEqualCryptoKit`), review APPROVE |
-| M3 Core platform layer | review | `08bbc4a` | — | Core and its tests on Windows: 1294 pass, 9 runtime skips, 36 listed skips, 10 excluded files, 0 failures |
+| M3 Core platform layer | review (round 2) | `08bbc4a` | — | round 1 (`c8dca6e`): tests FAILURES (Windows run 39003222984 failed in Swift Build's bundle Touch before any test ran; D-006 broken by one line of `InstanceLock.swift`; 9 warnings over the baseline), macOS run 39003224306 success, review CHANGES_REQUESTED (the same 2 blocking) → fixed: D-032 build-first, D-006 restored and exempted, port warnings fixed and upstream-line warnings baselined (D-033), plus the review's non-blocking items (pipe acceptor logs and reports a stop, header CR/LF refused, pipe key owner checked, PlatformGapsTests) |
 | M4 Providers | todo | | | |
 | M5 Hooks & MCP | todo | | | |
 | M6 Engine & UI protocol | todo | | | |
@@ -64,18 +64,24 @@ PowerShell's `*>` holds everything until the process exits too.
 | G6 boundaries | `python scripts\check-source-boundaries.py` | every milestone |
 
 Warning baseline (Swift 6.4.1 toolchain and SDK, not the port's): `WinSDK.swiftmodule … reference to type 'wchar_t'
-broken by a context change` (repeated per compile job); `'strerror' is deprecated` in `MCP/MCPStdio.swift` (shared
-code, Windows CRT only).
+broken by a context change` (repeated per compile job). Upstream lines the port did not change, Windows only
+(D-033): `'strerror' is deprecated` in `MCP/MCPStdio.swift`; `'close' is deprecated` in
+`Hooks/Permission/PermissionHookClient.swift` and `Providers/Kit/Zstandard/ZstandardReader.swift`; `'init(cString:)' is
+deprecated` in `Providers/Antigravity/AntigravityCLI.swift`; `result of call to 'wait(until:)' is unused` in
+`Providers/Codex/CodexDesktopStream.swift`; `no 'async' operations occur within 'await' expression` in
+`Hooks/Permission/DeepSeekQuestions.swift`. Anything else is a new warning.
 
 ## Next steps (resume here)
 
-1. M3 review round 1: port-tester (G1, G2 incl. the Windows workflow's Core build and test, G3 through
-   `scripts/windows/test.ps1`, G4, G6, G8) and port-reviewer on `08bbc4a...HEAD`; then tag `port-M3-approved`.
+1. M3 review round 2 on `08bbc4a...HEAD` (the round-1 fixes): port-tester and port-reviewer; a green Windows run is
+   required; then tag `port-M3-approved`.
 2. M4 (providers): SUPPORT_MATRIX research per client; D-019 executables/PATH; a scripted fake-engine executable for
    the Claude/Codex/Antigravity/MCP-client tests; Windows locators; DeepSeek observer test server on Winsock; Copilot
    `hostsFile` on Windows; then remove their entries from `skipped-tests.txt`.
-3. The spike worktree `%LOCALAPPDATA%\agenthud-dev\wt` (branch `spike-m0`) is no longer needed for Core: M3 put its
-   state on `windows-port`. New work happens on `windows-port` through the junction `%LOCALAPPDATA%\agenthud-dev\src`.
+3. M4 work in progress in the worktree `%LOCALAPPDATA%\agenthud-dev\wt`, branch `m4-work` (from `c8dca6e`; rebase it
+   on `windows-port` once M3 is approved): `Executables` on Windows (D-019 central filter), `WindowsCodex` npm engine
+   places, the fake engine `Tests/WindowsFakeEngine` with `Tests/AgentHUDCoreTests/Support/TestEngine.swift`, the
+   provider tests converted to it, `ProviderEnginesWindowsTests`.
 
 ## Known issues / TODO
 

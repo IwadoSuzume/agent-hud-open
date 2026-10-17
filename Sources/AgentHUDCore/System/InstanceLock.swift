@@ -21,7 +21,7 @@ public final class InstanceLock: Sendable {
     /// meet there.
     public static var sharedURL: URL {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? UserHome.directory.appendingPathComponent("Library/Caches", isDirectory: true)
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Caches", isDirectory: true)
         return caches.appendingPathComponent("app.agenthud", isDirectory: true).appendingPathComponent("instance.lock")
     }
 

@@ -36,6 +36,39 @@ enum Win32 {
         return userSID(ofToken: token)
     }()
 
+    /// The string form of `sid`, `S-1-5-…`.
+    static func sidString(_ sid: PSID) -> String? {
+        var text: LPWSTR?
+        guard ConvertSidToStringSidW(sid, &text), let text else { return nil }
+        defer { LocalFree(text) }
+        return string(text)
+    }
+
+    /// Whether the open file is the current user's and no one else is let in: owned by this user, with a DACL whose
+    /// every allowing entry names this user (a missing DACL lets everyone in, so it fails).
+    static func isOwnerOnly(_ handle: HANDLE) -> Bool {
+        guard let me = currentUserSID else { return false }
+        var owner: PSID?
+        var dacl: PACL?
+        var descriptor: PSECURITY_DESCRIPTOR?
+        let wanted = SECURITY_INFORMATION(OWNER_SECURITY_INFORMATION) | SECURITY_INFORMATION(DACL_SECURITY_INFORMATION)
+        guard GetSecurityInfo(handle, SE_FILE_OBJECT, wanted, &owner, nil, &dacl, nil, &descriptor) == DWORD(ERROR_SUCCESS),
+              let descriptor else { return false }
+        defer { LocalFree(descriptor) }
+        guard let owner, sidString(owner) == me, let dacl else { return false }
+        for index in 0..<DWORD(dacl.pointee.AceCount) {
+            var entry: LPVOID?
+            guard GetAce(dacl, index, &entry), let entry else { return false }
+            let type = entry.assumingMemoryBound(to: ACE_HEADER.self).pointee.AceType
+            if type == BYTE(ACCESS_DENIED_ACE_TYPE) { continue }
+            guard type == BYTE(ACCESS_ALLOWED_ACE_TYPE) else { return false }
+            // ACCESS_ALLOWED_ACE: the header, the mask, then the SID.
+            let sid = entry.advanced(by: MemoryLayout<ACE_HEADER>.size + MemoryLayout<ACCESS_MASK>.size)
+            guard sidString(sid) == me else { return false }
+        }
+        return true
+    }
+
     /// The user SID string of `token`.
     static func userSID(ofToken token: HANDLE) -> String? {
         var size: DWORD = 0

@@ -145,14 +145,14 @@ final class LogFiles {
         } else if !listed || values == nil {
             files.removeValue(forKey: path)
         }
-        return
-        #endif
+        #else
         if listed, let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey, .isRegularFileKey]),
            values.isRegularFile == true, let modified = values.contentModificationDate, let size = values.fileSize {
             add(path, File(modified: modified, size: size))
         } else if !listed || !FileManager.default.fileExists(atPath: path) {
             files.removeValue(forKey: path)
         }
+        #endif
     }
 
     private func add(_ path: String, _ file: File) {
@@ -300,11 +300,11 @@ final class LogFiles {
             // file system's own record is read instead, so a log that cannot be read is still listed, as on macOS.
             guard let values = WindowsFiles.attributes(url.path) else { gaps.unreadable += 1; return }
             if values.isRegularFile { files[url.path] = File(modified: values.modified, size: values.size) }
-            return
-            #endif
+            #else
             guard let values = try? url.resourceValues(forKeys: Set(Self.keys)), let modified = values.contentModificationDate,
                   let size = values.fileSize, values.isRegularFile != nil else { gaps.unreadable += 1; return }
             if values.isRegularFile == true { files[url.path] = File(modified: modified, size: size) }
+            #endif
         }
     }
 }

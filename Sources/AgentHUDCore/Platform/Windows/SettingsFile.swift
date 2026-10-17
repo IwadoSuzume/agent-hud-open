@@ -8,7 +8,7 @@ import Foundation
 ///
 /// Only what the stores keep is supported: data and booleans. Every way of setting or reading a value is overridden,
 /// so that nothing falls through to the CoreFoundation domain beneath; a value of another type is not stored.
-public final class SettingsFile: UserDefaults, @unchecked Sendable {
+public final class SettingsFile: UserDefaults {
     private enum Stored: Codable, Equatable {
         case data(Data)
         case bool(Bool)

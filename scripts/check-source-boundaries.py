@@ -25,6 +25,9 @@ secret_patterns = [
     r"\bAKIA[0-9A-Z]{16}\b",
 ]
 failures = []
+# Core files the Windows build replaces, as Package.swift lists them in `windowsReplaced`.
+_replaced = re.search(r"let windowsReplaced = \[(.*?)\]", (ROOT / "Package.swift").read_text(encoding="utf-8"), re.S)
+windows_replaced = {"Sources/AgentHUDCore/" + item for item in re.findall(r'"([^"]+)"', _replaced.group(1))} if _replaced else set()
 for name in sorted(set(filter(None, paths))):
     path = ROOT / name
     if not path.is_file():
@@ -45,9 +48,11 @@ for name in sorted(set(filter(None, paths))):
         if re.search(pattern, content):
             failures.append(f"{name}: prohibited source content ({pattern})")
     # Core reads the home folder through UserHome, which honours USERPROFILE on Windows (docs/windows-port D-020).
+    # The macOS files the Windows build replaces never compile there and stay as upstream wrote them (D-006).
     if (name.startswith("Sources/AgentHUDCore/") and path.suffix == ".swift"
             and name != "Sources/AgentHUDCore/System/UserHome.swift"
             and not name.startswith("Sources/AgentHUDCore/Platform/Windows/")
+            and name not in windows_replaced
             and "homeDirectoryForCurrentUser" in content):
         failures.append(f"{name}: read the home folder through UserHome.directory")
 

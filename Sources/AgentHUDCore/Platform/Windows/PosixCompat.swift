@@ -33,7 +33,7 @@ func memmem(_ haystack: UnsafeRawPointer?, _ haystackLength: Int, _ needle: Unsa
 /// paths on Windows (`C:/Users/…`); nil when it does not exist. The result is the caller's to `free`.
 func realpath(_ path: String, _ resolved: UnsafeMutablePointer<CChar>?) -> UnsafeMutablePointer<CChar>? {
     guard let final = WindowsPaths.finalPath(path) else { return nil }
-    return strdup(final)
+    return _strdup(final)
 }
 
 /// `realpath(3)` for a UTF-8 C string.

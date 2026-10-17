@@ -379,7 +379,8 @@ public final class UnixSocketListener {
         self.onRequest = onRequest
     }
 
-    public var isListening: Bool { acceptor != nil }
+    /// Whether the pipe is served: false once its accept thread has ended on an error it logged.
+    public var isListening: Bool { acceptor?.isRunning == true }
 
     /// Starts serving; false when another process serves the path or the pipe cannot be made.
     @discardableResult
@@ -390,7 +391,7 @@ public final class UnixSocketListener {
             PlatformLog.error(category, "No pipe key could be read or made beside \(path)")
             return false
         }
-        let acceptor = Acceptor(name: name, requestLimit: requestLimit) { data, connection in
+        let acceptor = Acceptor(name: name, requestLimit: requestLimit, category: category) { data, connection in
             DispatchQueue.main.async { MainActor.assumeIsolated { handler(data, connection) } }
         }
         do {
@@ -414,15 +415,24 @@ public final class UnixSocketListener {
         let name: String
         let requestLimit: Int
         let onRequest: @Sendable (Data, PipeConnection) -> Void
+        let category: String
         private let stopEvent = CreateEventW(nil, true, false, nil)!
         private let security: Win32.OwnerOnlySecurity?
+        private let running = NSLock()
+        private var runs = true
 
-        init(name: String, requestLimit: Int, onRequest: @escaping @Sendable (Data, PipeConnection) -> Void) {
+        init(name: String, requestLimit: Int, category: String, onRequest: @escaping @Sendable (Data, PipeConnection) -> Void) {
             self.name = name
             self.requestLimit = requestLimit
+            self.category = category
             self.onRequest = onRequest
             security = try? Win32.OwnerOnlySecurity()
         }
+
+        /// Whether the accept thread still keeps an instance waiting.
+        var isRunning: Bool { running.withLock { runs } }
+
+        private func ended() { running.withLock { runs = false } }
 
         deinit { CloseHandle(stopEvent) }
 
@@ -450,7 +460,9 @@ public final class UnixSocketListener {
         }
 
         private func run(_ first: HANDLE) {
+            defer { ended() }
             guard let overlapped = Overlapped() else {
+                PlatformLog.error(category, "The pipe stops serving: no event for overlapped I/O (\(GetLastError()))")
                 CloseHandle(first)
                 return
             }
@@ -474,7 +486,17 @@ public final class UnixSocketListener {
                     }
                 }
                 // The next client finds an instance waiting while this one is served.
-                instance = WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0 ? nil : try? makeInstance(first: false)
+                if WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0 {
+                    instance = nil
+                } else {
+                    do {
+                        instance = try makeInstance(first: false)
+                    } catch {
+                        // Not swallowed: the listener says it no longer listens, and the log says why.
+                        PlatformLog.error(category, "The pipe stops serving: its next instance cannot be made: \(error)")
+                        instance = nil
+                    }
+                }
                 if isConnected {
                     let connection = PipeConnection(handle: handle)
                     let limit = requestLimit, onRequest = onRequest

@@ -42,6 +42,9 @@ enum PipeKey {
         }
         guard let handle, handle != Win32.invalidHandle else { return nil }
         defer { CloseHandle(handle) }
+        // A key another user could have written is no secret: one this user does not own, or whose DACL lets anyone
+        // else in, is refused, and the channel stays closed (the client's own prompt answers instead).
+        guard Win32.isOwnerOnly(handle) else { return nil }
         var key = [UInt8](repeating: 0, count: length + 1)
         var count: DWORD = 0
         guard ReadFile(handle, &key, DWORD(key.count), &count, nil), count == DWORD(length) else { return nil }

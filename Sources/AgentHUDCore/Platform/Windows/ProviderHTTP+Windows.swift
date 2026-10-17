@@ -25,6 +25,11 @@ extension ProviderHTTP {
 enum WindowsHTTP {
     static let bodyLimit = 16 * 1024 * 1024
 
+    /// Whether `text` holds a line break, which no header name or value may.
+    static func breaksLine(_ text: String) -> Bool {
+        text.unicodeScalars.contains { $0 == "\r" || $0 == "\n" }
+    }
+
     /// The status and body of one exchange.
     static func send(_ request: URLRequest) throws -> (status: Int, body: Data) {
         guard let url = request.url, let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
@@ -69,12 +74,19 @@ enum WindowsHTTP {
                 throw ProviderFailure.local
             }
         }
-        let headers = (request.allHTTPHeaderFields ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)" }
+        let fields = (request.allHTTPHeaderFields ?? [:]).sorted { $0.key < $1.key }
+        // The headers go over as one block of CR LF-separated lines: a name or value with a line break of its own (a
+        // token read from a client's file, say) would add a header of its choosing, so such a request is not sent.
+        guard !fields.contains(where: { WindowsHTTP.breaksLine($0.key) || WindowsHTTP.breaksLine($0.value) }) else {
+            throw ProviderFailure.local
+        }
+        let headers = fields.map { "\($0.key): \($0.value)" }
         if !headers.isEmpty {
-            _ = Win32.withWide(headers.joined(separator: "\r\n")) {
+            let added = Win32.withWide(headers.joined(separator: "\r\n")) {
                 WinHttpAddRequestHeaders(handle, $0, DWORD(bitPattern: -1),
                                          DWORD(WINHTTP_ADDREQ_FLAG_ADD) | DWORD(WINHTTP_ADDREQ_FLAG_REPLACE))
             }
+            guard added else { throw ProviderFailure.local }
         }
         var body = [UInt8](request.httpBody ?? Data())
         let sent = body.withUnsafeMutableBytes { bytes in
