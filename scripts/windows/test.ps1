@@ -39,7 +39,8 @@ foreach ($pattern in Get-Content (Join-Path $here 'skipped-tests.txt')) {
 # With --skip, swift test names every selected test on the runner's command line, which on Windows must stay under
 # 32,767 characters: the Core tests run in batches by the first letters of their classes (Support's have no skips).
 if ($Filter.Count -gt 0) {
-    $batches = @(, ($Filter | ForEach-Object { @('--filter', $_) }) + $skips)
+    # One batch: the filters and the skips together (the comma makes the whole list a single element).
+    $batches = @(, (@($Filter | ForEach-Object { @('--filter', $_) }) + $skips))
 } else {
     $batches = @(, @('--filter', 'AgentHUDSupportTests'))
     foreach ($letters in '[AB]', 'C[a-n]', 'C[o-z]', '[D-H]', '[I-O]', 'P[a-h]', 'P[i-z]', '[Q-T]', '[U-Z]') {
@@ -55,29 +56,28 @@ try {
     $ErrorActionPreference = 'Continue'
     if ($Log) { Set-Content -LiteralPath $Log -Value '' -Encoding utf8 }
     # Runs swift with the arguments, writing its output to the console and the log; its exit status is left in
-    # $script:code (a function's return value would collect the output too).
+    # $script:code (a function's return value would collect the output too), and $script:busy says whether it reported
+    # a file another process held.
     function Invoke-Swift([string[]] $arguments) {
-        if ($Log) {
-            & swift @arguments 2>&1 | ForEach-Object {
-                $line = "$_"
-                Write-Host $line
-                Add-Content -LiteralPath $Log -Value $line -Encoding utf8
-            }
-        } else {
-            & swift @arguments
+        $script:busy = $false
+        & swift @arguments 2>&1 | ForEach-Object {
+            $line = "$_"
+            Write-Host $line
+            if ($line -match 'being used by another process') { $script:busy = $true }
+            if ($Log) { Add-Content -LiteralPath $Log -Value $line -Encoding utf8 }
         }
         $script:code = $LASTEXITCODE
     }
     # The tests are built once, before any batch runs. Swift Build on Windows can fail to touch a test bundle whose
-    # Info.plist another of its tasks still holds open ("being used by another process", DECISIONS.md D-032): the
-    # build is then tried again, up to three times, and no test runs without one.
+    # Info.plist another of its tasks still holds open ("being used by another process", DECISIONS.md D-032): only then
+    # is the build tried again, up to three times in all, and no test runs without one.
     $build = @('build', '--build-tests') + $(if ($ScratchPath) { @('--scratch-path', $ScratchPath) } else { @() })
     $status = 1
     foreach ($attempt in 1..3) {
         Invoke-Swift $build
         $status = $script:code
-        if ($status -eq 0) { break }
-        Write-Host "swift build --build-tests failed with status $status (attempt $attempt of 3)"
+        if ($status -eq 0 -or -not $script:busy) { break }
+        Write-Host "swift build --build-tests hit a file in use (attempt $attempt of 3)"
     }
     if ($status -eq 0) {
         foreach ($batch in $batches) {

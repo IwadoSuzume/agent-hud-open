@@ -29,11 +29,11 @@ final class WindowsFoldersTests: XCTestCase {
 
     func testTheHomeIsUserProfileWhenItNamesAnExistingFolder() throws {
         let home = try directory()
-        try with("USERPROFILE", home.path) {
+        with("USERPROFILE", home.path) {
             XCTAssertEqual(UserHome.directory.standardizedFileURL.path.lowercased(), home.standardizedFileURL.path.lowercased())
         }
         for bad in ["", "relative\\home", "C:\\does not exist \(UUID().uuidString)"] {
-            try with("USERPROFILE", bad) {
+            with("USERPROFILE", bad) {
                 XCTAssertNotEqual(UserHome.directory.path, URL(fileURLWithPath: bad).path, "\(bad) is not a home")
                 XCTAssertTrue(WindowsFolders.isAbsolute(UserHome.directory.path))
             }
@@ -42,13 +42,13 @@ final class WindowsFoldersTests: XCTestCase {
 
     func testDataFoldersFollowTheirVariablesOnlyWhenAbsoluteAndExisting() throws {
         let roaming = try directory(), local = try directory()
-        try with("APPDATA", roaming.path) {
-            try with("LOCALAPPDATA", local.path) {
+        with("APPDATA", roaming.path) {
+            with("LOCALAPPDATA", local.path) {
                 XCTAssertTrue(AppSupport.directory.path.lowercased().hasPrefix(roaming.path.lowercased()))
                 XCTAssertTrue(InstanceLock.sharedURL.path.lowercased().hasPrefix(local.path.lowercased()))
             }
         }
-        try with("APPDATA", "Roaming") {
+        with("APPDATA", "Roaming") {
             XCTAssertTrue(WindowsFolders.isAbsolute(WindowsFolders.roamingAppData.path), "a relative value is not used")
         }
     }

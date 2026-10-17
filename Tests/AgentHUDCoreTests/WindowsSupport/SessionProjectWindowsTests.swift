@@ -37,8 +37,12 @@ final class SessionProjectWindowsTests: XCTestCase {
 
     private func repository() throws -> (directory: URL, main: URL, worktree: URL) {
         try XCTSkipIf(Self.git == nil, "Git is not on PATH")
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("HUD Project 项目 \(UUID().uuidString)")
-        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let created = FileManager.default.temporaryDirectory.appendingPathComponent("HUD Project 项目 \(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: created, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: created) }
+        // Repositories are named by their final paths, which spell every folder in full: a temporary folder reached
+        // through an 8.3 name (`C:/Users/RUNNER~1/…` on CI) is resolved first, so the expected paths are spelled alike.
+        let directory = URL(fileURLWithPath: try XCTUnwrap(WindowsPaths.finalPath(created.path)), isDirectory: true)
         let main = directory.appendingPathComponent("main", isDirectory: true)
         let worktree = directory.appendingPathComponent("tree with space", isDirectory: true)
         try FileManager.default.createDirectory(at: main, withIntermediateDirectories: true)

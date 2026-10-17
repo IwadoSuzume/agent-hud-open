@@ -173,11 +173,33 @@ final class NamedPipesTests: XCTestCase {
         return try XCTUnwrap(text.map { Win32.string($0) })
     }
 
+    /// The ways SDDL text names this user: its SID, and the alias SDDL writes for a well-known account instead
+    /// (`LA` for the built-in Administrator, which a CI runner runs as).
+    private var userNames: [String] {
+        guard let sid = Win32.currentUserSID else { return [] }
+        var names = [sid]
+        var descriptor: PSECURITY_DESCRIPTOR?
+        let made = Win32.withWide("O:" + sid) {
+            ConvertStringSecurityDescriptorToSecurityDescriptorW($0, DWORD(SDDL_REVISION_1), &descriptor, nil)
+        }
+        if made, let descriptor {
+            defer { LocalFree(descriptor) }
+            var text: LPWSTR?
+            if ConvertSecurityDescriptorToStringSecurityDescriptorW(descriptor, DWORD(SDDL_REVISION_1),
+                                                                    SECURITY_INFORMATION(OWNER_SECURITY_INFORMATION), &text, nil),
+               let text {
+                defer { LocalFree(text) }
+                names.append(String(Win32.string(text).dropFirst(2)))
+            }
+        }
+        return names
+    }
+
     /// A protected DACL with one entry, for this user.
     private func assertOwnerOnly(_ sddl: String, file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(sddl.hasPrefix("D:P"), "the DACL is protected from inheritance: \(sddl)", file: file, line: line)
         XCTAssertEqual(sddl.components(separatedBy: "(").count - 1, 1, "one entry: \(sddl)", file: file, line: line)
-        XCTAssertTrue(sddl.contains(Win32.currentUserSID ?? "?"), sddl, file: file, line: line)
+        XCTAssertTrue(userNames.contains { sddl.hasSuffix(";;;\($0))") }, "\(sddl) names \(userNames)", file: file, line: line)
     }
 }
 #endif
