@@ -27,3 +27,6 @@ signing/
 *.dmg
 *.ipa
 tmp/
+
+# Swift Build on Windows writes a resource bundle's Info.plist into the package root (docs/windows-port).
+/Info.plist
