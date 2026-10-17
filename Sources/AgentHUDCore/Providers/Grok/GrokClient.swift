@@ -57,6 +57,7 @@ struct GrokClient: Sendable {
 
     private func fetchBot() async throws -> ProviderQuota? {
         if let readBot { return try await readBot() }
+        guard PlatformSupport.supportsDesktopApps else { return nil }
         return try GrokBotQuota.fetch(in: botDirectory, now: clock())
     }
 

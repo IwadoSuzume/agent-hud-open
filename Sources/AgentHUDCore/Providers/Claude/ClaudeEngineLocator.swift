@@ -8,17 +8,22 @@ import Foundation
 public enum ClaudeEngineLocator {
     public static func candidates(home: URL = UserHome.directory,
                                   path: String = Executables.systemPath) -> [URL] {
-        cli(home: home, path: path) + desktop(home: home)
+        cli(home: home, path: path) + (PlatformSupport.supportsDesktopApps ? desktop(home: home) : [])
     }
 
     /// The CLI's install places and `PATH`, without the desktop app's engines.
     static func cli(home: URL, path: String) -> [URL] {
+        #if os(Windows)
+        // The native installer's place (docs/windows-port/SUPPORT_MATRIX.md); the others are macOS's.
+        let list = [home.appendingPathComponent(".local/bin/claude")]
+        #else
         let list = [
             home.appendingPathComponent(".local/bin/claude"),
             home.appendingPathComponent(".claude/local/claude"),
             URL(fileURLWithPath: "/opt/homebrew/bin/claude"),
             URL(fileURLWithPath: "/usr/local/bin/claude"),
         ]
+        #endif
         let versions = home.appendingPathComponent(".local/share/claude/versions", isDirectory: true)
         return list + newestFirst(in: versions) + Executables.onPath("claude", path: path)
     }

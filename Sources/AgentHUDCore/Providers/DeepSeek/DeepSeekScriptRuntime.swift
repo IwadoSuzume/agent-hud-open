@@ -24,7 +24,7 @@ struct DeepSeekScriptRuntime: Sendable, Equatable {
     static func desktopApplication(in folders: [URL] = applicationFolders) -> URL? {
         // No source places the desktop app on Windows (docs/windows-port/SUPPORT_MATRIX.md), and `/Applications` would
         // name a folder at the current drive's root that any user may create (D-019): there it is never looked for.
-        guard PlatformSupport.supportsDeepSeekDesktop else { return nil }
+        guard PlatformSupport.supportsDesktopApps else { return nil }
         return folders.map { $0.appendingPathComponent(desktopName + ".app") }
             .first { FileManager.default.isExecutableFile(atPath: desktop($0).executable.path) }
     }

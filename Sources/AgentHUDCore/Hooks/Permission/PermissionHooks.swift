@@ -143,6 +143,8 @@ public enum PermissionHooks {
         /// Whether the client is here at all. A machine without it keeps its home untouched.
         public func isInstalled(home: URL = UserHome.directory,
                                 fileManager: FileManager = .default) -> Bool {
+            // A client this platform does not support is absent, and so is given no hook (PlatformSupport).
+            if let additional = AdditionalSource(rawValue: rawValue), !PlatformSupport.supports(additional) { return false }
             switch self {
             case .claude:
                 // The engine where its installers put it for this home; this process's PATH says nothing about the home.

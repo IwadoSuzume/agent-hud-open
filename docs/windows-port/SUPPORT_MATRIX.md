@@ -14,14 +14,14 @@ the same requests the macOS build makes, over WinHTTP: D-014), **Approvals** (pe
 | Client | Windows location (default; override) | Sessions/usage | Quota | Approvals | Completion | Jump |
 | --- | --- | --- | --- | --- | --- | --- |
 | Claude Code | `%USERPROFILE%\.claude`, `.claude.json`; `CLAUDE_CONFIG_DIR` | ✅ | ✅ engine `get_usage` | ⏳ M5 | ⏳ M5 | 🔶 ¹ |
-| Claude Code desktop sessions | — | 🔶 ² | — | — | — | 🔶 |
+| Claude desktop app (its Code sessions and its downloaded engine) | — | 🔶 ² | — | — | — | 🔶 |
 | Codex | `%USERPROFILE%\.codex`; `CODEX_HOME` | ✅ | ✅ `app-server` over stdio | ⏳ M5 | ⏳ M5 | 🔶 ¹ |
 | Codex desktop app (IPC, daemon origins) | — | 🔶 ³ | 🔶 ³ | 🔶 ³ | — | 🔶 |
 | GitHub Copilot CLI | `%USERPROFILE%\.copilot`; `COPILOT_HOME` | ✅ | ✅ GitHub CLI sign-in | ⏳ M5 | ⏳ M5 | 🔶 ¹ |
-| Cursor | `%APPDATA%\Cursor\User\globalStorage\state.vscdb`; agents `%USERPROFILE%\.cursor` | ✅ | ✅ | — | ⏳ M5 | 🔶 ¹ |
-| OpenCode (+ OpenCode Go quota) | data `%USERPROFILE%\.local\share\opencode`; `XDG_DATA_HOME`, `XDG_CONFIG_HOME` | ✅ | ✅ | — | ✅ plugin (Node) | 🔶 ¹ |
+| Cursor | `%APPDATA%\Cursor\User\globalStorage\state.vscdb` (the agent CLI's `~/.cursor` chat names: 🔶 ⁸) | ✅ | ✅ | — | 🔶 ⁹ | 🔶 ¹ |
+| OpenCode (+ OpenCode Go quota) | data `%USERPROFILE%\.local\share\opencode`, config `%USERPROFILE%\.config\opencode\opencode.json(c)`; `XDG_DATA_HOME`, `XDG_CONFIG_HOME` | ✅ | ✅ | — | ✅ plugin (Node) | 🔶 ¹ |
 | Pi | `%USERPROFILE%\.pi\agent`; `PI_CODING_AGENT_DIR` | ✅ | — | — | ✅ extension (Node) | 🔶 ¹ |
-| Kimi Code / GLM (quota from client configs) | Kimi `%USERPROFILE%\.kimi-code`; `KIMI_CODE_HOME` | ✅ | ✅ | — | — | 🔶 ¹ |
+| Kimi Code / GLM (quota from client configs) | Kimi `%USERPROFILE%\.kimi-code`; `KIMI_CODE_HOME` (the older `~/.kimi` is not read) | ✅ | ✅ | — | — | 🔶 ¹ |
 | Qwen Code | `%USERPROFILE%\.qwen`; `QWEN_HOME` | ✅ | — | — | ⏳ M5 | 🔶 ¹ |
 | CodeBuddy Code | `%USERPROFILE%\.codebuddy`; `CODEBUDDY_CONFIG_DIR` | ✅ | — | — | ⏳ M5 | 🔶 ¹ |
 | OpenClaw | `%USERPROFILE%\.openclaw`; `OPENCLAW_STATE_DIR` | ✅ | — | — | — | 🔶 ¹ |
@@ -38,7 +38,9 @@ the same requests the macOS build makes, over WinHTTP: D-014), **Approvals** (pe
 1. Jump reveals the session's terminal tab or window through macOS automation (AppleScript, Accessibility); Windows
    has no equivalent for other applications' tabs. The session list still shows the project and client.
 2. No source gives the desktop app's data folder on Windows; the macOS folders (`~/Library/Application Support/…`,
-   `/Applications`) are never looked for there (D-019: `/Applications` would name a folder at the current drive's
+   `/Applications`, `~/Applications/….app`) are never looked for there: `PlatformSupport.supportsDesktopApps` is false
+   for Claude's desktop app (its engine and its Code sessions), the Codex app, Grok Bot (data, sessions, quota cache,
+   routine runs) and DeepSeek Harness's app (D-036; D-019: `/Applications` would name a folder at the current drive's
    root that any user may create).
 3. The Codex desktop app's IPC socket and daemon are macOS mechanisms; `CodexDesktopIPC` is always unavailable on
    Windows (D-006, Platform/Windows/CodexDesktopIPC+Windows.swift).
@@ -48,7 +50,12 @@ the same requests the macOS build makes, over WinHTTP: D-014), **Approvals** (pe
 6. Only community reports place Antigravity's files and processes on Windows (`%LOCALAPPDATA%\Programs\Antigravity`,
    `language_server_windows_x64.exe`, `%USERPROFILE%\.gemini\antigravity`); no Google documentation was found.
    `PlatformSupport.supports(.antigravity)` is false: no folder is read and no process is listed.
-7. No Windows location was found for these clients' data.
+7. No Windows location was found for these clients' data. `PlatformSupport.supports` is false for them: their folders
+   are neither read nor watched, no quota is asked, no hook is installed, and WorkBuddy's `models.json` is not read
+   for a GLM key (D-036).
+8. Cursor's agent CLI keeps its chats and ACP sessions in `~/.cursor` on macOS; no source places them on Windows, so
+   session names there come from the editor's database alone.
+9. No source gives the shell Cursor runs a hook's command in on Windows (its docs name none; D-037, M5).
 
 ## Executables (D-019)
 
@@ -111,6 +118,9 @@ own keeps `SystemRoot`, `windir` and `SystemDrive` (D-035).
 - Data `%USERPROFILE%\.local\share\opencode` on Windows — OpenCode docs, *Troubleshooting → Storage*
   (opencode.ai/docs/troubleshooting); OpenCode uses the XDG folders on every platform, `XDG_DATA_HOME` and
   `XDG_CONFIG_HOME` first.
+- Config `~/.config/opencode/opencode.json` — OpenCode docs, *Config* ("Place your global OpenCode config in
+  `~/.config/opencode/opencode.json`", no platform named; opencode.ai/docs/config), the same XDG layout as the data
+  folder above.
 
 ### Pi, Kimi Code, Qwen Code, CodeBuddy, OpenClaw, Hermes, Grok
 

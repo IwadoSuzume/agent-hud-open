@@ -37,7 +37,8 @@ public enum CodexLocator {
     }
 
     private static func desktop(home: URL, applications: URL) -> [URL] {
-        [applications, home.appendingPathComponent("Applications")].flatMap { root in
+        guard PlatformSupport.supportsDesktopApps else { return [] }
+        return [applications, home.appendingPathComponent("Applications")].flatMap { root in
             ["Codex.app", "ChatGPT.app"].flatMap { engines(in: root.appendingPathComponent($0)) }
         }
     }

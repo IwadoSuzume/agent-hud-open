@@ -5,7 +5,8 @@ enum GrokLocalSessions: LocalSessionLayout {
     static let installPaths = GrokSessions.installPaths
 
     static func roots(home: URL, environment: [String: String]) -> [URL] {
-        GrokSessions.roots(home: home, environment: environment) + GrokBotSessions.roots(home: home, environment: environment)
+        GrokSessions.roots(home: home, environment: environment)
+            + (PlatformSupport.supportsDesktopApps ? GrokBotSessions.roots(home: home, environment: environment) : [])
     }
 
     static func accepts(_ url: URL) -> Bool { GrokSessions.accepts(url) || GrokBotSessions.accepts(url) }

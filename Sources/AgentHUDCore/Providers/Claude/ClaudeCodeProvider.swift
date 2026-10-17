@@ -60,7 +60,7 @@ public struct ClaudeCodeProvider: UsageProvider, LedgerRecording {
             home: ClaudeSubscription.home,
             sessionOriginsDirectory: ClaudeSessionOrigins.directory,
             compactionsDirectory: CompactionHooks.directory,
-            desktopSessions: ClaudeDesktopSessions()
+            desktopSessions: PlatformSupport.supportsDesktopApps ? ClaudeDesktopSessions() : nil
         )
     }
 

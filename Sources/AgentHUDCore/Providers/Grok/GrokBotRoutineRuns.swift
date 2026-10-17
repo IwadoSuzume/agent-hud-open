@@ -45,7 +45,7 @@ actor GrokBotRoutineRuns {
         }
         asked = asked.filter { unknown.contains($0.key) }
         guard !due.isEmpty else { return }
-        let agents = GrokBotSessions.agentIDs(in: directory)
+        let agents = PlatformSupport.supportsDesktopApps ? GrokBotSessions.agentIDs(in: directory) : []
         guard !agents.isEmpty, let reply = try? await read(agents) else { return }
         for id in due { asked[id] = ((asked[id]?.count ?? 0) + 1, now) }
         let cutoff = now.addingTimeInterval(-UsageLedger.retention)

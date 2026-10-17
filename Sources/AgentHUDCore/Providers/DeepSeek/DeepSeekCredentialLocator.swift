@@ -27,10 +27,10 @@ enum DeepSeekCredentialLocator {
 
     static func module(home: URL = UserHome.directory) -> URL? {
         #if os(Windows)
-        // npm's global packages and its npx cache on Windows (npm docs, *Folders* and *config: cache*); a POSIX folder
-        // would name the current drive's root, where any user may plant the module Node then loads (D-019).
-        var roots = [WindowsFolders.roamingAppData.appendingPathComponent("npm/node_modules"),
-                     home.appendingPathComponent(".bun/install/global/node_modules")]
+        // npm's global packages and its npx cache on Windows (npm docs, *Folders* and *config: cache*), the install the
+        // DeepSeek Harness docs give; a POSIX folder would name the current drive's root, where any user may plant the
+        // module Node then loads (D-019), and Bun's global folder has no documented place on Windows.
+        var roots = [WindowsFolders.roamingAppData.appendingPathComponent("npm/node_modules")]
         let cache = WindowsFolders.localAppData.appendingPathComponent("npm-cache/_npx")
         #else
         var roots = ["/opt/homebrew/lib/node_modules", "/usr/local/lib/node_modules"].map { URL(fileURLWithPath: $0) }

@@ -161,7 +161,8 @@ enum OpenAgentCredentials {
         // WorkBuddy keeps model entries in ~/.workbuddy/models.json; a GLM Coding Plan entry whose URL is
         // Zhipu's own coding endpoint carries the plan's key. Only those endpoints are read, mirroring the
         // restriction the same function applies to every other client's stored credentials.
-        let workBuddyModels = read(home.appendingPathComponent(".workbuddy/models.json"))
+        // Only where WorkBuddy is supported at all (PlatformSupport): a credential is never read from a client that is not.
+        let workBuddyModels = PlatformSupport.supports(.workbuddy) ? read(home.appendingPathComponent(".workbuddy/models.json")) : .null
         for entry in workBuddyModels.arrayValue ?? [] {
             guard entry["vendor"].stringValue == "GLM Coding Plan",
                   let key = entry["apiKey"].stringValue, !key.isEmpty,

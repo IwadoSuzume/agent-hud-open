@@ -52,6 +52,25 @@ final class WindowsExecutablesTests: XCTestCase {
         XCTAssertNil(Executables.first([URL(fileURLWithPath: "/usr/bin/env"), URL(fileURLWithPath: "/opt/homebrew/bin/node")]))
     }
 
+    /// D-019's rule itself, with programs that do exist: a path without a drive or share names a folder at the current
+    /// drive's root, which any user may create, so it is refused even where a real program sits behind it.
+    func testADrivelessPathIsRefusedEvenWhereAProgramExists() throws {
+        for path in ["/opt/homebrew/bin/node", "/Applications", "/usr/local/bin/claude"] {
+            XCTAssertFalse(WindowsFolders.isAbsolute(URL(fileURLWithPath: path).path), path)
+        }
+        let systemRoot = try XCTUnwrap(Win32.environment("SystemRoot"))
+        let whoami = URL(fileURLWithPath: systemRoot).appendingPathComponent("System32/whoami.exe")
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: whoami.path), "no whoami.exe")
+        XCTAssertNotNil(WindowsExecutables.program(whoami), "the drive-qualified spelling is a program")
+        // The same program spelled from the current drive's root, as `/Windows/System32/whoami` would be on macOS.
+        let rootRelative = String(whoami.path.drop { $0 != "/" && $0 != "\\" })
+        XCTAssertTrue(FileManager.default.fileExists(atPath: rootRelative), "the driveless spelling reaches the same file: \(rootRelative)")
+        XCTAssertNil(WindowsExecutables.program(URL(fileURLWithPath: rootRelative)), rootRelative)
+        XCTAssertNil(Executables.first([URL(fileURLWithPath: rootRelative), URL(fileURLWithPath: String(rootRelative.dropLast(4)))]))
+        XCTAssertTrue(Executables.onPath("whoami", path: #"\Windows\System32;Windows\System32"#).isEmpty,
+                      "PATH entries without a drive are skipped")
+    }
+
     func testACandidateWithoutAnExtensionIsLookedForAsAnExe() throws {
         let folder = try directory()
         _ = try program("bin/claude.exe", in: folder)

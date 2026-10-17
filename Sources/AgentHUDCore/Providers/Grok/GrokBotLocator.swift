@@ -4,6 +4,7 @@ import Foundation
 public enum GrokBotLocator {
     public static func isInstalled(home: URL = UserHome.directory,
                                    applicationURLs: [URL]? = nil) -> Bool {
+        guard PlatformSupport.supportsDesktopApps else { return false }
         let data = home.appendingPathComponent("Library/Application Support/Grok Bot", isDirectory: true)
         var directory: ObjCBool = false
         if FileManager.default.fileExists(atPath: data.path, isDirectory: &directory), directory.boolValue { return true }

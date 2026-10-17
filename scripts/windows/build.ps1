@@ -22,6 +22,11 @@ if ($SwiftArguments.Count -ge 2 -and $SwiftArguments[0] -eq '-Log') {
 
 # swift writes its progress to standard error, which Windows PowerShell would otherwise turn into a stopping error.
 $ErrorActionPreference = 'Continue'
+# Without swift, $LASTEXITCODE would keep whatever ran before: fail plainly instead.
+if (-not (Get-Command swift -ErrorAction SilentlyContinue)) {
+    Write-Host 'swift is not on PATH'
+    exit 1
+}
 $status = 1
 foreach ($attempt in 1..3) {
     $script:busy = $false

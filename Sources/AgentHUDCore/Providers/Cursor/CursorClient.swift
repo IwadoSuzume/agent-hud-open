@@ -217,9 +217,16 @@ actor CursorClient {
                 if let id = ReadOnlySQLite.text(row, 0), let title = SessionTitle.named(ReadOnlySQLite.text(row, 1)) { titles[id] = title }
             }
         }
+        #if os(Windows)
+        // No source places the agent CLI's folder on Windows (docs/windows-port/SUPPORT_MATRIX.md): names come from the
+        // editor's database alone there.
+        let agentFolders: [URL] = []
+        #else
         let chats = (try? FileManager.default.contentsOfDirectory(at: agentFolder.appendingPathComponent("chats"), includingPropertiesForKeys: nil)) ?? []
+        let agentFolders = [agentFolder.appendingPathComponent("acp-sessions")] + chats
+        #endif
         for id in conversations where titles[id] == nil {
-            for folder in [agentFolder.appendingPathComponent("acp-sessions")] + chats {
+            for folder in agentFolders {
                 let meta = folder.appendingPathComponent(id).appendingPathComponent("meta.json")
                 guard FileManager.default.fileExists(atPath: meta.path) else { continue }
                 // The agent calls a chat "New Agent" until its title arrives.

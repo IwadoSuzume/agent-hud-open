@@ -27,8 +27,11 @@ extension LocalSessionLayout {
 }
 
 extension AdditionalSource {
+    /// How the source's local sessions are laid out; nil for a source with none, or one this platform does not support
+    /// (`PlatformSupport`), whose folders are then neither read nor watched.
     var layout: (any LocalSessionLayout.Type)? {
-        switch self {
+        guard PlatformSupport.supports(self) else { return nil }
+        return switch self {
         case .cursor: nil
         case .antigravity: AntigravitySessions.self
         case .grok: GrokLocalSessions.self

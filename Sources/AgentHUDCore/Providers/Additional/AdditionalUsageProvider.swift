@@ -50,6 +50,8 @@ actor AdditionalUsageProvider: UsageProvider, LedgerRecording {
         let grok = GrokClient()
         let consented = CopilotClient.consent(in: settings)
         return AdditionalUsageProvider(source: source, readQuota: {
+            // A client this platform does not support is absent: no account is asked (PlatformSupport).
+            guard PlatformSupport.supports(source) else { return ProviderQuota() }
             switch source {
             case .antigravity: return try await AntigravityClient().fetch()
             case .cursor: return try await cursor.quota()

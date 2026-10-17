@@ -30,7 +30,12 @@ struct OpenAgentPaths: Sendable {
         switch source {
         case .opencode: [openCode]
         case .pi: [pi.appendingPathComponent("sessions")]
+        #if os(Windows)
+        // Kimi Code's documented folder only; the older `~/.kimi` has no Windows source (SUPPORT_MATRIX.md).
+        case .kimi: [kimi.appendingPathComponent("sessions")]
+        #else
         case .kimi: [kimi.appendingPathComponent("sessions"), home.appendingPathComponent(".kimi/sessions")]
+        #endif
         case .glm: []
         }
     }
