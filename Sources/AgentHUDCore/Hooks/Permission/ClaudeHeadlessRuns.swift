@@ -19,7 +19,7 @@ enum ClaudeHeadlessRuns {
                         home: URL = UserHome.directory) -> Bool {
         // Attended sessions, nearly every request, need no look at the process tree.
         guard environment["CLAUDE_CODE_SESSION_ATTENDED"] == "0" else { return false }
-        let executables = Set(ClaudeEngineLocator.candidates(home: home, path: environment["PATH"] ?? "")
+        let executables = Set(ClaudeEngineLocator.candidates(home: home, path: Executables.path(in: environment))
             .map { $0.resolvingSymlinksInPath().path })
         return headless(ancestors: HookProcessOrigins.ancestors(), environment: environment, executablePaths: executables)
     }

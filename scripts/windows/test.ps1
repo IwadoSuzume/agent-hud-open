@@ -8,7 +8,7 @@
   - the tests in skipped-tests.txt are skipped, each registered in SKIPPED_TESTS.md;
   - afterwards the preference files swift-corelibs-foundation writes into the real %LOCALAPPDATA% for the tests'
     UserDefaults suites are removed (remove-test-preferences.ps1).
-  Output goes to -Log as well as the console; the exit status is swift test's.
+  Output goes to -Log as well as the console; the exit status is the build's if it never succeeds, else the last failing batch's.
 
 .EXAMPLE
   scripts\windows\test.ps1 -ScratchPath "$env:LOCALAPPDATA\agenthud-dev\build" -Log "$env:TEMP\g3.log"

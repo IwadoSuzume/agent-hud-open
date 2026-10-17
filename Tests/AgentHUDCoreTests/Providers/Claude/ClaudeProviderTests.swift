@@ -796,19 +796,17 @@ final class ClaudeCodeProviderTests: XCTestCase {
         super.tearDown()
     }
 
-    private func fakeEngine(script: String) throws -> ClaudeEngineUsageClient {
+    private func fakeEngine(_ steps: [TestEngine.Step]) throws -> ClaudeEngineUsageClient {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("agenthud-engine-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let fake = dir.appendingPathComponent("claude")
-        try script.write(to: fake, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+        let fake = try TestEngine.write(steps, to: dir.appendingPathComponent("claude"))
         return ClaudeEngineUsageClient(executable: fake, workingDirectory: dir, timeout: 10)
     }
 
     /// An engine that answers `get_usage` with the given `rate_limits` object.
     private func fakeEngine(rateLimits: String, subscription: String = "max") throws -> ClaudeEngineUsageClient {
         let response = #"{"type":"control_response","response":{"subtype":"success","request_id":"agent-hud-usage","response":{"subscription_type":"\#(subscription)","rate_limits_available":true,"rate_limits":\#(rateLimits)}}}"#
-        return try fakeEngine(script: "#!/bin/bash\nread -r l\necho '\(response)'\n")
+        return try fakeEngine([.readLine, .out(response)])
     }
 
     func testBuildsReportFromMocks() async throws {
@@ -917,7 +915,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
         let iso = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
         let line = #"{"sessionId":"f","cwd":"/p","type":"assistant","message":{"id":"m1","role":"assistant","model":"claude-fable-5-1","usage":{"input_tokens":10,"output_tokens":5}},"timestamp":"\#(iso.format(now.addingTimeInterval(-60)))"}"#
         try (line + "\n").write(to: root.appendingPathComponent("f.jsonl"), atomically: true, encoding: .utf8)
-        let engine = try fakeEngine(script: "#!/bin/bash\nread -r l\necho '\(ClaudeEngineTests.response)'\n")
+        let engine = try fakeEngine([.readLine, .out(ClaudeEngineTests.response)])
         let provider = ClaudeCodeProvider(
             engine: engine,
             transcripts: ClaudeTranscriptStore(root: root.deletingLastPathComponent()),
@@ -970,7 +968,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
         try (line + "\n").write(to: root.appendingPathComponent("k.jsonl"), atomically: true, encoding: .utf8)
         let response = #"{"type":"control_response","response":{"subtype":"success","request_id":"x","response":{"subscription_type":null,"rate_limits_available":false,"rate_limits":null}}}"#
         let provider = ClaudeCodeProvider(
-            engine: try fakeEngine(script: "#!/bin/bash\nread -r l\necho '\(response)'\n"),
+            engine: try fakeEngine([.readLine, .out(response)]),
             transcripts: ClaudeTranscriptStore(root: root.deletingLastPathComponent()),
             history: QuotaHistoryStore(),
             clock: { now }
@@ -986,7 +984,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
 
     func testEngineFailureThrows() async throws {
         let provider = ClaudeCodeProvider(
-            engine: try fakeEngine(script: "#!/bin/bash\nread -r l\necho boom >&2\nexit 1\n"),
+            engine: try fakeEngine([.readLine, .err("boom"), .exit(1)]),
             transcripts: ClaudeTranscriptStore(root: FileManager.default.temporaryDirectory.appendingPathComponent("agenthud-empty-\(UUID().uuidString)")),
             history: QuotaHistoryStore()
         )
@@ -1022,9 +1020,8 @@ final class ClaudeCodeProviderTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let date = Date()
         try (ClaudeTranscriptTests.endTurn("msg_one", at: date) + "\n").write(to: directory.appendingPathComponent("s.jsonl"), atomically: true, encoding: .utf8)
-        let script = directory.appendingPathComponent("engine")
-        try "#!/bin/sh\necho called >> calls\nread line\necho boom >&2\nexit 1\n".write(to: script, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        let script = try TestEngine.write([.append("calls", "called\n"), .readLine, .err("boom"), .exit(1)],
+                                          to: directory.appendingPathComponent("engine"))
         // The engine exits as soon as it has read the request; the deadline only bounds a stalled launch.
         let engine = ClaudeEngineUsageClient(executable: script, workingDirectory: directory, timeout: 10)
         for client in [engine, nil] {
@@ -1072,7 +1069,7 @@ final class ClaudeCodeProviderTests: XCTestCase {
 
         // With no session of the week left, a failed engine read still keeps the month's local data.
         try FileManager.default.removeItem(at: directory.appendingPathComponent("recent.jsonl"))
-        let quiet = ClaudeCodeProvider(engine: try fakeEngine(script: "#!/bin/bash\nread -r l\necho boom >&2\nexit 1\n"),
+        let quiet = ClaudeCodeProvider(engine: try fakeEngine([.readLine, .err("boom"), .exit(1)]),
                                        transcripts: ClaudeTranscriptStore(root: directory), history: QuotaHistoryStore(), clock: { now })
         let local = try await quiet.fetchAccountAndLocalUsage(agents: [], historyHours: 31 * 24 + 25)
         XCTAssertEqual(local.sessions.map(\.id), [])

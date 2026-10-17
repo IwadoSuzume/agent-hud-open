@@ -40,12 +40,18 @@ enum AntigravityService {
             + AntigravitySessions.roots(home: home, environment: environment)
             + [home.appendingPathComponent(".gemini/antigravity-ide"), home.appendingPathComponent("Applications/Antigravity IDE.app")]
             + ["Antigravity.app", "Antigravity IDE.app"].map { applications.appendingPathComponent($0) }
+        #if os(Windows)
+        // A POSIX path such as the default `/Applications` names a folder at the current drive's root that any user may
+        // create (D-019): only places under an absolute Windows path count.
+        return places.contains { WindowsFolders.isAbsolute($0.path) && FileManager.default.fileExists(atPath: $0.path) }
+        #else
         return places.contains { FileManager.default.fileExists(atPath: $0.path) }
+        #endif
     }
 
     /// The running CLIs and servers, from a listing of the user's processes, taken only while `isPresent` says so.
     static func running(
-        isPresent: @Sendable () -> Bool = { AntigravityService.isPresent() },
+        isPresent: @Sendable () -> Bool = { PlatformSupport.supports(.antigravity) && AntigravityService.isPresent() },
         inspect: @Sendable (String, [String]) async throws -> String = ProviderCommand.run
     ) async throws -> [Candidate] {
         guard isPresent() else { return [] }
@@ -55,7 +61,7 @@ enum AntigravityService {
     /// Only services advertising their local credentials can supply an authenticated native approval snapshot.
     /// A failed inspection is unknown, rather than proof that one of their prompts has disappeared.
     static func permissionEndpoints(
-        isPresent: @Sendable () -> Bool = { AntigravityService.isPresent() },
+        isPresent: @Sendable () -> Bool = { PlatformSupport.supports(.antigravity) && AntigravityService.isPresent() },
         inspect: @Sendable (String, [String]) async throws -> String = ProviderCommand.run
     ) async throws -> [Endpoint] {
         let running = try await running(isPresent: isPresent, inspect: inspect)

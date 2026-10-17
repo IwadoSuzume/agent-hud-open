@@ -86,7 +86,8 @@ functions only.
 
 Each provider: research the Windows client's data location from official documentation or the client's source;
 without such a source the client is "not supported on Windows" (SUPPORT_MATRIX.md). Fixture tests in temporary
-directories only.
+directories only. **M4 result:** each client's state, location and source is in SUPPORT_MATRIX.md; the rows below are
+what the plan was.
 
 | Area | macOS specifics | Plan | Milestone |
 | --- | --- | --- | --- |
@@ -116,7 +117,7 @@ SKIPPED_TESTS.md (M3) with its reason and Windows counterpart.
 | `System/InstanceLockTests` | macOS bundle paths, `flock` | `WindowsSupport/InstanceLockWindowsTests` | M3 |
 | `MCP/MCPAppChannelTests` | raw AF_UNIX squatter sockets | port to pipes | M5 |
 | `Hooks/Permission/PermissionHookTests` | raw AF_UNIX client, `flock` (most cases are pure logic) | split: logic runs on Windows, socket cases ported to pipes | M5 |
-| `Hooks/Permission/DeepSeekQuestionObserverTests` | raw BSD TCP WebSocket test server | port the server to Winsock | M4 |
+| `Hooks/Permission/DeepSeekQuestionObserverTests` | raw BSD TCP WebSocket test server | **done M4:** the host on Winsock (`IdleQuestionHost+Windows.swift`); its one test waits for M5's WinHTTP WebSocket | M4 S |
 | `Providers/Codex/CodexDaemonOriginTransportTests`, `CodexDesktopTestServer`, `CodexDesktopPermissionsTests`, `CodexDesktopStreamTests` | unix-socket servers for features unsupported on Windows | none (feature U) | — |
 | Runtime skips seen in the spike | opt-in probes (`…ReadOnlyProbe`, `SessionUsageProbeTests`), tests that need Node or a Zstandard tool absent on the machine (`DeepSeekDesktopTests` ×2, `DeepSeekProviderTests` ×3), `LogFilesTests.testAFileEventInASkippedOrHiddenFolderAddsNothing` | registered with their skip reasons | M3 |
 

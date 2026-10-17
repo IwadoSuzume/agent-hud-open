@@ -63,10 +63,8 @@ final class SubscriptionTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let profileURL = directory.appendingPathComponent(".claude.json")
         try profile(tier: "default_claude_max_20x", accountUuid: "user-1", organizationUuid: "org-1", email: "dev@example.com").write(to: profileURL)
-        let executable = directory.appendingPathComponent("claude")
         let response = #"{"type":"control_response","response":{"subtype":"success","response":{"subscription_type":"max","rate_limits_available":true,"rate_limits":{"five_hour":{"utilization":21,"resets_at":null}}}}}"#
-        try "#!/bin/sh\nread -r request\necho '\(response)'\n".write(to: executable, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        let executable = try TestEngine.write([.readLine, .out(response)], to: directory.appendingPathComponent("claude"))
         let provider = ClaudeCodeProvider(
             engine: .init(executable: executable, workingDirectory: directory),
             transcripts: .init(roots: []), history: .init(), accountProfileURL: profileURL

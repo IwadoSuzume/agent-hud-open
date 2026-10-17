@@ -273,10 +273,8 @@ final class ProviderAccountTests: XCTestCase {
         let profile = directory.appendingPathComponent(".claude.json")
         try #"{"oauthAccount":{"accountUuid":"one","organizationUuid":"org"}}"#.write(to: profile, atomically: true, encoding: .utf8)
         let response = #"{"type":"control_response","response":{"subtype":"success","response":{"subscription_type":"pro","rate_limits_available":true,"rate_limits":{"five_hour":{"utilization":10}}}}}"#
-        let engine = directory.appendingPathComponent("claude")
-        try "#!/bin/sh\nread -r request\nprintf '%s' '{\"oauthAccount\":{\"accountUuid\":\"two\",\"organizationUuid\":\"org\"}}' > '\(profile.path)'\necho '\(response)'\n"
-            .write(to: engine, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: engine.path)
+        let engine = try TestEngine.write([.readLine, .write(profile.path, #"{"oauthAccount":{"accountUuid":"two","organizationUuid":"org"}}"#),
+                                           .out(response)], to: directory.appendingPathComponent("claude"))
         let provider = ClaudeCodeProvider(engine: .init(executable: engine, workingDirectory: directory), transcripts: .init(roots: []),
                                           history: .init(), accountProfileURL: profile)
         do {

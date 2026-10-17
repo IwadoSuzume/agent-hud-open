@@ -50,7 +50,7 @@ public enum ClaudeSessionOrigins {
     public static func record(data: Data, now: Date = Date(), directory: URL = directory,
                               environment: [String: String] = ProcessInfo.processInfo.environment,
                               home: URL = UserHome.directory) throws {
-        let executables = Set(ClaudeEngineLocator.candidates(home: home, path: environment["PATH"] ?? "")
+        let executables = Set(ClaudeEngineLocator.candidates(home: home, path: Executables.path(in: environment))
             .map { $0.resolvingSymlinksInPath().path })
         let ancestors = HookProcessOrigins.ancestors()
         let host = host(ancestors: ancestors, environment: environment, executablePaths: executables)

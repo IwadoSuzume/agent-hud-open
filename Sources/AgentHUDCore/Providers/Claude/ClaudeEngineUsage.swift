@@ -88,7 +88,10 @@ public struct ClaudeEngineUsageClient: Sendable {
     private func environment() -> [String: String] {
         var environment = ProcessInfo.processInfo.environment
         let home = UserHome.directory.path
+        #if !os(Windows)
+        // On Windows the engine keeps this process's PATH: the folders below are macOS's (DECISIONS.md D-019).
         environment["PATH"] = "\(home)/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+        #endif
         environment["CLAUDE_CODE_ENTRYPOINT"] = "agent-hud"
         return environment
     }

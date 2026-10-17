@@ -381,9 +381,20 @@ public final class ChildProcess: @unchecked Sendable {
         return header == [0x4D, 0x5A]
     }
 
+    /// What a Windows program needs in its environment to start at all.
+    static let systemVariables = ["SystemRoot", "windir", "SystemDrive"]
+
     /// `NAME=value` strings, sorted by name without regard to case as Windows expects, each ended by a NUL, and a NUL
     /// after the last.
     static func environmentBlock(_ environment: [String: String]) -> [UInt16] {
+        var environment = environment
+        // An environment given to a child is complete on macOS, where a program starts in an empty one. A Windows
+        // program does not: Node, for one, aborts at start without SystemRoot (its random-number source looks it up).
+        // So the variables naming the system's own folders come from this process when the child's leave them out
+        // (DECISIONS.md D-035); they name no user's data.
+        for name in systemVariables where !environment.keys.contains(where: { $0.uppercased() == name.uppercased() }) {
+            if let value = Win32.environment(name) { environment[name] = value }
+        }
         let entries = environment.filter { !$0.key.isEmpty && !$0.key.contains("=") }
             .sorted { $0.key.uppercased() < $1.key.uppercased() }
         var block: [UInt16] = []

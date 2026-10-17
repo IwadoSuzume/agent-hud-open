@@ -120,8 +120,19 @@ struct CopilotCredentials: Sendable {
     var hostsFile: URL {
         let folder = ClientHome.variable("GH_CONFIG_DIR", in: environment).map { URL(fileURLWithPath: $0) }
             ?? ClientHome.variable("XDG_CONFIG_HOME", in: environment).map { URL(fileURLWithPath: $0).appendingPathComponent("gh") }
-            ?? home.appendingPathComponent(".config/gh")
+            ?? Self.defaultConfigFolder(home: home, environment: environment)
         return folder.appendingPathComponent("hosts.yml")
+    }
+
+    /// gh's own folder when nothing moves it: `%AppData%\GitHub CLI` on Windows (cli/go-gh `pkg/config/config.go`,
+    /// `ConfigDir`; docs/windows-port/SUPPORT_MATRIX.md), `~/.config/gh` elsewhere.
+    private static func defaultConfigFolder(home: URL, environment: [String: String]) -> URL {
+        #if os(Windows)
+        let roaming = ClientHome.variable("APPDATA", in: environment).flatMap(WindowsFolders.existingFolder) ?? WindowsFolders.roamingAppData
+        return roaming.appendingPathComponent("GitHub CLI", isDirectory: true)
+        #else
+        return home.appendingPathComponent(".config/gh")
+        #endif
     }
 
     func token() -> String? {

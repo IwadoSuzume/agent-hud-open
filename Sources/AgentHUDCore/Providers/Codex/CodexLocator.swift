@@ -16,7 +16,7 @@ public enum CodexLocator {
     /// its known names, then wherever Launch Services has it under its bundle ID, whatever it is called now.
     public static func candidates(home: URL = UserHome.directory,
                                   applications: URL = URL(fileURLWithPath: "/Applications"),
-                                  path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
+                                  path: String = Executables.systemPath,
                                   registered: [URL] = VendorCatalog.applications("Codex")) -> [URL] {
         desktop(home: home, applications: applications) + registered.flatMap(engines(in:)) + cli(home: home, path: path)
     }
@@ -24,7 +24,7 @@ public enum CodexLocator {
     /// The same order as `candidates`, asking Launch Services only when no app sits under a known name.
     public static func find(home: URL = UserHome.directory,
                             applications: URL = URL(fileURLWithPath: "/Applications"),
-                            path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
+                            path: String = Executables.systemPath,
                             registered: @autoclosure () -> [URL] = VendorCatalog.applications("Codex")) -> URL? {
         Executables.first(desktop(home: home, applications: applications))
             ?? Executables.first(registered().flatMap(engines(in:)))
@@ -43,8 +43,12 @@ public enum CodexLocator {
     }
 
     private static func cli(home: URL, path: String) -> [URL] {
+        #if os(Windows)
+        WindowsCodex.engines() + Executables.onPath("codex", path: path)
+        #else
         [home.appendingPathComponent(".bun/bin/codex"), home.appendingPathComponent(".local/bin/codex"),
          URL(fileURLWithPath: "/opt/homebrew/bin/codex"), URL(fileURLWithPath: "/usr/local/bin/codex")]
             + Executables.onPath("codex", path: path)
+        #endif
     }
 }

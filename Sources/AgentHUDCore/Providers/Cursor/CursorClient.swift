@@ -19,7 +19,17 @@ actor CursorClient {
         return result
     }
 
-    init(database: URL = UserHome.directory.appendingPathComponent("Library/Application Support/Cursor/User/globalStorage/state.vscdb"),
+    /// Cursor's settings database: in its user data folder, `~/Library/Application Support/Cursor` on macOS and
+    /// `%AppData%\Cursor` on Windows (docs/windows-port/SUPPORT_MATRIX.md).
+    static var defaultDatabase: URL {
+        #if os(Windows)
+        WindowsFolders.roamingAppData.appendingPathComponent("Cursor/User/globalStorage/state.vscdb")
+        #else
+        UserHome.directory.appendingPathComponent("Library/Application Support/Cursor/User/globalStorage/state.vscdb")
+        #endif
+    }
+
+    init(database: URL = CursorClient.defaultDatabase,
          agentFolder: URL = UserHome.directory.appendingPathComponent(".cursor"),
          http: ProviderHTTP = ProviderHTTP()) {
         self.database = database; self.agentFolder = agentFolder; self.http = http

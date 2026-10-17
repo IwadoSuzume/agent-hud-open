@@ -80,7 +80,7 @@ package enum MCPClient: String, CaseIterable, Sendable, Identifiable {
     /// not a command a person runs and is passed over.
     package func executable(home: URL = UserHome.directory,
                            applications: URL = URL(fileURLWithPath: "/Applications"),
-                           path: String = ProcessInfo.processInfo.environment["PATH"] ?? "",
+                           path: String = Executables.systemPath,
                            registered: @autoclosure () -> [URL] = VendorCatalog.applications("Codex")) -> URL? {
         switch self {
         case .claudeCode: return Executables.first(ClaudeEngineLocator.cli(home: home, path: path))

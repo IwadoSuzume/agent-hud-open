@@ -61,6 +61,18 @@ final class SessionProjectWindowsTests: XCTestCase {
         }
     }
 
+    func testAWorkingDirectoryRecordedInItsShortSpellingBelongsToTheMainRepository() throws {
+        let fixture = try repository()
+        let long = fixture.worktree.path.replacingOccurrences(of: "/", with: "\\")
+        let length = Win32.withWide(long) { GetShortPathNameW($0, nil, 0) }
+        var buffer = [WCHAR](repeating: 0, count: Int(length) + 1)
+        let written = Win32.withWide(long) { GetShortPathNameW($0, &buffer, DWORD(buffer.count)) }
+        try XCTSkipIf(written == 0 || Int(written) >= buffer.count, "no short spelling for the fixture")
+        let short = String(decodingCString: buffer, as: UTF16.self)
+        try XCTSkipIf(short.lowercased() == long.lowercased(), "the volume keeps no 8.3 names")
+        XCTAssertEqual(SessionProject(session(short)).path?.lowercased(), fixture.main.path.lowercased(), short)
+    }
+
     func testAJunctionToAWorktreeUsesTheSameRepository() throws {
         let fixture = try repository()
         let alias = fixture.directory.appendingPathComponent("linked-alias")

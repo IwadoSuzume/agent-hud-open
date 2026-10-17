@@ -42,10 +42,8 @@ final class AntigravityCLITests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let printed = directory.appendingPathComponent("usage.json")
         try Data(Self.printed.utf8).write(to: printed)
-        let agy = directory.appendingPathComponent("agy")
-        try "#!/bin/sh\n[ \"$*\" = \"-p /usage --output-format json\" ] || exit 3\ncat '\(printed.path)'\n"
-            .write(to: agy, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: agy.path)
+        let agy = try TestEngine.write([.requireArguments(["-p", "/usage", "--output-format", "json"], orExit: 3), .cat(printed.path)],
+                                       to: directory.appendingPathComponent("agy"))
 
         let quota = try await AntigravityCLI().quota(executable: agy)
         XCTAssertEqual(quota.windows.count, 4)

@@ -50,9 +50,7 @@ final class ClaudeEngineTests: XCTestCase {
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: home) }
         func engine(_ output: String) throws -> ClaudeEngineUsageClient {
-            let url = home.appendingPathComponent("claude-\(UUID().uuidString)")
-            try "#!/bin/sh\ncat <<'JSON'\n\(output)\nJSON\n".write(to: url, atomically: true, encoding: .utf8)
-            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+            let url = try TestEngine.write([.out(output)], to: home.appendingPathComponent("claude-\(UUID().uuidString)"))
             return ClaudeEngineUsageClient(executable: url, workingDirectory: home)
         }
         let out = await (try engine(#"{"loggedIn": false, "authMethod": "none"}"#)).isSignedIn()
@@ -69,23 +67,18 @@ final class ClaudeEngineTests: XCTestCase {
         let versions = home.appendingPathComponent(".local/share/claude/versions", isDirectory: true)
         try FileManager.default.createDirectory(at: versions, withIntermediateDirectories: true)
         for name in ["2.1.9", "2.1.245", "2.1.100"] {
-            let url = versions.appendingPathComponent(name)
-            try "#!/bin/sh\n".write(to: url, atomically: true, encoding: .utf8)
-            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+            try TestEngine.write([], to: versions.appendingPathComponent(name))
         }
         XCTAssertEqual(ClaudeEngineLocator.find(home: home, path: "")?.lastPathComponent, "2.1.245")
-        let bin = home.appendingPathComponent(".local/bin/claude")
-        try FileManager.default.createDirectory(at: bin.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try "#!/bin/sh\n".write(to: bin, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: bin.path)
+        let bin = try TestEngine.write([], to: home.appendingPathComponent(".local/bin/claude"))
         XCTAssertEqual(ClaudeEngineLocator.find(home: home, path: ""), bin, "the user-facing symlink wins when present")
         XCTAssertNil(ClaudeEngineLocator.find(home: home.appendingPathComponent("missing"), path: ""))
         // PATH comes after every install place, as for the other clients' executables.
         let elsewhere = home.appendingPathComponent("elsewhere", isDirectory: true)
         try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
-        try FileManager.default.copyItem(at: bin, to: elsewhere.appendingPathComponent("claude"))
-        XCTAssertEqual(ClaudeEngineLocator.find(home: home.appendingPathComponent("missing"), path: "/nonexistent:" + elsewhere.path),
-                       elsewhere.appendingPathComponent("claude"))
+        let onPath = try TestEngine.write([], to: elsewhere.appendingPathComponent(TestEngine.programName("claude")))
+        XCTAssertEqual(ClaudeEngineLocator.find(home: home.appendingPathComponent("missing"), path: ["/nonexistent", elsewhere.path].joined(separator: TestEngine.pathSeparator)),
+                       onPath)
         XCTAssertEqual(ClaudeEngineLocator.find(home: home, path: elsewhere.path), bin)
     }
 
@@ -93,19 +86,12 @@ final class ClaudeEngineTests: XCTestCase {
         let home = FileManager.default.temporaryDirectory.appendingPathComponent("agenthud-home-\(UUID().uuidString)", isDirectory: true)
         let root = home.appendingPathComponent("Library/Application Support/Claude/claude-code", isDirectory: true)
         func engine(_ version: String, _ build: String) throws -> URL {
-            let url = root.appendingPathComponent("\(version)/\(build)/claude.app/Contents/MacOS/claude")
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try "#!/bin/sh\n".write(to: url, atomically: true, encoding: .utf8)
-            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
-            return url
+            try TestEngine.write([], to: root.appendingPathComponent("\(version)/\(build)/claude.app/Contents/MacOS/claude"))
         }
         _ = try engine("2.1.99", "9d6405864fdc")
         let newest = try engine("2.1.295", "1a2b3c4d5e6f")
         XCTAssertEqual(ClaudeEngineLocator.find(home: home, path: ""), newest, "a Mac with only the desktop app has its engine")
-        let onPath = home.appendingPathComponent("elsewhere/claude")
-        try FileManager.default.createDirectory(at: onPath.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try "#!/bin/sh\n".write(to: onPath, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: onPath.path)
+        let onPath = try TestEngine.write([], to: home.appendingPathComponent("elsewhere/" + TestEngine.programName("claude")))
         XCTAssertEqual(ClaudeEngineLocator.find(home: home, path: onPath.deletingLastPathComponent().path), onPath,
                        "any CLI engine, even one only on PATH, comes before the desktop app's")
     }
@@ -113,16 +99,8 @@ final class ClaudeEngineTests: XCTestCase {
     func testClientRunsAFakeEngine() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("agenthud-engine-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let fake = dir.appendingPathComponent("claude")
-        let script = """
-        #!/bin/bash
-        read -r line
-        echo '{"type":"system","subtype":"init"}'
-        echo '\(Self.response)'
-        sleep 5
-        """
-        try script.write(to: fake, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+        let fake = try TestEngine.write([.readLine, .out(#"{"type":"system","subtype":"init"}"#), .out(Self.response), .sleep(5)],
+                                        to: dir.appendingPathComponent("claude"))
         let client = ClaudeEngineUsageClient(executable: fake, workingDirectory: dir, timeout: 10)
         let started = Date()
         let usage = try await client.fetch()
@@ -134,8 +112,7 @@ final class ClaudeEngineTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("agenthud-engine-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let fake = dir.appendingPathComponent("claude")
-        try? "#!/bin/bash\nsleep 30\n".write(to: fake, atomically: true, encoding: .utf8)
-        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+        try? TestEngine.write([.sleep(30)], to: fake)
         let client = ClaudeEngineUsageClient(executable: fake, workingDirectory: dir, timeout: 1)
         do {
             _ = try await client.fetch()
@@ -151,9 +128,7 @@ final class ClaudeEngineTests: XCTestCase {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("agenthud-reset-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: dir) }
-        let fake = dir.appendingPathComponent("claude")
-        try "#!/bin/bash\nread -r line\necho '\(Self.response)'\n".write(to: fake, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fake.path)
+        let fake = try TestEngine.write([.readLine, .out(Self.response)], to: dir.appendingPathComponent("claude"))
         let now = try XCTUnwrap(DateParsing.iso8601("2026-09-08T00:00:00Z"))
         let provider = ClaudeCodeProvider(engine: .init(executable: fake, workingDirectory: dir),
                                          transcripts: .init(roots: []), history: .init(), clock: { now })

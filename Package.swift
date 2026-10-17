@@ -21,7 +21,6 @@ let windowsSkippedTests = [
     "System/InstanceLockTests.swift",
     "MCP/MCPAppChannelTests.swift",
     "Hooks/Permission/PermissionHookTests.swift",
-    "Hooks/Permission/DeepSeekQuestionObserverTests.swift",
     "Providers/Codex/CodexDaemonOriginTransportTests.swift",
     "Providers/Codex/CodexDesktopTestServer.swift",
     "Providers/Codex/CodexDesktopPermissionsTests.swift",
@@ -45,6 +44,8 @@ let package = Package(
         .testTarget(name: "AgentHUDSupportTests", dependencies: ["AgentHUDSupport"], resources: [.copy("Fixtures")]),
         .testTarget(name: "AgentHUDCoreTests", dependencies: ["AgentHUDCore", "AgentHUDSupport", "SQLite3"],
                     exclude: windowsSkippedTests, resources: [.copy("Providers/Kit/Zstandard/Fixtures")]),
+        // The stand-in engine the Core tests copy where a client's program is looked for (D-034); built with the tests.
+        .executableTarget(name: "AgentHUDFakeEngine", path: "Tests/WindowsFakeEngine"),
     ]
 )
 #else

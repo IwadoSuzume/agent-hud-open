@@ -283,7 +283,7 @@ final class PiSessionObserverTests: XCTestCase, @unchecked Sendable {
         emit('agent_start'); emit('agent_settled');
         console.log('Pi native lifecycle checks passed');
         """#.utf8), to: test)
-        let output = try await ProviderCommand.run("/usr/bin/env", ["node", test.path, home.path])
+        let output = try await TestNode.run([test.path, home.path])
         XCTAssertTrue(output.contains("Pi native lifecycle checks passed"), output)
     }
 }

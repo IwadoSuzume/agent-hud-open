@@ -130,11 +130,19 @@ enum Win32 {
         return URL(fileURLWithPath: string(path), isDirectory: true)
     }
 
-    /// The value of the environment variable `name` when it is set and not blank.
+    /// The value of the environment variable `name` when it is set and not blank, its name matched without regard to
+    /// case as Windows matches it (`ProcessInfo.environment` is keyed by the spelling the variable was set with, and a
+    /// process may inherit `SYSTEMROOT` or `Path`).
     static func environment(_ name: String) -> String? {
-        guard let value = ProcessInfo.processInfo.environment[name],
-              !value.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        return value
+        withWide(name) { key -> String? in
+            let size = GetEnvironmentVariableW(key, nil, 0)
+            guard size > 0 else { return nil }
+            var buffer = [WCHAR](repeating: 0, count: Int(size))
+            let count = GetEnvironmentVariableW(key, &buffer, size)
+            guard count > 0, count < size else { return nil }
+            let value = String(decoding: buffer[..<Int(count)], as: UTF16.self)
+            return value.trimmingCharacters(in: .whitespaces).isEmpty ? nil : value
+        }
     }
 
     static var invalidHandle: HANDLE? { HANDLE(bitPattern: -1) }

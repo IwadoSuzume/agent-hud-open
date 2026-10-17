@@ -173,8 +173,33 @@ final class ChildProcessWindowsTests: XCTestCase {
     func testEnvironmentBlocksAreSortedWithoutRegardToCase() {
         let block = ChildProcess.environmentBlock(["b": "2", "A": "1", "C": "3", "": "x", "bad=key": "y"])
         let entries = String(decoding: block, as: UTF16.self).split(separator: "\0").map(String.init)
+            .filter { entry in !ChildProcess.systemVariables.contains { entry.uppercased().hasPrefix($0.uppercased() + "=") } }
         XCTAssertEqual(entries, ["A=1", "b=2", "C=3"])
         XCTAssertEqual(block.suffix(2), [0, 0], "the block ends with two NULs")
+    }
+
+    /// D-035: a Windows program cannot start in an empty environment, so the system's folders are always passed on;
+    /// a value the caller gives wins, in whatever case it names the variable.
+    func testAGivenEnvironmentKeepsTheSystemFolders() throws {
+        func entries(_ environment: [String: String]) -> [String] {
+            String(decoding: ChildProcess.environmentBlock(environment), as: UTF16.self).split(separator: "\0").map(String.init)
+        }
+        let root = try XCTUnwrap(Win32.environment("SystemRoot"))
+        XCTAssertTrue(entries([:]).contains("SystemRoot=" + root), "\(entries([:]))")
+        XCTAssertFalse(entries([:]).contains { $0.uppercased().hasPrefix("PATH=") || $0.uppercased().hasPrefix("USERPROFILE=") },
+                       "nothing else is added")
+        XCTAssertEqual(entries(["SYSTEMROOT": #"D:\Other"#]).filter { $0.uppercased().hasPrefix("SYSTEMROOT=") }, [#"SYSTEMROOT=D:\Other"#])
+    }
+
+    /// Node, the runtime the DeepSeek reader starts with an environment of its own, runs in one that names nothing else.
+    func testNodeStartsInAnOtherwiseEmptyEnvironment() async throws {
+        guard let node = Executables.first(Executables.onPath("node", path: Executables.systemPath)) else {
+            throw XCTSkip("Node.js is not on PATH")
+        }
+        let output = try await ChildProcess.run(node, ["-e", "console.log(require('node:crypto').randomBytes(4).length)"],
+                                                environment: [:], timeout: 30, stdoutLimit: 1024)
+        XCTAssertEqual(output.status, 0, String(decoding: output.stderr, as: UTF8.self))
+        XCTAssertEqual(String(decoding: output.stdout, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines), "4")
     }
 }
 #endif

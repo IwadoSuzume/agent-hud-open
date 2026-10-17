@@ -13,7 +13,7 @@ struct DeepSeekScriptRuntime: Sendable, Equatable {
     static let applicationFolders = [URL(fileURLWithPath: "/Applications"),
                                      UserHome.directory.appendingPathComponent("Applications")]
 
-    static func node(path: String = ProcessInfo.processInfo.environment["PATH"] ?? "") -> Self? {
+    static func node(path: String = Executables.systemPath) -> Self? {
         DeepSeekLocator.nodeExecutable(path: path).map { Self(executable: $0, environment: [:]) }
     }
 
@@ -22,7 +22,10 @@ struct DeepSeekScriptRuntime: Sendable, Equatable {
     }
 
     static func desktopApplication(in folders: [URL] = applicationFolders) -> URL? {
-        folders.map { $0.appendingPathComponent(desktopName + ".app") }
+        // No source places the desktop app on Windows (docs/windows-port/SUPPORT_MATRIX.md), and `/Applications` would
+        // name a folder at the current drive's root that any user may create (D-019): there it is never looked for.
+        guard PlatformSupport.supportsDeepSeekDesktop else { return nil }
+        return folders.map { $0.appendingPathComponent(desktopName + ".app") }
             .first { FileManager.default.isExecutableFile(atPath: desktop($0).executable.path) }
     }
 

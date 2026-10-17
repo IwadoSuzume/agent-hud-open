@@ -42,8 +42,11 @@ package enum MCPClientCommand {
     package static func run(_ executable: URL, _ arguments: [String], timeout: TimeInterval = timeout) async -> MCPCommandResult {
         let home = UserHome.directory
         var environment = ProcessInfo.processInfo.environment
+        #if !os(Windows)
+        // On Windows the child keeps this process's PATH: the folders below are macOS's (DECISIONS.md D-019).
         environment["PATH"] = "\(home.path)/.bun/bin:\(home.path)/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:"
             + (environment["PATH"] ?? "")
+        #endif
         do {
             let child = try ChildProcess(executable, arguments, environment: environment, directory: home, stdoutLimit: 64 * 1024)
             defer { child.stop() }

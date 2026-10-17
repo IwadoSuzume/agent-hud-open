@@ -1,6 +1,13 @@
+#if canImport(CryptoKit)
 import CryptoKit
+#endif
+#if canImport(Darwin)
 import Darwin
+#endif
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import XCTest
 @testable import AgentHUDCore
 
@@ -314,6 +321,8 @@ private final class ObserverStreams {
     func finishAll() { for index in connections.indices { finish(index) } }
 }
 
+#if !os(Windows)
+// Windows: WindowsSupport/IdleQuestionHost+Windows.swift, the same host on Winsock.
 /// The handshake completes, then the host stays silent until the client closes its socket.
 private final class IdleQuestionHost: @unchecked Sendable {
     let port: Int
@@ -394,3 +403,4 @@ private final class IdleQuestionHost: @unchecked Sendable {
 
     private enum Failure: Error { case socket }
 }
+#endif

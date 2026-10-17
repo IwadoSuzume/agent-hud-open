@@ -152,9 +152,7 @@ final class UsageInsightsTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         let response = #"{"type":"control_response","response":{"subtype":"success","request_id":"agent-hud-usage","response":{"subscription_type":"max","rate_limits_available":true,"rate_limits":\#(rateLimits)}}}"#
-        let script = directory.appendingPathComponent("claude")
-        try "#!/bin/bash\nread -r l\necho '\(response)'\n".write(to: script, atomically: true, encoding: .utf8)
-        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        let script = try TestEngine.write([.readLine, .out(response)], to: directory.appendingPathComponent("claude"))
         return ClaudeEngineUsageClient(executable: script, workingDirectory: directory, timeout: 10)
     }
 }

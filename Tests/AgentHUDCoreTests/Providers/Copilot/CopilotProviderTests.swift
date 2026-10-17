@@ -150,7 +150,12 @@ final class CopilotProviderTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(credentials([:], keychain: encoded).token(), "from-keychain")
         XCTAssertEqual(calls.values, ["keychain gh:github.com"])
         XCTAssertEqual(credentials([:], keychain: nil).token(), "from-file")
+        #if os(Windows)
+        // gh's own folder on Windows (docs/windows-port/SUPPORT_MATRIX.md).
+        XCTAssertEqual(calls.values.last, WindowsFolders.roamingAppData.appendingPathComponent("GitHub CLI/hosts.yml").path)
+        #else
         XCTAssertEqual(calls.values.last, home.appendingPathComponent(".config/gh/hosts.yml").path)
+        #endif
         XCTAssertEqual(credentials(["XDG_CONFIG_HOME": "/xdg"], keychain: nil).hostsFile.path, "/xdg/gh/hosts.yml")
         XCTAssertEqual(credentials(["GH_CONFIG_DIR": "/gh", "XDG_CONFIG_HOME": "/xdg"], keychain: nil).hostsFile.path, "/gh/hosts.yml")
         XCTAssertNil(CopilotCredentials.hostsToken("ghe.example.com:\n    oauth_token: enterprise\n"))

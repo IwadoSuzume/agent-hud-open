@@ -16,7 +16,12 @@ struct AntigravityCLI: Sendable {
             var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
             guard proc_pidpath(Int32(candidate.pid), &path, UInt32(path.count)) > 0 else { return nil }
             let url = URL(fileURLWithPath: String(cString: path))
+            #if os(Windows)
+            // A Windows program is named with its extension, in whatever case (DECISIONS.md D-019).
+            return url.lastPathComponent.lowercased() == "agy.exe" ? url : nil
+            #else
             return url.lastPathComponent == "agy" ? url : nil
+            #endif
         }.first
     }
 

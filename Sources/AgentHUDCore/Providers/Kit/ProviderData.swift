@@ -44,16 +44,27 @@ public enum AdditionalSource: String, CaseIterable, Sendable {
     }
 
     public func isInstalled(home: URL = UserHome.directory) -> Bool {
+        guard PlatformSupport.supports(self) else { return false }
         let paths: [String]
         switch self {
-        case .cursor: paths = ["Library/Application Support/Cursor/User/globalStorage/state.vscdb", "Applications/Cursor.app"]
+        case .cursor:
+            #if os(Windows)
+            return FileManager.default.fileExists(atPath: CursorClient.defaultDatabase.path)
+            #else
+            paths = ["Library/Application Support/Cursor/User/globalStorage/state.vscdb", "Applications/Cursor.app"]
+            #endif
         case .antigravity: paths = layout?.installPaths ?? []
         // A same-named desktop app is not the CLI these clients read, and it must not trigger hook installation.
         default: return layout?.installPaths.contains { FileManager.default.fileExists(atPath: home.appendingPathComponent($0).path) } ?? false
         }
+        #if os(Windows)
+        // No `/Applications` here: it would name a folder at the current drive's root that any user may create (D-019).
+        return paths.contains { FileManager.default.fileExists(atPath: home.appendingPathComponent($0).path) }
+        #else
         return paths.contains { FileManager.default.fileExists(atPath: home.appendingPathComponent($0).path) }
             || FileManager.default.fileExists(atPath: "/Applications/\(vendor).app")
             || !VendorCatalog.applications(vendor).isEmpty
+        #endif
     }
 }
 

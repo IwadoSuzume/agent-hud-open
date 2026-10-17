@@ -264,7 +264,7 @@ final class OpenCodeSessionObserverTests: XCTestCase, @unchecked Sendable {
         await blocked.event(undefined);
         console.log('OpenCode plugin checks passed');
         """#.utf8), to: test)
-        let output = try await ProviderCommand.run("/usr/bin/env", ["node", test.path, home.path])
+        let output = try await TestNode.run([test.path, home.path])
         XCTAssertTrue(output.contains("OpenCode plugin checks passed"), output)
     }
 }
