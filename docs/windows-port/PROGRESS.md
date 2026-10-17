@@ -4,20 +4,20 @@ Read this first when resuming (TASK.md, top). Update after every step.
 
 ## Status
 
-- **Current milestone:** M1 — Windows CI skeleton (in review)
+- **Current milestone:** M2 — Support cross-platform (in review)
 - **Branch:** `windows-port`, pushed to the fork `IwadoSuzume/agent-hud-open` (created 2026-10-16 for CI; upstream
   `jazzenchen/agent-hud-open` is never pushed to, no PR is opened).
 - **Spike branch:** `spike-m0` (commit `809e047`, local only): the full spike, Core + tests building and running on
   Windows. Milestones M1–M5 re-apply it in reviewed steps; do not merge it.
-- **Last approved tag:** `port-M0-approved` (`990426e`)
+- **Last approved tag:** `port-M1-approved` (`ffc8dba`); earlier `port-M0-approved` (`990426e`)
 
 ## Milestones
 
 | Milestone | State | Start commit | Approved tag | Notes |
 | --- | --- | --- | --- | --- |
 | M0 Reconnaissance & decisions | approved 2026-10-16 | `c258093` (upstream main) | `port-M0-approved` (`990426e`) | round 1: tests ALL_PASS (G1 run 38969577715 success, G6 pass); review CHANGES_REQUESTED (4 blocking, all doc gaps) → fixed |
-| M1 Windows CI skeleton | review | `703ae2e` | — | windows.yml, Windows manifest branch (Support) |
-| M2 Support cross-platform | todo | | | |
+| M1 Windows CI skeleton | approved 2026-10-16 | `703ae2e` | `port-M1-approved` (`ffc8dba`) | round 1: tests ALL_PASS (Windows run 38982139136, macOS run 38982141982), review APPROVE |
+| M2 Support cross-platform | review | `ffc8dba` | — | portable SHA-256/SHA-1, golden samples, Support built and tested in CI |
 | M3 Core platform layer | todo | | | |
 | M4 Providers | todo | | | |
 | M5 Hooks & MCP | todo | | | |
@@ -56,7 +56,7 @@ PowerShell's `*>` holds everything until the process exits too.
 
 | Gate | Command | Applies |
 | --- | --- | --- |
-| G1 macOS | GitHub Actions `Source checks` (`ci.yml`) dispatched on `windows-port` in the fork (`POST /repos/IwadoSuzume/agent-hud-open/actions/workflows/ci.yml/dispatches {"ref":"windows-port"}`), read with `GET /repos/IwadoSuzume/agent-hud-open/actions/runs?branch=windows-port&event=workflow_dispatch`; jobs `test`, `app`, `macos` must be `success` for the milestone's head commit | every milestone (M0: run 38969577715 on `d28f59d`, success) |
+| G1 macOS | GitHub Actions `Source checks` (`ci.yml`) dispatched on `windows-port` in the fork (`POST /repos/IwadoSuzume/agent-hud-open/actions/workflows/ci.yml/dispatches {"ref":"windows-port"}`), read with `GET /repos/IwadoSuzume/agent-hud-open/actions/runs?branch=windows-port&event=workflow_dispatch`; jobs `test`, `app`, `macos` must be `success` for the milestone's head commit | every milestone (runs listed in the milestone table) |
 | G2 Windows build | `swift build -c release --scratch-path $build` (warnings compared with the baseline below); `dotnet build windows\AgentHUD.sln -c Release` from M7; the `Windows port` workflow (`windows.yml`) | M1 (CI), M2+ |
 | G3 Windows tests | `swift test --scratch-path $build` in the temporary profile; every exclusion and runtime skip in SKIPPED_TESTS.md | M2 (Support), M3+ (Core) |
 | G4 determinism | `RecordCodingGoldenTests` (Support), on Windows and in the macOS CI | M2+ |
@@ -69,28 +69,16 @@ code, Windows CRT only).
 
 ## Next steps (resume here)
 
-1. M0 is **approved**: tag `port-M0-approved` on `990426e` (reviewer round 2 APPROVE; tester round 2
-   ALL_PASS, G1 run 38971749789 success, report `reports/M0-tests-2.md`).
-2. M1: Windows branch of `Package.swift` (Support only) + `.github/workflows/windows.yml` (draft in the worktree).
-3. Development continues in the worktree `%LOCALAPPDATA%\agenthud-dev\wt` (branch `spike-m0`, ASCII path, builds in
-   place with `--scratch-path %LOCALAPPDATA%\agenthud-dev\wtbuild`). State at commit `284fc05`: Support tests 9/9
-   pass on Windows (golden samples, NIST vectors); Windows platform tests 30/34 pass — the overlapped-I/O count fix
-   (NamedPipes read/write, ChildProcess reader) is applied but not yet re-run; still to fix two test mistakes:
-   `InstanceLockWindowsTests.testOnlyARunningHolderCountsAsRunning` (release the claim in a `do {}` block before
-   rewriting the file) and `ChildProcessWindowsTests.testLines…` (`set /p` exits 1: end the command with `&exit /b 0`).
-
-## M0 round-2 non-blocking notes (to fold in at M1/M3)
-
-- D-007: `%LOCALAPPDATA%` can itself be non-ASCII; the build script needs an ASCII per-user fallback with an
-  owner-only DACL. PORTING_PLAN §3: "8 not replaced" → 10. ADR-001: 20 guards remain after D-006; 16 files with
-  `os(Windows)` branches (18 counting the two import-only files).
-- D-018: override every `UserDefaults.set` overload the stores call; test that a round trip writes no `.plist`.
-- D-021: verify after G3 that no `AgentHUDTests.*.plist` appears in the real `%LOCALAPPDATA%`.
-- D-010: `pipe.key` created with `CREATE_NEW` and an explicit owner-only DACL, never logged; unreadable → fall back.
-- D-023: `ReplaceFileW` on the link's final target; a first write uses a non-replacing move.
-- D-011: keep the `.bat`/`.cmd` check (after trimming dots/spaces) in addition to the `MZ` check.
-- D-020: the boundary rule runs on macOS too — accept and note, or run it only in the Windows CI.
-- PROGRESS gate snippet: rename `$profile` (PowerShell automatic variable) to `$testProfile`.
+1. M2 review round 1: port-tester (G1, G2 Windows run, G3 Support tests, G4 golden on both platforms, G6, G8) and
+   port-reviewer on `ffc8dba...HEAD`; then tag `port-M2-approved`.
+2. M3 (Core platform layer): bring the Core work over from the worktree `%LOCALAPPDATA%\agenthud-dev\wt` (branch
+   `spike-m0`, ASCII path; builds there with `--scratch-path %LOCALAPPDATA%\agenthud-dev\wtbuild`). Already done there:
+   the replaced macOS files restored to upstream (D-006), `UserHome` seam over 43 files (D-020), `WindowsFolders`
+   absolute-existing checks (D-008), `SettingsFile` (D-018), per-user pipe key (D-010), ChildProcess scalar quoting and
+   batch/PE checks (D-011), overlapped-I/O count fix; Windows platform tests 9+13+5+5+6+6 pass. Still to do for M3:
+   `ReadOnlySQLite` WAL/immutable and the SQLite version check (D-003), case-insensitive path comparisons (D-023),
+   the boundary rule for home reads (D-020), SKIPPED_TESTS.md, the M3 failures of PORTING_PLAN §8, the Core steps in
+   `windows.yml`.
 
 ## Known issues / TODO
 

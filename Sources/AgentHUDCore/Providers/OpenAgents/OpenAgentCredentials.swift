@@ -1,6 +1,8 @@
 import AgentHUDSupport
 import Foundation
+#if canImport(CryptoKit)
 import CryptoKit
+#endif
 
 struct OpenAgentCredential: Sendable {
     enum Service: String, Sendable { case kimi, kimiGlobal, glmChina, glmGlobal, go }

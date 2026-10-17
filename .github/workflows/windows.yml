@@ -24,6 +24,9 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          # No step after checkout needs the token, and the toolchain installer runs in this job.
+          persist-credentials: false
 
       - name: Check source boundaries
         run: python scripts/check-source-boundaries.py
@@ -59,7 +62,7 @@ jobs:
           $hash = (Get-FileHash $installer -Algorithm SHA256).Hash
           if ($hash -ne $env:SWIFT_INSTALLER_SHA256) { throw "Swift installer hash $hash does not match the pinned one" }
           $signature = Get-AuthenticodeSignature $installer
-          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Apple Inc\.') {
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch '(^|, )O=Apple Inc\.(,|$)') {
             throw "Swift installer signature is $($signature.Status) by $($signature.SignerCertificate.Subject)"
           }
           $process = Start-Process -FilePath $installer -ArgumentList '/quiet', '/norestart', '/log', "$env:RUNNER_TEMP\swift-install.log" -Wait -PassThru
@@ -81,8 +84,24 @@ jobs:
       - name: Toolchain
         run: swift --version
 
-      - name: Resolve the Windows package graph
-        run: swift package dump-package | Out-Null
+      - name: Cache the Swift build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: swift-build-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift') }}-${{ github.sha }}
+          restore-keys: swift-build-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift') }}-
+
+      - name: Build (release)
+        run: swift build -c release
+
+      - name: Test
+        # In a temporary profile: tests must not write the runner's real APPDATA or LOCALAPPDATA (DECISIONS.md D-021).
+        run: |
+          $profileRoot = "$env:RUNNER_TEMP\testprofile"
+          New-Item -ItemType Directory -Force "$profileRoot\Roaming", "$profileRoot\Local" | Out-Null
+          $env:APPDATA = "$profileRoot\Roaming"
+          $env:LOCALAPPDATA = "$profileRoot\Local"
+          swift test
 
       - name: Compile a smoke package
         # Proves the toolchain, the Windows SDK and the linker work on the runner before the port's own targets do.

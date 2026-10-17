@@ -1,5 +1,7 @@
 import AgentHUDSupport
+#if canImport(CryptoKit)
 import CryptoKit
+#endif
 import Foundation
 
 /// The desktop client's account-scoped roster. Runtime turn state is deliberately absent from its persisted rows.

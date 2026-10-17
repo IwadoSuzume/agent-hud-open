@@ -1,0 +1,206 @@
+{
+  "about": "Golden samples for RecordCoding and the portable digests (docs/windows-port/adr/ADR-004-sha256.md). Digests were computed with Python's hashlib; the same tests check them against CryptoKit on macOS and against the portable implementation on Windows.",
+  "recordHashes": [
+    {
+      "components": [],
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "components": [
+        ""
+      ],
+      "hash": "ba768b331fd86cec803be04e56ab2b3d4c0e98ef4ee4fcd4e72ad7cce61a1d1f"
+    },
+    {
+      "components": [
+        "",
+        ""
+      ],
+      "hash": "390feabc786e369e55b904251d643b52b52b691c60eb74a498ef7c6df993bf12"
+    },
+    {
+      "components": [
+        "a"
+      ],
+      "hash": "4162fddd39a3e4225e8e2392eced237fbeb34e6e218b5647d27bd4d2b9c0da24"
+    },
+    {
+      "components": [
+        "ab",
+        "c"
+      ],
+      "hash": "430fb1b4ac43316eca81fab27a1930ab8eff8fef6a1dc7903dce44bbc2790dc5"
+    },
+    {
+      "components": [
+        "a",
+        "bc"
+      ],
+      "hash": "5310a58788781ab25d5ad7c3f85035824b4eb7bdfa394e0ac2186271472b5492"
+    },
+    {
+      "components": [
+        "claude",
+        "session-1",
+        "2026-10-16T09:41:00.123Z"
+      ],
+      "hash": "e990d944df7925621b3010dd2ab0365775568a76b648cbaa5666ff86598e2694"
+    },
+    {
+      "components": [
+        "codex",
+        "C:\\Users\\张三\\.codex\\sessions\\rollout.jsonl",
+        "42"
+      ],
+      "hash": "18ba0b1792e81c95bb390bc6863ad5474a82eec21af2ad859211384adc48e91a"
+    },
+    {
+      "components": [
+        "é中😀",
+        "\u0000",
+        "line\nbreak",
+        "tab\t",
+        "\"quoted\""
+      ],
+      "hash": "7107ce2c7c418d9441b1b4973178f8c3f3889c105352ceabf5a6b4409af4c28e"
+    },
+    {
+      "components": [
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      ],
+      "hash": "f6b26572a562fadb7e167a2ceac55009b3f5c639dac2066da553ef7df1a912b6"
+    },
+    {
+      "components": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "32",
+        "33",
+        "34",
+        "35",
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44",
+        "45",
+        "46",
+        "47",
+        "48",
+        "49",
+        "50",
+        "51",
+        "52",
+        "53",
+        "54",
+        "55",
+        "56",
+        "57",
+        "58",
+        "59",
+        "60",
+        "61",
+        "62",
+        "63"
+      ],
+      "hash": "589fabf2aefb157f2073318b040db9f7c1bea6875cd5898e4a1f0b9860ff3ee6"
+    }
+  ],
+  "sha256": [
+    {
+      "utf8": "",
+      "hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "utf8": "abc",
+      "hex": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    },
+    {
+      "utf8": "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+      "hex": "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
+    },
+    {
+      "utf8": "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+      "hex": "cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1"
+    },
+    {
+      "repeat": "a",
+      "count": 1000000,
+      "hex": "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
+    }
+  ],
+  "sha1": [
+    {
+      "utf8": "",
+      "hex": "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+    },
+    {
+      "utf8": "abc",
+      "hex": "a9993e364706816aba3e25717850c26c9cd0d89d"
+    },
+    {
+      "utf8": "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+      "hex": "84983e441c3bd26ebaae4aa1f95129e5e54670f1"
+    },
+    {
+      "utf8": "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+      "hex": "a49b2446a02c645bf419f995b67091253a04a259"
+    },
+    {
+      "repeat": "a",
+      "count": 1000000,
+      "hex": "34aa973cd4c4daa4f61eeb2bdbad27316534016f"
+    },
+    {
+      "utf8": "dGhlIHNhbXBsZSBub25jZQ==258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
+      "hex": "b37a4f2cc0624f1690f64606cf385945b2bec4ea",
+      "base64": "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+    }
+  ],
+  "milliseconds": [
+    0,
+    1,
+    999,
+    1000,
+    1700000000123,
+    1760607660999,
+    -1,
+    -1700000000123,
+    253402300799999
+  ],
+  "encoderSample": "{\"at\":1700000000123,\"count\":9007199254740993,\"flag\":true,\"list\":[\"x\"],\"name\":\"a/b é中😀 \\\"q\\\" \\\\ \\n\\t\",\"nested\":{\"B\":3,\"a\":2,\"a10\":4,\"a2\":5,\"z\":1},\"ratio\":1.5}"
+}
