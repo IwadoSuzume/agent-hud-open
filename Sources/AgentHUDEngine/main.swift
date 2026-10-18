@@ -8,7 +8,10 @@ import Foundation
 // windows (Codex, Qwen Code) or that runs in a terminal (Claude Code) shows none.
 if let status = HookEntry.handle(arguments: CommandLine.arguments) { exit(status) }
 
-// The UI protocol the Windows shell talks to the engine over comes with M6 (PROTOCOL.md). Until then, anything else is
-// a mistake to say.
-FileHandle.standardError.write(Data("agenthud-engine: no command given (hooks and --mcp only in this build)\n".utf8))
+// The Windows shell's child: the protocol over the inherited standard input and output (PROTOCOL.md).
+if EngineServe.isRequested(by: CommandLine.arguments) {
+    EngineServe.run(arguments: CommandLine.arguments, executable: Bundle.main.executableURL)
+}
+
+EngineServe.complain("no command given (--serve, --mcp or a hook)")
 exit(2)

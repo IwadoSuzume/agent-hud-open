@@ -30,3 +30,10 @@ tmp/
 
 # Swift Build on Windows writes a resource bundle's Info.plist into the package root (docs/windows-port).
 /Info.plist
+
+# The Windows shell's .NET build products (docs/windows-port).
+windows/**/bin/
+windows/**/obj/
+windows/**/TestResults/
+windows/TestResults/
+__pycache__/

@@ -125,8 +125,8 @@ SKIPPED_TESTS.md (M3) with its reason and Windows counterpart.
 
 | Item | Where | Milestone |
 | --- | --- | --- |
-| Engine executable (`AgentHUDEngine`, Windows only) | `Sources/AgentHUDEngine` | M6 |
-| Versioned shell↔engine protocol + JSON Schema + shared fixtures | `docs/windows-port/PROTOCOL.md`, `windows/protocol/` | M6 |
+| Engine executable (`AgentHUDEngine`, Windows only) | `Sources/AgentHUDEngine` (hooks and `--mcp` M5; **done M6:** `--serve`, `Platform/Windows/Shell/EngineServe.swift`, `EngineServer.swift`) | M6 |
+| Versioned shell↔engine protocol + JSON Schema + shared fixtures | **done M6:** `docs/windows-port/PROTOCOL.md`, `windows/protocol/` (schema, fixtures), `ShellProtocol.swift`, `ShellStrings.swift`, `windows/AgentHUD.Protocol` (+ tests), `scripts/windows/check-protocol.py` (D-041, D-042) | M6 |
 | WPF shell, tests | `windows/AgentHUD`, `windows/AgentHUD.Tests` | M7 |
 | Windows CI | `.github/workflows/windows.yml` | M1 |
 | Build/package script | `scripts/build-windows.ps1` | M8 |

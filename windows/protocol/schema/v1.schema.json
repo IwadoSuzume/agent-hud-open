@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/IwadoSuzume/agent-hud-open/windows/protocol/schema/v1.schema.json",
+  "title": "Agent HUD engine-shell protocol, version 1.0",
+  "description": "One message per line (docs/windows-port/PROTOCOL.md). Minor versions only add optional properties and message types; this file describes 1.0 exactly, and a reader ignores what it does not know.",
+  "oneOf": [
+    { "$ref": "#/$defs/engineHello" },
+    { "$ref": "#/$defs/lockHeld" },
+    { "$ref": "#/$defs/state" },
+    { "$ref": "#/$defs/event" },
+    { "$ref": "#/$defs/error" },
+    { "$ref": "#/$defs/shellHello" },
+    { "$ref": "#/$defs/refresh" },
+    { "$ref": "#/$defs/quit" },
+    { "$ref": "#/$defs/answer" },
+    { "$ref": "#/$defs/updateSettings" }
+  ],
+  "$defs": {
+    "time": { "type": "integer", "description": "milliseconds since 1970 UTC" },
+    "timeOrNull": { "type": ["integer", "null"] },
+    "textOrNull": { "type": ["string", "null"] },
+    "pct": { "type": "number", "minimum": 0, "maximum": 100 },
+    "pctOrNull": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+    "level": { "enum": ["ok", "warning", "critical"] },
+    "levelOrNull": { "enum": ["ok", "warning", "critical", null] },
+
+    "engineHello": {
+      "type": "object", "additionalProperties": false,
+      "required": ["v", "type", "minor", "engine", "demo", "language", "strings"],
+      "properties": {
+        "v": { "const": 1 }, "type": { "const": "hello" }, "minor": { "type": "integer", "minimum": 0 },
+        "engine": { "type": "object", "additionalProperties": false, "required": ["version"],
+                    "properties": { "version": { "type": "string" } } },
+        "demo": { "type": "boolean" },
+        "language": { "enum": ["zh", "en"] },
+        "strings": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "lockHeld": {
+      "type": "object", "additionalProperties": false, "required": ["v", "type", "holder"],
+      "properties": { "v": { "const": 1 }, "type": { "const": "lock-held" }, "holder": { "$ref": "#/$defs/textOrNull" } }
+    },
+    "error": {
+      "type": "object", "additionalProperties": false, "required": ["v", "type", "message"],
+      "properties": { "v": { "const": 1 }, "type": { "const": "error" }, "message": { "type": "string" } }
+    },
+    "state": {
+      "type": "object", "additionalProperties": false,
+      "required": ["v", "type", "generatedAt", "paused", "error", "settings", "panel", "approvals"],
+      "properties": {
+        "v": { "const": 1 }, "type": { "const": "state" },
+        "generatedAt": { "$ref": "#/$defs/timeOrNull" },
+        "paused": { "type": "boolean" },
+        "error": { "$ref": "#/$defs/textOrNull" },
+        "settings": { "type": "object", "description": "Core's own encoding of Settings; Core validates every change" },
+        "panel": { "$ref": "#/$defs/panel" },
+        "approvals": { "type": "array", "items": { "$ref": "#/$defs/approval" } }
+      }
+    },
+    "panel": {
+      "type": "object", "additionalProperties": false, "required": ["now", "maxUsedPct", "glow", "agents", "sessions"],
+      "properties": {
+        "now": { "$ref": "#/$defs/time" },
+        "maxUsedPct": { "$ref": "#/$defs/pctOrNull" },
+        "glow": { "type": "array", "items": {
+          "type": "object", "additionalProperties": false, "required": ["vendor", "level"],
+          "properties": { "vendor": { "type": "string" }, "level": { "$ref": "#/$defs/level" } } } },
+        "agents": { "type": "array", "items": { "$ref": "#/$defs/agent" } },
+        "sessions": { "type": "array", "items": { "$ref": "#/$defs/session" } }
+      }
+    },
+    "agent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "vendor", "model", "shortModel", "level", "usedPct", "remainingPct", "weeklyRemainingPct",
+                   "resetAt", "resetText", "missingQuotaLabel", "paletteIndex", "isCurrentAccount", "forecastHint"],
+      "properties": {
+        "id": { "type": "string" }, "vendor": { "type": "string" }, "model": { "type": "string" },
+        "shortModel": { "$ref": "#/$defs/textOrNull" }, "level": { "$ref": "#/$defs/levelOrNull" },
+        "usedPct": { "$ref": "#/$defs/pctOrNull" }, "remainingPct": { "$ref": "#/$defs/pctOrNull" },
+        "weeklyRemainingPct": { "$ref": "#/$defs/pctOrNull" },
+        "resetAt": { "$ref": "#/$defs/timeOrNull" }, "resetText": { "$ref": "#/$defs/textOrNull" },
+        "missingQuotaLabel": { "type": "string" }, "paletteIndex": { "type": "integer", "minimum": 0 },
+        "isCurrentAccount": { "type": "boolean" }, "forecastHint": { "$ref": "#/$defs/textOrNull" }
+      }
+    },
+    "session": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "agentId", "task", "project", "phase", "phaseText", "startedAt", "lastEventAt", "message",
+                   "liveStatus", "tokensIn", "tokensOut", "cacheReadTokens", "tokensText"],
+      "properties": {
+        "id": { "type": "string" }, "agentId": { "type": "string" }, "task": { "type": "string" },
+        "project": { "$ref": "#/$defs/textOrNull" },
+        "phase": { "enum": ["running", "waitingForApproval", "idle", "unverified"] },
+        "phaseText": { "type": "string" },
+        "startedAt": { "$ref": "#/$defs/time" }, "lastEventAt": { "$ref": "#/$defs/time" },
+        "message": { "$ref": "#/$defs/textOrNull" }, "liveStatus": { "type": "boolean" },
+        "tokensIn": { "type": "integer", "minimum": 0 }, "tokensOut": { "type": "integer", "minimum": 0 },
+        "cacheReadTokens": { "type": "integer", "minimum": 0 }, "tokensText": { "type": "string" }
+      }
+    },
+    "approval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "source", "vendor", "sessionID", "toolName", "summary", "detail", "project", "path", "removed",
+                   "added", "at", "isQuestion", "questions", "isPlan", "plan", "answersPlan", "alwaysAllowRule"],
+      "properties": {
+        "id": { "type": "string" }, "source": { "type": "string" }, "vendor": { "type": "string" },
+        "sessionID": { "type": "string" }, "toolName": { "$ref": "#/$defs/textOrNull" }, "summary": { "type": "string" },
+        "detail": { "$ref": "#/$defs/textOrNull" }, "project": { "$ref": "#/$defs/textOrNull" },
+        "path": { "$ref": "#/$defs/textOrNull" }, "removed": { "$ref": "#/$defs/textOrNull" },
+        "added": { "$ref": "#/$defs/textOrNull" }, "at": { "$ref": "#/$defs/time" },
+        "isQuestion": { "type": "boolean" },
+        "questions": { "type": "array", "items": {
+          "type": "object", "additionalProperties": false, "required": ["key", "question", "header", "multiSelect", "options"],
+          "properties": {
+            "key": { "type": "string" }, "question": { "type": "string" }, "header": { "$ref": "#/$defs/textOrNull" },
+            "multiSelect": { "type": "boolean" },
+            "options": { "type": "array", "items": {
+              "type": "object", "additionalProperties": false, "required": ["label", "description"],
+              "properties": { "label": { "type": "string" }, "description": { "$ref": "#/$defs/textOrNull" } } } } } } },
+        "isPlan": { "type": "boolean" }, "plan": { "$ref": "#/$defs/textOrNull" }, "answersPlan": { "type": "boolean" },
+        "alwaysAllowRule": { "$ref": "#/$defs/textOrNull" }
+      }
+    },
+    "event": {
+      "type": "object", "additionalProperties": false, "required": ["v", "type", "event"],
+      "properties": {
+        "v": { "const": 1 }, "type": { "const": "event" },
+        "event": { "oneOf": [
+          { "type": "object", "additionalProperties": false,
+            "required": ["kind", "id", "alert", "agentId", "vendor", "model", "preview", "timeToExhaust", "timeToExhaustText", "alsoExhausted"],
+            "properties": {
+              "kind": { "const": "quotaAlert" }, "id": { "type": "string" }, "alert": { "enum": ["exhaustion", "reset"] },
+              "agentId": { "type": "string" }, "vendor": { "type": "string" }, "model": { "type": "string" },
+              "preview": { "type": "boolean" }, "timeToExhaust": { "type": ["integer", "null"] },
+              "timeToExhaustText": { "$ref": "#/$defs/textOrNull" },
+              "alsoExhausted": { "type": "array", "items": { "type": "string" } } } },
+          { "type": "object", "additionalProperties": false, "required": ["kind", "id", "added", "preview"],
+            "properties": { "kind": { "const": "resetCredits" }, "id": { "type": "string" },
+                            "added": { "type": "integer", "minimum": 0 }, "preview": { "type": "boolean" } } },
+          { "type": "object", "additionalProperties": false,
+            "required": ["kind", "id", "sessionID", "vendor", "task", "model", "startedAt", "completedAt"],
+            "properties": { "kind": { "const": "completion" }, "id": { "type": "string" }, "sessionID": { "type": "string" },
+                            "vendor": { "type": "string" }, "task": { "type": "string" }, "model": { "type": "string" },
+                            "startedAt": { "$ref": "#/$defs/timeOrNull" }, "completedAt": { "$ref": "#/$defs/time" } } }
+        ] }
+      }
+    },
+
+    "shellHello": {
+      "type": "object", "additionalProperties": false, "required": ["v", "type", "minor", "shell"],
+      "properties": {
+        "v": { "const": 1 }, "type": { "const": "hello" }, "minor": { "type": "integer", "minimum": 0 },
+        "shell": { "type": "object", "additionalProperties": false, "required": ["version"],
+                   "properties": { "version": { "type": "string" } } }
+      }
+    },
+    "refresh": { "type": "object", "additionalProperties": false, "required": ["v", "type"],
+                 "properties": { "v": { "const": 1 }, "type": { "const": "refresh" } } },
+    "quit": { "type": "object", "additionalProperties": false, "required": ["v", "type"],
+              "properties": { "v": { "const": 1 }, "type": { "const": "quit" } } },
+    "answer": {
+      "type": "object", "additionalProperties": false, "required": ["v", "type", "id", "decision"],
+      "properties": {
+        "v": { "const": 1 }, "type": { "const": "answer" }, "id": { "type": "string", "minLength": 1 },
+        "decision": { "enum": ["allow", "deny", "allowAlways", "answer", "approvePlan", "keepPlanning", "leave"] },
+        "answers": { "type": "object", "additionalProperties": {
+          "type": "object", "additionalProperties": false, "required": ["selected"],
+          "properties": { "selected": { "type": "array", "items": { "type": "string" } },
+                          "custom": { "$ref": "#/$defs/textOrNull" } } } },
+        "acceptEdits": { "type": "boolean" },
+        "note": { "$ref": "#/$defs/textOrNull" }
+      }
+    },
+    "updateSettings": {
+      "type": "object", "additionalProperties": false, "required": ["v", "type", "patch"],
+      "properties": { "v": { "const": 1 }, "type": { "const": "update-settings" },
+                      "patch": { "type": "object", "description": "Settings fields; Core decodes and validates them" } }
+    }
+  }
+}

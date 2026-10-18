@@ -31,6 +31,12 @@ jobs:
       - name: Check source boundaries
         run: python scripts/check-source-boundaries.py
 
+      - name: Shell protocol and .NET tests (G5)
+        # The image's .NET 10 SDK (ADR-002); telemetry off inside the script (DECISIONS.md D-042).
+        run: |
+          dotnet --list-sdks
+          scripts/windows/test-dotnet.ps1
+
       - name: System SQLite version
         # ADR-003: the port reads SQLite through the system's winsqlite3; its version follows the image's OS build.
         run: |

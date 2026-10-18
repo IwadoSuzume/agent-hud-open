@@ -27,7 +27,8 @@ extension HookSettings {
     ///
     /// When a step fails the user's file is never lost: `ReplaceFileW` can fail after it moved the old file to the
     /// backup name (`ERROR_UNABLE_TO_MOVE_REPLACEMENT_2`), and then the backup is moved back. The staged file is removed
-    /// only once the user's file is in place again, and the backup only once the new file is.
+    /// only once the user's file is in place again (or, when the file went away on its own meanwhile, once there is no
+    /// copy of the user's to keep), and the backup only once the new file is. A copy that cannot be removed is logged.
     static func replaceKeepingSecurity(_ data: Data, at file: URL, replace: Replace = systemReplace) throws {
         let folder = file.deletingLastPathComponent()
         let token = UUID().uuidString
@@ -41,31 +42,43 @@ extension HookSettings {
             }
             guard moved else {
                 let code = GetLastError()
-                try? FileManager.default.removeItem(at: staged)
+                remove(staged)
                 throw failure(file, code)
             }
             return
         }
         guard let code = replace(target, source, saved) else {
             // The new file is in place; the old one, kept until now, can go.
-            try? FileManager.default.removeItem(at: backup)
+            remove(backup)
             return
         }
+        let manager = FileManager.default
         // The old file was moved aside and the new one could not take its place: put the old one back.
-        if !FileManager.default.fileExists(atPath: file.path), FileManager.default.fileExists(atPath: backup.path) {
+        if !manager.fileExists(atPath: file.path), manager.fileExists(atPath: backup.path) {
             _ = Win32.withWide(saved) { saved in
                 Win32.withWide(target) { target in MoveFileExW(saved, target, DWORD(MOVEFILE_WRITE_THROUGH)) }
             }
         }
-        if FileManager.default.fileExists(atPath: file.path) {
-            try? FileManager.default.removeItem(at: staged)
-            if FileManager.default.fileExists(atPath: backup.path) { try? FileManager.default.removeItem(at: backup) }
-        }
-        // Otherwise nothing more is touched: whatever copy is left beside it is the user's, named in the log.
-        else {
-            PlatformLog.error("hooks", "Settings file \(file.path) could not be put back; its content is in \(backup.path) or \(staged.path)")
+        if manager.fileExists(atPath: file.path) {
+            remove(staged)
+            if manager.fileExists(atPath: backup.path) { remove(backup) }
+        } else if !manager.fileExists(atPath: backup.path) {
+            // The file went away on its own between the check and the replace (its client removed it): there is no copy
+            // of the user's to keep, and the staged one is only Agent HUD's.
+            PlatformLog.error("hooks", "Settings file \(file.path) disappeared while it was being replaced; nothing was written")
+            remove(staged)
+        } else {
+            // Nothing more is touched: the copy left beside it is the user's, named in the log.
+            PlatformLog.error("hooks", "Settings file \(file.path) could not be put back; its content is in \(backup.path)")
         }
         throw failure(file, code)
+    }
+
+    /// Removes a staged or backup copy of Agent HUD's, saying so when it cannot (one held by an indexer or a scanner).
+    private static func remove(_ url: URL) {
+        do { try FileManager.default.removeItem(at: url) } catch {
+            PlatformLog.error("hooks", "Could not remove \(url.path): \(error.localizedDescription)")
+        }
     }
 
     private static func failure(_ file: URL, _ code: DWORD) -> Error {
@@ -76,7 +89,8 @@ extension HookSettings {
     /// The path as Windows file calls take it, in its `\\?\` form when it is longer than `MAX_PATH` allows.
     static func native(_ url: URL) -> String {
         let path = url.path.replacingOccurrences(of: "/", with: "\\")
-        guard path.count >= Int(MAX_PATH) - 12 else { return path }
+        // Counted in UTF-16 units, as Windows counts MAX_PATH; 12 left for the longest name a folder call adds.
+        guard path.utf16.count >= Int(MAX_PATH) - 12 else { return path }
         if path.hasPrefix(#"\\?\"#) { return path }
         if path.hasPrefix(#"\\"#) { return #"\\?\UNC\"# + path.dropFirst(2) }
         return #"\\?\"# + path

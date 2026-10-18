@@ -213,7 +213,41 @@ final class HookFormsWindowsTests: XCTestCase {
         for name in ["TEMP", "TMP"] { _ = Win32.withWide(name) { name in Win32.withWide(short) { SetEnvironmentVariableW(name, $0) } } }
         let spelledInFull = long + #"\Temp7_Agent HUD for Windows long name.zip\Agent HUD\agenthud-engine.exe"#
         XCTAssertTrue(HookCommand.isTransient(spelledInFull), "TEMP \(short), engine \(spelledInFull)")
-        XCTAssertTrue(HookCommand.isTransient(Win32.longPath(spelledInFull)))
+        // The other way round: TEMP spelled in full, the engine's path in 8.3 names (zip folder included).
+        for name in ["TEMP", "TMP"] { _ = Win32.withWide(name) { name in Win32.withWide(long) { SetEnvironmentVariableW(name, $0) } } }
+        let copyLength = Win32.withWide(spelledInFull) { GetShortPathNameW($0, nil, 0) }
+        var copyBuffer = [WCHAR](repeating: 0, count: Int(copyLength) + 1)
+        _ = Win32.withWide(spelledInFull) { GetShortPathNameW($0, &copyBuffer, DWORD(copyBuffer.count)) }
+        let spelledShort = String(decoding: copyBuffer.prefix { $0 != 0 }, as: UTF16.self)
+        XCTAssertNotEqual(spelledShort.lowercased(), spelledInFull.lowercased())
+        XCTAssertTrue(HookCommand.isTransient(spelledShort), "TEMP \(long), engine \(spelledShort)")
+    }
+
+    /// A local path with the long-path prefix is the drive it names, not a share; a prefixed share still is one.
+    func testALongPathPrefixedLocalEngineIsNoShare() {
+        let programs = (Win32.environment("ProgramFiles") ?? #"C:\Program Files"#) + #"\Agent HUD\agenthud-engine.exe"#
+        XCTAssertFalse(HookCommand.isTransient(#"\\?\"# + programs))
+        XCTAssertTrue(HookCommand.isTransient(#"\\?\UNC\server\share\agenthud-engine.exe"#))
+        XCTAssertEqual(Win32.unprefixed(#"\\?\C:\Tools\a.exe"#), #"C:\Tools\a.exe"#)
+        XCTAssertEqual(Win32.unprefixed(#"\\?\UNC\server\share\a.exe"#), #"\\server\share\a.exe"#)
+        XCTAssertEqual(Win32.unprefixed(#"C:\Tools\a.exe"#), #"C:\Tools\a.exe"#)
+    }
+
+    /// `Win32.longPath` beyond MAX_PATH: asked in its `\\?\` form, given back without it.
+    func testTheLongFormOfAPathBeyondMaxPath() throws {
+        var folder = home!
+        while folder.path.utf16.count < 300 { folder.appendPathComponent("深层 long folder name \(folder.pathComponents.count)") }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let long = folder.path.replacingOccurrences(of: "/", with: "\\")
+        let prefixed = #"\\?\"# + long
+        let length = Win32.withWide(prefixed) { GetShortPathNameW($0, nil, 0) }
+        var buffer = [WCHAR](repeating: 0, count: Int(length) + 1)
+        let written = Win32.withWide(prefixed) { GetShortPathNameW($0, &buffer, DWORD(buffer.count)) }
+        let short = Win32.unprefixed(String(decoding: buffer.prefix { $0 != 0 }, as: UTF16.self))
+        try XCTSkipIf(written == 0 || short.lowercased() == long.lowercased(), "the volume keeps no 8.3 names")
+        XCTAssertEqual(Win32.longPath(short).lowercased(), long.lowercased())
+        XCTAssertEqual(Win32.longPath(long).lowercased(), long.lowercased())
+        XCTAssertEqual(Win32.longPath(#"C:\does not exist\x"#), #"C:\does not exist\x"#, "a path that does not exist comes back as given")
     }
 
     // MARK: Security descriptors (D-023)
@@ -294,6 +328,49 @@ final class HookFormsWindowsTests: XCTestCase {
         try HookSettings.replaceKeepingSecurity(new, at: file)
         XCTAssertEqual(try Data(contentsOf: file), new)
         XCTAssertEqual(try leftovers(beside: file), [], "the backup goes once the new file is in place")
+    }
+
+    /// When the old file cannot even be moved back (something holds the backup), nothing is deleted: the user's content
+    /// stays in the backup, beside the file's name, and the error is thrown.
+    func testARestoreThatFailsKeepsTheUsersCopy() throws {
+        let file = home.appendingPathComponent(".claude/settings.json")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let original = Data(#"{"model":"opus"}"#.utf8)
+        try original.write(to: file)
+        final class Held: @unchecked Sendable { var handle: HANDLE? }
+        let held = Held()
+        defer { if let handle = held.handle { CloseHandle(handle) } }
+        XCTAssertThrowsError(try HookSettings.replaceKeepingSecurity(Data("{}".utf8), at: file) { target, _, backup in
+            _ = Win32.withWide(target) { target in Win32.withWide(backup) { backup in MoveFileExW(target, backup, 0) } }
+            // Open without FILE_SHARE_DELETE: the move back is refused.
+            held.handle = Win32.withWide(backup) {
+                CreateFileW($0, DWORD(GENERIC_READ), DWORD(FILE_SHARE_READ), nil, DWORD(OPEN_EXISTING), 0, nil)
+            }
+            return 1177
+        })
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path), "the move back was refused")
+        let kept = try leftovers(beside: file).filter { $0.hasSuffix(".backup") }
+        XCTAssertEqual(kept.count, 1)
+        let backup = file.deletingLastPathComponent().appendingPathComponent(try XCTUnwrap(kept.first))
+        XCTAssertEqual(try Data(contentsOf: backup), original, "the user's content is kept, not deleted")
+        if let handle = held.handle { CloseHandle(handle); held.handle = nil }
+        for name in try leftovers(beside: file) {
+            try FileManager.default.removeItem(at: file.deletingLastPathComponent().appendingPathComponent(name))
+        }
+    }
+
+    /// The file went away on its own between the check and the replace: no copy of the user's exists, and Agent HUD's
+    /// staged one is not left behind.
+    func testAFileThatVanishesMeanwhileLeavesNothingBehind() throws {
+        let file = home.appendingPathComponent(".claude/settings.json")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(#"{"model":"opus"}"#.utf8).write(to: file)
+        XCTAssertThrowsError(try HookSettings.replaceKeepingSecurity(Data("{}".utf8), at: file) { target, _, _ in
+            _ = Win32.withWide(target) { DeleteFileW($0) }
+            return DWORD(ERROR_FILE_NOT_FOUND)
+        })
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+        XCTAssertEqual(try leftovers(beside: file), [])
     }
 
     /// A real failure: the client holds its settings file open without letting it be replaced.

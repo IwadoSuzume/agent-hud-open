@@ -91,7 +91,10 @@ final class ProviderHTTPWindowsTests: XCTestCase, @unchecked Sendable {
             XCTAssertNotEqual(rules.disabledFeatures & DWORD(WINHTTP_DISABLE_COOKIES), 0, host)
             XCTAssertNotEqual(rules.disabledFeatures & DWORD(WINHTTP_DISABLE_AUTHENTICATION), 0, host)
         }
-        XCTAssertNotNil(WindowsHTTP.rules(host: "127.0.0.1", secure: true).ignoredCertificateErrors)
+        // Exactly the four errors a self-signed local certificate raises: never revocation, never every error.
+        XCTAssertEqual(WindowsHTTP.rules(host: "127.0.0.1", secure: true).ignoredCertificateErrors,
+                       DWORD(SECURITY_FLAG_IGNORE_UNKNOWN_CA) | DWORD(SECURITY_FLAG_IGNORE_CERT_CN_INVALID)
+                           | DWORD(SECURITY_FLAG_IGNORE_CERT_DATE_INVALID) | DWORD(SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE))
         for (host, secure) in [("api.github.com", true), ("127.0.0.1", false), ("localhost", true), ("::1", true),
                                ("127.0.0.1.example.com", true), ("127.0.0.2", true)] {
             XCTAssertNil(WindowsHTTP.rules(host: host, secure: secure).ignoredCertificateErrors, "a certificate error is never ignored for \(host)")

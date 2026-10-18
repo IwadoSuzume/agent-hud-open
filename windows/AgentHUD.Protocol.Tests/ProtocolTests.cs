@@ -1,0 +1,138 @@
+// The protocol's C# side against the fixtures the Swift side checks too (windows/protocol/fixtures, PROTOCOL.md):
+// every engine message the Swift engine wrote is read into its type; every shell message is written byte for byte as
+// its fixture; the lines a reader must refuse are refused.
+using System.Text;
+using System.Text.Json.Nodes;
+using AgentHUD.Protocol;
+
+namespace AgentHUD.Protocol.Tests;
+
+[TestClass]
+public sealed class ProtocolTests
+{
+    static readonly string Fixtures = FindFixtures();
+
+    static string FindFixtures()
+    {
+        for (var folder = new DirectoryInfo(AppContext.BaseDirectory); folder != null; folder = folder.Parent)
+        {
+            var candidate = Path.Combine(folder.FullName, "windows", "protocol", "fixtures");
+            if (Directory.Exists(candidate)) return candidate;
+            candidate = Path.Combine(folder.FullName, "protocol", "fixtures");
+            if (Directory.Exists(candidate)) return candidate;
+        }
+        throw new DirectoryNotFoundException("windows/protocol/fixtures");
+    }
+
+    /// <summary>The fixture's one line, without its LF.</summary>
+    static string Line(string name)
+    {
+        var bytes = File.ReadAllBytes(Path.Combine(Fixtures, name));
+        Assert.IsFalse(bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF, $"{name}: no BOM");
+        var text = new UTF8Encoding(false, true).GetString(bytes);
+        Assert.EndsWith("\n", text, $"{name}: ends with LF");
+        text = text[..^1];
+        Assert.IsFalse(text.Contains('\n') || text.Contains('\r'), $"{name}: one line");
+        return text;
+    }
+
+    [TestMethod]
+    public void TheEnginesHelloIsRead()
+    {
+        var hello = (EngineHello)EngineMessage.Parse(Line("engine-hello.json"));
+        Assert.AreEqual(0, hello.Minor);
+        Assert.IsTrue(hello.Demo);
+        Assert.AreEqual("en", hello.Language);
+        Assert.AreEqual("Quit", hello.Strings["menu.quit"]);
+        Assert.AreEqual("Always allow", hello.Strings["approval.always"]);
+    }
+
+    [TestMethod]
+    public void TheEnginesStateIsReadWhole()
+    {
+        var state = (State)EngineMessage.Parse(Line("engine-state.demo.json"));
+        Assert.IsFalse(state.Paused);
+        Assert.IsNull(state.Error);
+        Assert.IsNotEmpty(state.Panel.Agents);
+        Assert.IsNotEmpty(state.Panel.Sessions);
+        Assert.IsNotEmpty(state.Approvals);
+        Assert.AreEqual(DateTimeOffset.FromUnixTimeMilliseconds(1_792_000_000_000), state.Panel.Now);
+        // The engine's words and judgements arrive as they are: the shell shows them, it does not work them out.
+        Assert.IsTrue(state.Panel.Agents.All(a => a.MissingQuotaLabel.Length > 0));
+        Assert.IsTrue(state.Panel.Sessions.All(s => s.PhaseText.Length > 0 && s.TokensText.Length > 0));
+        Assert.IsTrue(state.Panel.Agents.Where(a => a.ResetAt != null).All(a => a.ResetText != null));
+        Assert.AreEqual("system", state.Settings["language"]?.GetValue<string>());
+    }
+
+    [TestMethod]
+    public void TheOtherEngineMessagesAreRead()
+    {
+        Assert.AreEqual(@"C:\Program Files\Agent HUD\agenthud-engine.exe", ((LockHeld)EngineMessage.Parse(Line("engine-lock-held.json"))).Holder);
+        Assert.AreEqual("unknown type nap", ((EngineError)EngineMessage.Parse(Line("engine-error.json"))).Message);
+        var completion = (CompletionEvent)EngineMessage.Parse(Line("engine-event-completion.json"));
+        Assert.AreEqual("claude:demo-session", completion.SessionId);
+        Assert.AreEqual(DateTimeOffset.FromUnixTimeMilliseconds(1_792_000_000_000), completion.CompletedAt);
+    }
+
+    [TestMethod]
+    public void EveryEngineFixtureIsRead()
+    {
+        var names = Directory.GetFiles(Fixtures, "engine-*.json").Select(Path.GetFileName).ToList();
+        Assert.IsGreaterThanOrEqualTo(5, names.Count);
+        foreach (var name in names) Assert.IsNotNull(EngineMessage.Parse(Line(name!)), name);
+    }
+
+    /// <summary>A later minor version adds fields; a 1.0 reader ignores them.</summary>
+    [TestMethod]
+    public void FieldsOfALaterMinorVersionAreIgnored()
+    {
+        var hello = JsonNode.Parse(Line("engine-hello.json"))!.AsObject();
+        hello["minor"] = 3;
+        hello["somethingNew"] = new JsonObject { ["x"] = 1 };
+        Assert.AreEqual(3, ((EngineHello)EngineMessage.Parse(hello.ToJsonString())).Minor);
+    }
+
+    [TestMethod]
+    public void LinesTheShellMustRefuseAreRefused()
+    {
+        foreach (var line in new[]
+        {
+            "refresh please", "[1]", """{"v":2,"type":"state"}""", """{"type":"hello"}""", """{"v":"1","type":"hello"}""",
+            """{"v":1,"type":"nap"}""", """{"v":1}""", """{"v":1,"type":"lock-held"}""", """{"v":1,"type":"error","message":7}""",
+        })
+            Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(line), line);
+        var state = JsonNode.Parse(Line("engine-state.demo.json"))!.AsObject();
+        state["panel"]!["glow"]![0]!["level"] = "orange";
+        Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(state.ToJsonString()), "an unknown level");
+    }
+
+    [TestMethod]
+    public void TheShellsMessagesAreItsFixturesByteForByte()
+    {
+        var written = new Dictionary<string, string>
+        {
+            ["shell-hello.json"] = ShellMessage.Hello("0.1.0"),
+            ["shell-refresh.json"] = ShellMessage.Refresh(),
+            ["shell-quit.json"] = ShellMessage.Quit(),
+            ["shell-answer-allow.json"] = ShellMessage.Answer("demo-tests", ShellMessage.Decision.Allow),
+            ["shell-answer-deny.json"] = ShellMessage.Answer("demo-tests", ShellMessage.Decision.Deny),
+            ["shell-answer-always.json"] = ShellMessage.Answer("demo-tests", ShellMessage.Decision.AllowAlways),
+            ["shell-answer-leave.json"] = ShellMessage.Answer("demo-tests", ShellMessage.Decision.Leave),
+            ["shell-answer-question.json"] = ShellMessage.AnswerQuestions("demo-question", new Dictionary<string, (IReadOnlyList<string>, string?)>
+            {
+                ["Which database?"] = (["SQLite"], null),
+                ["Anything else?"] = ([], "Keep the 用量 ledger"),
+            }),
+            ["shell-answer-plan.json"] = ShellMessage.ApprovePlan("demo-plan", acceptEdits: true),
+            ["shell-answer-keep-planning.json"] = ShellMessage.KeepPlanning("demo-plan", "Split step 2"),
+            ["shell-update-settings.json"] = ShellMessage.UpdateSettings(new JsonObject { ["language"] = "zh-Hans", ["approvalWaitMinutes"] = 5 }),
+        };
+        var present = Directory.GetFiles(Fixtures, "shell-*.json").Select(Path.GetFileName).ToHashSet();
+        CollectionAssert.AreEquivalent(written.Keys.ToList(), present.ToList(), "every shell fixture is written here");
+        foreach (var (name, line) in written)
+        {
+            Assert.EndsWith("\n", line, name);
+            Assert.AreEqual(Line(name), line[..^1], name);
+        }
+    }
+}

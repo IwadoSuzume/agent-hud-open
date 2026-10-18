@@ -187,7 +187,8 @@ extension HookCommand {
     /// optical or RAM drive, and a network share. A handler pointing there stops working once the copy is cleaned up or
     /// the drive goes. The temporary folder as such is not one, as `/tmp` is not on macOS.
     static func isTransientOnWindows(_ path: String) -> Bool {
-        let native = path.replacingOccurrences(of: "/", with: "\\")
+        // A local path spelled with the long-path prefix (`\\?\C:\…`) is no share.
+        let native = Win32.unprefixed(path.replacingOccurrences(of: "/", with: "\\"))
         if native.hasPrefix(#"\\"#) { return true }
         // Each spelled as given and in its long form: a temporary folder named in its 8.3 form (`C:\Users\9B63~1\…`, for
         // a long or non-ASCII user name) still holds an engine path spelled in full, and the other way round.

@@ -151,3 +151,33 @@ The 18 sprites Clawd plays on Claude's marks are copied unchanged into Sources/A
 Copyright (c) Anthropic PBC. All rights reserved.
 
 The sprites are Anthropic's artwork and are not covered by this repository's license.
+
+Windows port: .NET test packages (test projects only, never part of a build that is shipped)
+Used by windows/AgentHUD.Protocol.Tests (docs/windows-port/DECISIONS.md D-042), restored from nuget.org:
+MSTest.TestFramework 4.0.2, MSTest.TestAdapter 4.0.2, MSTest.Analyzers 4.0.2, Microsoft.NET.Test.Sdk 18.0.1,
+Microsoft.CodeCoverage 18.0.1, Microsoft.TestPlatform.TestHost 18.0.1, Microsoft.TestPlatform.ObjectModel 18.0.1,
+Microsoft.TestPlatform.AdapterUtilities 18.0.1, Microsoft.Testing.Platform 2.0.2, Microsoft.Testing.Platform.MSBuild 2.0.2,
+Microsoft.Testing.Extensions.Telemetry 2.0.2, Microsoft.Testing.Extensions.TrxReport.Abstractions 2.0.2,
+Microsoft.Testing.Extensions.VSTestBridge 2.0.2, Microsoft.ApplicationInsights 2.23.0 (Copyright (c) Microsoft
+Corporation); Newtonsoft.Json 13.0.3 (Copyright (c) 2007 James Newton-King). The test runs switch the testing
+platform's telemetry off (TESTINGPLATFORM_TELEMETRY_OPTOUT=1, DOTNET_CLI_TELEMETRY_OPTOUT=1).
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

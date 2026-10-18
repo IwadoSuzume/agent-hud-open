@@ -65,9 +65,34 @@ manifest = (ROOT / "Package.swift").read_text(encoding="utf-8")
 if re.search(r"\.package\s*\(", manifest):
     failures.append("Package.swift: review external package dependencies before including them")
 
+# The Windows shell's .NET projects (docs/windows-port, TASK.md G6): only the packages recorded in DECISIONS.md and
+# THIRD_PARTY_NOTICES.txt, at their recorded versions, and only in test projects; no feed other than nuget.org.
+allowed_packages = {("Microsoft.NET.Test.Sdk", "18.0.1"), ("MSTest.TestAdapter", "4.0.2"), ("MSTest.TestFramework", "4.0.2")}
+notices = (ROOT / "THIRD_PARTY_NOTICES.txt").read_text(encoding="utf-8")
+decisions = (ROOT / "docs/windows-port/DECISIONS.md").read_text(encoding="utf-8")
+for name in sorted(set(filter(None, paths))):
+    if not name.startswith("windows/"):
+        continue
+    if Path(name).name.lower() in {"nuget.config", "packages.config"}:
+        failures.append(f"{name}: the projects restore from nuget.org alone, through PackageReference")
+    if not name.endswith(".csproj"):
+        continue
+    project = (ROOT / name).read_text(encoding="utf-8")
+    for package, version in re.findall(r'<PackageReference\s+Include="([^"]+)"\s+Version="([^"]+)"', project):
+        if (package, version) not in allowed_packages:
+            failures.append(f"{name}: package {package} {version} is not on the recorded list")
+        elif not name.endswith(".Tests.csproj"):
+            failures.append(f"{name}: package {package} belongs in a test project only")
+        if f"{package} {version}" not in notices or package not in decisions:
+            failures.append(f"{name}: {package} {version} must be named in THIRD_PARTY_NOTICES.txt and DECISIONS.md")
+    if re.search(r"<PackageReference\s+Include=\"[^\"]+\"(?![^>]*Version=)", project):
+        failures.append(f"{name}: every package reference names its version")
+
 # Verify ignore rules without creating any secret-shaped files.
 ignored = [".env", "signing/local.env", "config/service.local.json", "AuthKey_example.p8", "certificate.p12",
-           "account.key", "development.mobileprovision", "build/Agent HUD Open.app/Contents/Info.plist", ".build/ignore-check/AgentHUDOpen"]
+           "account.key", "development.mobileprovision", "build/Agent HUD Open.app/Contents/Info.plist", ".build/ignore-check/AgentHUDOpen",
+           "windows/AgentHUD.Protocol/bin/Release/net10.0/AgentHUD.Protocol.dll", "windows/AgentHUD.Protocol/obj/project.assets.json",
+           "windows/TestResults/run.trx"]
 # Bytes, so that no platform writes the line ends as CR LF, which git would read as part of each path.
 result = subprocess.run(["git", "check-ignore", "--stdin"], cwd=ROOT,
                         input=("\n".join(ignored)+"\n").encode(), capture_output=True)

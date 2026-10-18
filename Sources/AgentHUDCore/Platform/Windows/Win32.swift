@@ -131,13 +131,26 @@ enum Win32 {
     }
 
     /// `path` in its long form, every 8.3 name spelled out (`GetLongPathNameW`), or as given when it does not exist or has none.
+    /// A path longer than `MAX_PATH` is asked for in its `\\?\` form and given back without it.
     static func longPath(_ path: String) -> String {
-        let length = Win32.withWide(path) { GetLongPathNameW($0, nil, 0) }
+        let unprefixed = Win32.unprefixed(path)
+        let asked: String
+        if unprefixed.utf16.count < Int(MAX_PATH) { asked = unprefixed }
+        else if unprefixed.hasPrefix(#"\\"#) { asked = #"\\?\UNC\"# + unprefixed.dropFirst(2) }
+        else { asked = #"\\?\"# + unprefixed }
+        let length = Win32.withWide(asked) { GetLongPathNameW($0, nil, 0) }
         guard length > 0 else { return path }
         var buffer = [WCHAR](repeating: 0, count: Int(length) + 1)
-        let written = Win32.withWide(path) { GetLongPathNameW($0, &buffer, DWORD(buffer.count)) }
+        let written = Win32.withWide(asked) { GetLongPathNameW($0, &buffer, DWORD(buffer.count)) }
         guard written > 0, Int(written) < buffer.count else { return path }
-        return String(decoding: buffer.prefix { $0 != 0 }, as: UTF16.self)
+        return Win32.unprefixed(String(decoding: buffer.prefix { $0 != 0 }, as: UTF16.self))
+    }
+
+    /// `path` without a `\\?\` prefix: `\\?\C:\…` as `C:\…`, `\\?\UNC\server\share` as `\\server\share`.
+    static func unprefixed(_ path: String) -> String {
+        if path.hasPrefix(#"\\?\UNC\"#) { return #"\\"# + path.dropFirst(8) }
+        if path.hasPrefix(#"\\?\"#) { return String(path.dropFirst(4)) }
+        return path
     }
 
     /// The value of the environment variable `name` when it is set and not blank, its name matched without regard to

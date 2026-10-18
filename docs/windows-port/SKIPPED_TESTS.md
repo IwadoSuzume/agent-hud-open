@@ -9,8 +9,8 @@ not listed here counts as a failure. Three mechanisms, each listed below, and ca
 3. **Runtime skips** — tests that skip themselves (`XCTSkip`) on every platform when an opt-in variable or a tool is
    missing.
 
-State at M5 (2026-10-18, Windows 11 26200, Swift 6.4.1, `test.ps1`, round 2): 1426 pass, 4 runtime skips, 34 listed skips,
-7 excluded files, 0 failures.
+State at M6 (2026-10-18, Windows 11 26200, Swift 6.4.1, `test.ps1`): 1441 pass, 4 runtime skips, 34 listed skips,
+7 excluded files, 0 failures. The C# contract tests (`scripts\windows\test-dotnet.ps1`): 7 pass, none skipped.
 
 ## AgentHUDSupportTests
 
@@ -59,7 +59,7 @@ and the NIST and golden tests are its Windows counterpart.
 | `DeepSeekProviderTests/testConcatenatedZstandardFramesAndTornFinalFrameMatchPlaintext`, `…/testAGrownCompressedLogIsDecodedFromItsLastCompleteFrame`, `…/testLargeCompressedLogDrainsPipeAndSkipsPackedConversationContent` | Node.js with Zstandard support is not installed (on Windows: no `node.exe` on `PATH`; they run where it is, as on this machine since M4) |
 | `ChildProcessWindowsTests/testNodeStartsInAnOtherwiseEmptyEnvironment` | on Windows only: no `node.exe` on `PATH` |
 | `SessionProjectWindowsTests` (every test that makes a repository) | on Windows only: no `git.exe` on `PATH` |
-| `SessionProjectWindowsTests/testAWorkingDirectoryRecordedInItsShortSpellingBelongsToTheMainRepository`, `HookFormsWindowsTests/testAZipsCopyIsTransientWhicheverWayTheTemporaryFolderIsSpelled`, `WindowsExecutablesTests/testClaudesEngineIsRecognisedAmongAHooksAncestors` (its short-spelling cases, after the rest ran) | on Windows only: the volume keeps no 8.3 names (the fixture has no short spelling) |
+| `SessionProjectWindowsTests/testAWorkingDirectoryRecordedInItsShortSpellingBelongsToTheMainRepository`, `HookFormsWindowsTests/testAZipsCopyIsTransientWhicheverWayTheTemporaryFolderIsSpelled`, `WindowsExecutablesTests/testClaudesEngineIsRecognisedAmongAHooksAncestors` (its short-spelling cases, after the rest ran), `HookFormsWindowsTests/testTheLongFormOfAPathBeyondMaxPath` | on Windows only: the volume keeps no 8.3 names (the fixture has no short spelling) |
 | `OpenCodeSessionObserverTests/testNativePluginRecordsOnlyFinishedTurnsOfTopLevelSessions`, `PiSessionObserverTests/testNativeExtensionLifecycleRetriesHeartbeatAndPrivacy` | on Windows only: no `node.exe` on `PATH` (`TestNode`, D-034) |
 | `HookFormsWindowsTests/testQwenCodesPowerShellRunsTheCommand` | on Windows only: no Windows PowerShell at `%SystemRoot%\System32\WindowsPowerShell\v1.0` (present on every supported Windows; it runs on this machine and in CI) |
 | `HookFormsWindowsTests/testCodeBuddysGitBashRunsTheCommand` | on Windows only: Git for Windows' `bash.exe` not found from `git.exe` on `PATH` (it runs on this machine and in CI) |
