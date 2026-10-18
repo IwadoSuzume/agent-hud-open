@@ -41,9 +41,38 @@ public enum ShellStrings {
         "plan.send": ("发送", "Send"),
         // `{vendor}` stands where the Desktop interpolates `request.vendor`; the shell puts the request's vendor there.
         "plan.elsewhere": ("请到 {vendor} 里审批这份计划", "Review this plan in {vendor}"),
+        // The settings window (SettingsWindowController.swift, GeneralPane.swift).
+        "settings.title": ("设置", "Settings"),
+        "settings.general": ("通用", "General"),
+        "settings.appearanceLanguage": ("外观与语言", "Appearance & language"),
+        "settings.appearance": ("外观", "Appearance"),
+        "settings.system": ("跟随系统", "System"),
+        "settings.light": ("浅色", "Light"),
+        "settings.dark": ("深色", "Dark"),
+        "settings.language": ("语言", "Language"),
+        "settings.startup": ("启动", "Startup"),
+        "settings.launchAtLogin": ("登录时启动", "Launch at login"),
+        "settings.clients": ("客户端", "Clients"),
+        "settings.clientHooks": ("客户端回调", "Client hooks"),
+        "settings.clientHooksNote": ("写入各客户端的设置，用来在 HUD 上回答权限请求、显示完成与等待批准。",
+                                     "Added to each client's settings so the HUD can answer permission requests and show completions and waiting."),
+        "settings.removeHooks": ("移除客户端回调？", "Remove client hooks?"),
+        "settings.cancel": ("取消", "Cancel"),
+        "settings.remove": ("移除", "Remove"),
+        "settings.wait": ("等待回答", "Wait for an answer"),
+        "settings.waitNote": ("到时没回答的权限请求交还客户端，由它自己询问。",
+                              "After this, an unanswered permission request goes back to the client's own prompt."),
     ]
 
-    /// Every string, in the resolved language (`L10n`).
-    public static var current: [String: String] { pairs.mapValues { L10n.text($0.zh, $0.en) } }
+    /// Every string, in the resolved language (`L10n`), and the words made from Core's own values: each of the
+    /// approval wait's choices (`Settings.approvalWaitChoices`) as GeneralPane names it, under `settings.wait.<minutes>`.
+    /// The calls are written as the Desktop writes them; `ShellProtocolTests` finds them in its sources.
+    public static var current: [String: String] {
+        var words = pairs.mapValues { L10n.text($0.zh, $0.en) }
+        for minutes in Settings.approvalWaitChoices {
+            words["settings.wait.\(minutes)"] = L10n.text("\(minutes) 分钟", minutes == 1 ? "1 minute" : "\(minutes) minutes")
+        }
+        return words
+    }
 }
 #endif

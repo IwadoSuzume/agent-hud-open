@@ -107,8 +107,40 @@ static class Snapshot
             using (var file = File.Create(Path.Combine(folder, name + ".png"))) encoder.Save(file);
             report.AppendLine($"{name} {bitmap.PixelWidth}x{bitmap.PixelHeight}");
         }
+        status |= DrawSettings(island, folder, report);
         File.WriteAllText(Path.Combine(folder, "snapshot.txt"), report.ToString());
         return status;
+    }
+
+    /// <summary>The settings window, its content on a solid ground (the backdrop is the desktop's, which a picture has
+    /// none of), off the screen's pixels at 2x.</summary>
+    static int DrawSettings(IslandWindow island, string folder, StringBuilder report)
+    {
+        var settings = new SettingsWindow(island.View.Model, _ => { }) { Left = -20000, Top = -20000, ShowActivated = false };
+        try
+        {
+            settings.Show();
+            settings.UpdateLayout();
+            settings.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+            var content = (FrameworkElement)settings.Content;
+            if (content.ActualWidth < 1 || content.ActualHeight < 1) { report.AppendLine("settings 0x0"); return 1; }
+            // The content and its margins: it is drawn where it stands in the window.
+            var size = new Size(content.ActualWidth + content.Margin.Left + content.Margin.Right,
+                                content.ActualHeight + content.Margin.Top + content.Margin.Bottom);
+            var bitmap = new RenderTargetBitmap((int)Math.Ceiling(size.Width * 2), (int)Math.Ceiling(size.Height * 2),
+                                                192, 192, PixelFormats.Pbgra32);
+            var ground = new DrawingVisual();
+            using (var context = ground.RenderOpen())
+                context.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x20, 0x20, 0x20)), null, new Rect(size));
+            bitmap.Render(ground);
+            bitmap.Render(content);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var file = File.Create(Path.Combine(folder, "settings.png"))) encoder.Save(file);
+            report.AppendLine($"settings {bitmap.PixelWidth}x{bitmap.PixelHeight}");
+            return IsBlank(bitmap) ? 1 : 0;
+        }
+        finally { settings.Close(); }
     }
 
     /// <summary>True when every pixel is the same (nothing was drawn).</summary>

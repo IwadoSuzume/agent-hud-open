@@ -30,6 +30,22 @@
       </Grid>
     </DataTemplate>
 
+    <!-- The island draws its own look whatever theme the application's normal windows take: these implicit styles,
+         nearer than the application's, keep the Fluent theme's off its buttons and scroll bars. -->
+    <Style TargetType="Button" />
+    <Style TargetType="ScrollViewer" />
+    <!-- The island's fields draw nothing but their text and caret. -->
+    <Style TargetType="TextBox">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <ScrollViewer x:Name="PART_ContentHost" Focusable="False" HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Hidden" Background="Transparent" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
     <Style x:Key="CardButton" TargetType="Button">
       <Setter Property="Foreground" Value="White" />
       <Setter Property="Padding" Value="12,4" />

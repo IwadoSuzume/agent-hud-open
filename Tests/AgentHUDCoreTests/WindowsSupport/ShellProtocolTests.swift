@@ -224,16 +224,23 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
             sources += (try? String(contentsOf: desktop.appendingPathComponent(path), encoding: .utf8)) ?? ""
         }
         XCTAssertFalse(sources.isEmpty)
+        // White space aside: the Desktop breaks a long pair over two lines.
+        func squeezed(_ text: String) -> String { text.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
+        let flat = squeezed(sources)
         for (key, pair) in ShellStrings.pairs {
             // A template's `{vendor}` is the Desktop's interpolation of the request's vendor.
             let zh = pair.zh.replacingOccurrences(of: "{vendor}", with: #"\(request.vendor)"#)
             let en = pair.en.replacingOccurrences(of: "{vendor}", with: #"\(request.vendor)"#)
-            XCTAssertTrue(sources.contains("L10n.text(\"\(zh)\", \"\(en)\")"), "\(key): \(pair.zh) / \(pair.en)")
+            XCTAssertTrue(flat.contains(squeezed("L10n.text(\"\(zh)\", \"\(en)\")")), "\(key): \(pair.zh) / \(pair.en)")
         }
         L10n.setLanguage(.zhHans)
         XCTAssertEqual(ShellStrings.current["menu.quit"], "退出")
+        XCTAssertEqual(ShellStrings.current["settings.wait.1"], "1 分钟")
         L10n.setLanguage(.en)
         XCTAssertEqual(ShellStrings.current["menu.quit"], "Quit")
+        XCTAssertEqual(ShellStrings.current["settings.wait.1"], "1 minute")
+        XCTAssertEqual(ShellStrings.current["settings.wait.30"], "30 minutes")
+        XCTAssertEqual(Settings.approvalWaitChoices.filter { ShellStrings.current["settings.wait.\($0)"] == nil }, [], "every choice is named")
     }
 
     /// An event's words (protocol 1.2) are the Desktop's copy: every `L10n.text` call of ShellEventCopy.swift is found
@@ -247,12 +254,17 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
             sources += (try? String(contentsOf: desktop.appendingPathComponent(path), encoding: .utf8)) ?? ""
         }
         sources = squeezed(sources)
-        let copy = try String(contentsOf: Self.root.appendingPathComponent("Sources/AgentHUDCore/Platform/Windows/Shell/ShellEventCopy.swift"),
-                              encoding: .utf8)
-        // A call, its interpolations one level deep: `L10n.text("\(names)额度仍已耗尽", "Still exhausted: \(names)")`.
-        let call = try NSRegularExpression(pattern: #"L10n\.text\((?:[^()]|\([^()]*\))*\)"#)
-        let calls = call.matches(in: copy, range: NSRange(copy.startIndex..., in: copy)).compactMap { Range($0.range, in: copy).map { String(copy[$0]) } }
-        XCTAssertGreaterThanOrEqual(calls.count, 20, "the calls are found")
+        // A call with words of its own (not ShellStrings' `L10n.text($0.zh, $0.en)`), its interpolations one level deep:
+        // `L10n.text("\(names)额度仍已耗尽", "Still exhausted: \(names)")`. ShellStrings' calls made from Core's values
+        // (the approval wait's choices) are held to the Desktop's the same way.
+        let call = try NSRegularExpression(pattern: #"L10n\.text\("(?:[^()]|\([^()]*\))*\)"#)
+        var calls: [String] = []
+        for file in ["ShellEventCopy.swift", "ShellStrings.swift"] {
+            let text = try String(contentsOf: Self.root.appendingPathComponent("Sources/AgentHUDCore/Platform/Windows/Shell/\(file)"),
+                                  encoding: .utf8)
+            calls += call.matches(in: text, range: NSRange(text.startIndex..., in: text)).compactMap { Range($0.range, in: text).map { String(text[$0]) } }
+        }
+        XCTAssertGreaterThanOrEqual(calls.count, 21, "the calls are found")
         for found in calls {
             XCTAssertTrue(sources.contains(squeezed(found)), found)
         }

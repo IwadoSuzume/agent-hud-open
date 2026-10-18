@@ -95,9 +95,13 @@ deprecated` in `Providers/Antigravity/AntigravityCLI.swift`; `result of call to 
    sources), `EventQueue` (the Desktop's alert queue for news), the event line at rest and its card when hovered, the
    snapshot's six event pictures from the fixtures (`--feed`). Not yet: replies listed beside a waiting request; a
    reply's return to its session and token-usage actions (session navigation is macOS-only so far).
-5. M7 next, in this order: the settings window (patches through `update-settings`; Core validates); the statistics window (needs a
-   protocol addition for the statistics data); light/dark and Mica for the normal windows; launch at login (`Run` key);
-   docks on other edges and dragging; full-screen apps; then the review. The engine still lacks: the session title and
+5. M7 step 5 (D-048): the settings window (the General pane: appearance, language, launch at login, client hooks with
+   their confirmation, the approval wait), launch at login through the `Run` key, WPF's Fluent theme with Mica for the
+   normal windows, `--show-settings`; the snapshot draws the window and `ui-check.ps1` changes a setting through the
+   engine (19 checks passed locally).
+6. M7 next, in this order: the statistics window (needs a protocol addition for the statistics data); the other
+   settings panes the shell can honour (agents and their live status need the agent list in the protocol); docks on
+   other edges and dragging; full-screen apps; the timezone (below); then the review. The engine still lacks: the session title and
    row token total (D-043), a session `message` in any fixture, `NSTimeZone.default` from the Windows zone (Known
    issues). Visual Studio may be used (Environment); the gates build with `dotnet`.
 

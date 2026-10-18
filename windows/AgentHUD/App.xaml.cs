@@ -13,7 +13,8 @@ namespace AgentHUD;
 
 /// <summary>The shell: starts the engine (`agenthud-engine --serve`), keeps one island per display, a tray icon, and
 /// sends the user's choices back. Options: `--demo` (the engine's example data), `--language en|zh-Hans`,
-/// `--engine &lt;path&gt;`, `--snapshot &lt;folder&gt;` (the G5 smoke test: draws the HUD into PNG files and quits).</summary>
+/// `--engine &lt;path&gt;`, `--show-settings`, `--snapshot &lt;folder&gt;` (the G5 smoke test: draws the HUD into PNG files and
+/// quits; `--feed &lt;folder&gt;` gives it the protocol's event fixtures to draw).</summary>
 public partial class App : Application
 {
     readonly ShellModel model = new();
@@ -26,7 +27,7 @@ public partial class App : Application
     EngineConnection? engine;
     Tray? tray;
     string? snapshotFolder;
-    bool quitting;
+    bool quitting, demo, showSettings;
     volatile string? lastComplaint;
 
     public App() => cards = new Cards(model);
@@ -37,19 +38,25 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+#pragma warning disable WPF0001 // ThemeMode: the Fluent theme, experimental in WPF's API but shipped and supported.
+        // The normal windows' controls as Windows 11 draws them; the settings window then follows the appearance setting.
+        ThemeMode = ThemeMode.Dark;
+#pragma warning restore WPF0001
         var arguments = new List<string>();
         var enginePath = EngineConnection.DefaultEnginePath;
         for (var i = 0; i < e.Args.Length; i++)
         {
             switch (e.Args[i])
             {
-                case "--demo": arguments.Add("--demo"); break;
+                case "--demo": arguments.Add("--demo"); demo = true; break;
                 case "--language" when i + 1 < e.Args.Length: arguments.AddRange(["--language", e.Args[++i]]); break;
                 case "--engine" when i + 1 < e.Args.Length: enginePath = e.Args[++i]; break;
                 case "--feed" when i + 1 < e.Args.Length: feedFolder = Path.GetFullPath(e.Args[++i]); break;
+                case "--show-settings": showSettings = true; break;
                 case "--snapshot" when i + 1 < e.Args.Length:
                     snapshotFolder = Path.GetFullPath(e.Args[++i]);
                     if (!arguments.Contains("--demo")) arguments.Add("--demo");
+                    demo = true;
                     break;
                 default:
                     Console.Error.WriteLine($"AgentHUD: unknown option {e.Args[i]}");
@@ -84,6 +91,8 @@ public partial class App : Application
         if (snapshotFolder is null) tray = new Tray(model, OpenSettings, OpenStatistics, Quit);
         engine.Start(ShellVersion);
         if (snapshotFolder is not null) Snapshot.Begin(this, model, islands, snapshotFolder, feedFolder);
+        // As the macOS app's `--show-settings`: the window once the engine has said hello (its words are the engine's).
+        else if (showSettings) model.Changed += OpenSettingsOnce;
     }
 
     void OnModelChanged()
@@ -102,6 +111,7 @@ public partial class App : Application
         PlaceRequests();
         tray?.Refresh();
         RefreshIslands();
+        FollowLaunchAtLogin();
     }
 
     /// <summary>New requests go to the display the pointer is on (docs/hud.md, Approvals).</summary>
@@ -198,7 +208,37 @@ public partial class App : Application
 
     internal void Send(string line) => engine?.Send(line);
 
-    void OpenSettings() => Log("Settings window: a later M7 step");
+    void OpenSettingsOnce()
+    {
+        if (model.Hello is null || model.State is null) return;
+        model.Changed -= OpenSettingsOnce;
+        Dispatcher.BeginInvoke(OpenSettings);
+    }
+
+    SettingsWindow? settingsWindow;
+
+    /// <summary>Settings: the one window, brought forward when it is open.</summary>
+    internal void OpenSettings()
+    {
+        if (settingsWindow is { IsLoaded: true }) { settingsWindow.Activate(); return; }
+        settingsWindow = new SettingsWindow(model, Send);
+        settingsWindow.Closed += (_, _) => settingsWindow = null;
+        settingsWindow.Show();
+        settingsWindow.Activate();
+    }
+
+    bool? launchAtLogin;
+
+    /// <summary>Launch at login follows the setting as the macOS Desktop's does: registered once if it is on and never
+    /// was, then set as it changes; never in the demo or a snapshot.</summary>
+    void FollowLaunchAtLogin()
+    {
+        if (demo || model.State is null) return;
+        var wanted = model.BoolSetting("launchAtLogin", false);
+        if (launchAtLogin is null) { if (wanted) LoginItem.RegisterIfNeverRegistered(); }
+        else if (launchAtLogin != wanted) LoginItem.Set(wanted);
+        launchAtLogin = wanted;
+    }
 
     internal void OpenStatistics() => Log("Statistics window: a later M7 step");
 

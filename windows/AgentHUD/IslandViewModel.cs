@@ -51,6 +51,8 @@ sealed class IslandViewModel : INotifyPropertyChanged
 
     public string Display { get; set; }
 
+    public ShellModel Model => model;
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>Everything again: a new state, a request opened on any display.</summary>

@@ -111,6 +111,54 @@ try {
 } finally {
     Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 1
+}
+
+# Settings: a change goes to the engine, which saves it (the demo's own settings file); switching the hooks off asks.
+$demoSettings = Join-Path $profileRoot 'Roaming\Agent HUD Open\settings.demo.json'
+# The demo keeps its settings as swift-corelibs' defaults do: Core's encoding, base64, under `settings.v1`.
+function SavedSettings {
+    if (-not (Test-Path -LiteralPath $demoSettings)) { return $null }
+    $defaults = Get-Content -Raw -LiteralPath $demoSettings | ConvertFrom-Json
+    $data = $defaults.values.'settings.v1'.data._0
+    [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($data)) | ConvertFrom-Json
+}
+$env:APPDATA = Join-Path $profileRoot 'Roaming'; $env:LOCALAPPDATA = Join-Path $profileRoot 'Local'
+$process = Start-Process -FilePath $shell -PassThru -ArgumentList @('--demo', '--show-settings', '--engine', "`"$Engine`"", '--language', 'en')
+$env:APPDATA = $realRoaming; $env:LOCALAPPDATA = $realLocal
+try {
+    Start-Sleep -Seconds 5
+    $mine = New-Object Windows.Automation.PropertyCondition ([Windows.Automation.AutomationElement]::ProcessIdProperty), $process.Id
+    function Id($id) { All | Where-Object { $_.Current.AutomationId -eq $id } | Select-Object -First 1 }
+    $wait = Id 'WaitChoice'
+    Check ([bool]$wait) '--show-settings opens the settings window'
+    if ($wait) {
+        $wait.GetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
+        Start-Sleep -Milliseconds 500
+        $five = All | Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::ListItem -and $_.Current.Name -eq '5 minutes' } | Select-Object -First 1
+        Check ([bool]$five) "the wait's choices are the engine's words"
+        if ($five) { ClickOn $five }
+        Start-Sleep -Milliseconds 1500
+        $saved = SavedSettings
+        Check ($saved.approvalWaitMinutes -eq 5) 'the engine saved the wait the window chose'
+        $hooks = Id 'ClientHooks'
+        ClickOn $hooks
+        Start-Sleep -Milliseconds 800
+        # The settings window owns the dialog, and UI Automation lists it under its owner.
+        $confirm = All | Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::Window -and $_.Current.Name -eq 'Remove client hooks?' } | Select-Object -First 1
+        Check ([bool]$confirm) 'switching the hooks off asks first'
+        if ($confirm) {
+            $cancel = $confirm.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition) |
+                Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.Name -eq 'Cancel' } | Select-Object -First 1
+            ClickOn $cancel
+            Start-Sleep -Milliseconds 800
+        }
+        $state = $hooks.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Current.ToggleState
+        $saved = SavedSettings
+        Check ($state -eq [Windows.Automation.ToggleState]::On -and $saved.clientHooks -eq $true) 'Cancel keeps the hooks on'
+    }
+} finally {
+    Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
     Remove-Item -Recurse -Force $profileRoot -ErrorAction SilentlyContinue
 }
 if ($failures) { Write-Host "$failures check(s) failed"; exit 1 }
