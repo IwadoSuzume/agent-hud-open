@@ -250,6 +250,7 @@ final class CopilotProviderTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(hooks["sessionStart"], .array([]))
         XCTAssertEqual(hooks["agentStop"].arrayValue?.count, 2)
         XCTAssertEqual(hooks["agentStop"].arrayValue?.last?["timeoutSec"], .integer(5))
-        XCTAssertEqual(hooks["agentStop"].arrayValue?.last?["bash"].stringValue, "'\(executable.path)' --completion-hook copilot")
+        XCTAssertEqual(hooks["agentStop"].arrayValue?.last.flatMap { TestHooks.commandLine(of: $0, key: "bash") },
+                       HookCommand.make(executable: executable, arguments: "--completion-hook copilot"))
     }
 }

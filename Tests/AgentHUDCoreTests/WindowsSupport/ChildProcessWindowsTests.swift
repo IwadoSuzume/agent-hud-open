@@ -185,6 +185,8 @@ final class ChildProcessWindowsTests: XCTestCase {
             String(decoding: ChildProcess.environmentBlock(environment), as: UTF16.self).split(separator: "\0").map(String.init)
         }
         let root = try XCTUnwrap(Win32.environment("SystemRoot"))
+        XCTAssertEqual(Win32.environment("systemroot"), root, "names match without regard to case (D-035)")
+        XCTAssertEqual(Win32.environment("SYSTEMROOT"), root)
         XCTAssertTrue(entries([:]).contains("SystemRoot=" + root), "\(entries([:]))")
         XCTAssertFalse(entries([:]).contains { $0.uppercased().hasPrefix("PATH=") || $0.uppercased().hasPrefix("USERPROFILE=") },
                        "nothing else is added")

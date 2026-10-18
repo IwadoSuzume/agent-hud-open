@@ -115,9 +115,9 @@ SKIPPED_TESTS.md (M3) with its reason and Windows counterpart.
 | `System/UnixSocketListenerTests` | AF_UNIX files, `stat` | `WindowsSupport/NamedPipesTests` | M3 |
 | `System/ChildProcessTests` | `/bin/sh`, signals | `WindowsSupport/ChildProcessWindowsTests` | M3 |
 | `System/InstanceLockTests` | macOS bundle paths, `flock` | `WindowsSupport/InstanceLockWindowsTests` | M3 |
-| `MCP/MCPAppChannelTests` | raw AF_UNIX squatter sockets | port to pipes | M5 |
-| `Hooks/Permission/PermissionHookTests` | raw AF_UNIX client, `flock` (most cases are pure logic) | split: logic runs on Windows, socket cases ported to pipes | M5 |
-| `Hooks/Permission/DeepSeekQuestionObserverTests` | raw BSD TCP WebSocket test server | **done M4:** the host on Winsock (`IdleQuestionHost+Windows.swift`); its one test waits for M5's WinHTTP WebSocket | M4 S |
+| `MCP/MCPAppChannelTests` | raw AF_UNIX squatter sockets | **done M5:** on pipes (a raw pipe instance as the squatter) | M5 |
+| `Hooks/Permission/PermissionHookTests` | raw AF_UNIX client, `flock` (most cases are pure logic) | **done M5:** runs on Windows, socket cases on pipes; the ZCode case a registered skip | M5 |
+| `Hooks/Permission/DeepSeekQuestionObserverTests` | raw BSD TCP WebSocket test server | **done M4/M5:** the host on Winsock (`IdleQuestionHost+Windows.swift`); its test runs on Windows over the WinHTTP WebSocket (D-040) | M4 S |
 | `Providers/Codex/CodexDaemonOriginTransportTests`, `CodexDesktopTestServer`, `CodexDesktopPermissionsTests`, `CodexDesktopStreamTests` | unix-socket servers for features unsupported on Windows | none (feature U) | — |
 | Runtime skips seen in the spike | opt-in probes (`…ReadOnlyProbe`, `SessionUsageProbeTests`), tests that need Node or a Zstandard tool absent on the machine (`DeepSeekDesktopTests` ×2, `DeepSeekProviderTests` ×3), `LogFilesTests.testAFileEventInASkippedOrHiddenFolderAddsNothing` | registered with their skip reasons | M3 |
 
@@ -143,9 +143,9 @@ SKIPPED_TESTS.md (M3) with its reason and Windows counterpart.
 | --- | --- | --- | --- |
 | Fake engines written as `#!/bin/sh` scripts cannot be started (`CreateProcessW` error 193/3) | ClaudeEngineTests ×4, ClaudeCodeProviderTests ×5, CodexProviderTests.testClientPerformsHandshake…, ProviderAccountTests, SubscriptionTests, UsageInsightsTests, AntigravityCLITests ×2, MCPClientTests.testACommandRuns…, OpenCode/Pi observer tests (run `node`) | a Windows test helper executable that plays a scripted engine; Node-based tests run only where `node.exe` is on `PATH` (skipped otherwise, as on a Mac without Node) | M4 |
 | Locators look in macOS places (`/Applications`, `Library/Application Support`, `.bun/bin`) | ClaudeEngineTests ×2, CodexProviderTests ×3, DeepSeekDesktopTests, MCPClientTests.testAClientIsFound… | Windows locations per SUPPORT_MATRIX and D-019, Windows variants of the tests | M4 |
-| macOS bundle paths in the instance-lock holder | MCPToolsOffTests ×2 | Windows holder record (D-009); Windows variants | M5 |
+| macOS bundle paths in the instance-lock holder | MCPToolsOffTests ×2 | **done M5:** `MCPToolsOffWindowsTests` (D-009) | M5 |
 | Symbolic links (need Developer Mode or elevation on Windows) and the `/var`→`/private/var` alias the tests rely on | SessionProjectTests ×4, LogFilesTests ×2 | Windows variants using junctions, or skip with reason | M3 |
-| POSIX permission bits | ClientHooksTests.testASettingsFileKeptAsALink… | Windows: the ACL is kept (D-023) | M5 |
+| POSIX permission bits | ClientHooksTests.testASettingsFileKeptAsALink… | **done M5:** `HookFormsWindowsTests` keeps the DACL, through a link too (D-023) | M5 |
 | To investigate | LedgerFileStoreTests.testMissingLog…, TencentBuddyProviderTests (5 s difference in a time), OpenClawProviderTests (title) | root-cause each | M3/M4 |
 | WAL database without its files | AdditionalProviderTests.testAntigravityReadsWALDatabase… | §8.1 | M3 |
 

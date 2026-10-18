@@ -93,7 +93,7 @@ enum WindowsHTTP {
             WinHttpSendRequest(handle, nil, 0, bytes.baseAddress, DWORD(bytes.count), DWORD(bytes.count), 0)
         }
         guard sent, WinHttpReceiveResponse(handle, nil) else {
-            throw watchdog.expired ? URLError(.timedOut) : URLError(.cannotConnectToHost)
+            throw timedOut() || watchdog.expired ? URLError(.timedOut) : URLError(.cannotConnectToHost)
         }
         var status: DWORD = 0
         var size = DWORD(MemoryLayout<DWORD>.size)
@@ -104,13 +104,17 @@ enum WindowsHTTP {
         while true {
             var count: DWORD = 0
             let read = buffer.withUnsafeMutableBytes { WinHttpReadData(handle, $0.baseAddress, DWORD($0.count), &count) }
-            guard read else { throw watchdog.expired ? URLError(.timedOut) : URLError(.networkConnectionLost) }
+            guard read else { throw timedOut() || watchdog.expired ? URLError(.timedOut) : URLError(.networkConnectionLost) }
             if count == 0 { break }
             data.append(contentsOf: buffer[..<Int(count)])
             guard data.count <= bodyLimit else { throw ProviderFailure.limit }
         }
         return (Int(status), data)
     }
+
+    /// Whether the call that just failed ran out of one of the session's timeouts, which URLSession reports as
+    /// `URLError.timedOut` too. It reads the thread's last error, so it is asked first, before anything else can set it.
+    private static func timedOut() -> Bool { GetLastError() == DWORD(ERROR_WINHTTP_TIMEOUT) }
 
     /// Owns a request's handle: closes it once the exchange is over, or earlier when its time is up, which makes the
     /// call waiting on it fail.

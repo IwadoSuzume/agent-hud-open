@@ -9,11 +9,18 @@ public enum HookSettings {
     public static func write(_ object: [String: JSONValue], to url: URL) throws {
         let file = target(of: url)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        #if os(Windows)
+        // The file keeps its security descriptor instead of POSIX permissions (HookSettings+Windows.swift).
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try replaceKeepingSecurity(try encoder.encode(JSONValue.object(object)), at: file)
+        #else
         let permissions = try? FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions]
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         try encoder.encode(JSONValue.object(object)).write(to: file, options: .atomic)
         if let permissions { try FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: file.path) }
+        #endif
     }
 
     /// The file behind `url`: where its symbolic links lead, a relative one from the directory that holds it.

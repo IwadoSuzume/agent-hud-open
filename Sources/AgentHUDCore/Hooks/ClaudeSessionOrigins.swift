@@ -50,8 +50,7 @@ public enum ClaudeSessionOrigins {
     public static func record(data: Data, now: Date = Date(), directory: URL = directory,
                               environment: [String: String] = ProcessInfo.processInfo.environment,
                               home: URL = UserHome.directory) throws {
-        let executables = Set(ClaudeEngineLocator.candidates(home: home, path: Executables.path(in: environment))
-            .map { $0.resolvingSymlinksInPath().path })
+        let executables = ClaudeEngineLocator.processPaths(home: home, path: Executables.path(in: environment))
         let ancestors = HookProcessOrigins.ancestors()
         let host = host(ancestors: ancestors, environment: environment, executablePaths: executables)
         let target = navigationTarget(ancestors: ancestors, environment: environment,
@@ -110,8 +109,15 @@ public enum ClaudeSessionOrigins {
         let shells: Set<String> = ["/bin/sh", "/bin/bash", "/bin/zsh"]
         guard let process = ancestors.first(where: { !shells.contains($0.executable) }) else { return nil }
         let executable = URL(fileURLWithPath: process.executable).resolvingSymlinksInPath().path
+        #if os(Windows)
+        // Windows paths match without regard to case. An npm install (`claude.cmd` starting `node.exe` on its script) is
+        // not recognized: the shim is no link to follow.
+        let installed = executablePaths.contains { $0.caseInsensitiveCompare(executable) == .orderedSame }
+        #else
+        let installed = executablePaths.contains(executable)
+        #endif
         let arguments: [String]
-        if executablePaths.contains(executable) || process.bundleIdentifier == "com.anthropic.claude-code" {
+        if installed || process.bundleIdentifier == "com.anthropic.claude-code" {
             arguments = process.arguments
         } else if URL(fileURLWithPath: executable).lastPathComponent == "node", process.arguments.count > 1,
                   executablePaths.contains(URL(fileURLWithPath: process.arguments[1]).resolvingSymlinksInPath().path) {

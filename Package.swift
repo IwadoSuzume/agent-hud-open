@@ -19,8 +19,6 @@ let windowsSkippedTests = [
     "System/UnixSocketListenerTests.swift",
     "System/ChildProcessTests.swift",
     "System/InstanceLockTests.swift",
-    "MCP/MCPAppChannelTests.swift",
-    "Hooks/Permission/PermissionHookTests.swift",
     "Providers/Codex/CodexDaemonOriginTransportTests.swift",
     "Providers/Codex/CodexDesktopTestServer.swift",
     "Providers/Codex/CodexDesktopPermissionsTests.swift",
@@ -34,6 +32,8 @@ let package = Package(
     products: [
         .library(name: "AgentHUDSupport", targets: ["AgentHUDSupport"]),
         .library(name: "AgentHUDCore", targets: ["AgentHUDCore"]),
+        // The console program the clients' hooks and MCP servers run (ADR-001); the UI protocol joins it in M6.
+        .executable(name: "agenthud-engine", targets: ["AgentHUDEngine"]),
     ],
     targets: [
         .systemLibrary(name: "SQLite3", path: "Sources/SQLite3Windows"),
@@ -41,6 +41,7 @@ let package = Package(
         .target(name: "AgentHUDSupport", swiftSettings: [.swiftLanguageMode(.v6)]),
         .target(name: "AgentHUDCore", dependencies: ["AgentHUDSupport", "SQLite3", "CWinHTTP"], exclude: windowsReplaced,
                 swiftSettings: [.swiftLanguageMode(.v6)], linkerSettings: [.linkedLibrary("ntdll")]),
+        .executableTarget(name: "AgentHUDEngine", dependencies: ["AgentHUDCore"], swiftSettings: [.swiftLanguageMode(.v6)]),
         .testTarget(name: "AgentHUDSupportTests", dependencies: ["AgentHUDSupport"], resources: [.copy("Fixtures")]),
         .testTarget(name: "AgentHUDCoreTests", dependencies: ["AgentHUDCore", "AgentHUDSupport", "SQLite3"],
                     exclude: windowsSkippedTests, resources: [.copy("Providers/Kit/Zstandard/Fixtures")]),

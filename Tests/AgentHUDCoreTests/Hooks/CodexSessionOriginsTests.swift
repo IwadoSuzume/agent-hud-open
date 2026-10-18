@@ -114,10 +114,10 @@ final class CodexSessionOriginsTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(start[0]["hooks"].arrayValue?.last?["timeout"].countValue, 23)
         for event in CodexSessionOrigins.events {
             let handlers = (updated["hooks"][event].arrayValue ?? []).flatMap { $0["hooks"].arrayValue ?? [] }
-            let commands = handlers.compactMap { $0["command"].stringValue }
-            XCTAssertEqual(commands.filter { $0.hasSuffix(" --session-origin-hook codex") }, ["'\(executable.path)' --session-origin-hook codex"])
+            let commands = handlers.compactMap { TestHooks.commandLine(of: $0) }
+            XCTAssertEqual(commands.filter { $0.hasSuffix(" --session-origin-hook codex") }, [HookCommand.make(executable: executable, arguments: "--session-origin-hook codex")])
             XCTAssertTrue(commands.contains("~/bin/session-log"))
-            XCTAssertEqual(handlers.filter { $0["command"].stringValue?.hasSuffix(" --session-origin-hook codex") == true }.map { $0["async"] },
+            XCTAssertEqual(handlers.filter { TestHooks.commandLine(of: $0)?.hasSuffix(" --session-origin-hook codex") == true }.map { $0["async"] },
                            [.bool(true)], "where a session runs is a report: Codex goes on without waiting for it, an older handler included")
             XCTAssertTrue(handlers.filter { $0["command"].stringValue == "~/bin/session-log" }.allSatisfy { $0["async"] == .null })
         }

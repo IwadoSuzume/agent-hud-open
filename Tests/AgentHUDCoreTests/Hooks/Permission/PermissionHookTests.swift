@@ -1,5 +1,7 @@
 import AgentHUDSupport
+#if canImport(Darwin)
 import Darwin
+#endif
 import Foundation
 import XCTest
 @testable import AgentHUDCore
@@ -56,11 +58,11 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
         let updated = try XCTUnwrap(try ProviderJSON.read(Data(contentsOf: settings)).objectValue)
         XCTAssertEqual(updated["model"]?.stringValue, "opus", "nothing else in the file is touched")
         let groups = updated["hooks"]?["PermissionRequest"].arrayValue ?? []
-        let commands = groups.flatMap { $0["hooks"].arrayValue ?? [] }.compactMap { $0["command"].stringValue }
+        let commands = groups.flatMap { $0["hooks"].arrayValue ?? [] }.compactMap { TestHooks.commandLine(of: $0) }
         XCTAssertEqual(commands.count, 2)
         XCTAssertTrue(commands.contains("say hi"))
         let ours = try XCTUnwrap(groups.first { group in
-            (group["hooks"].arrayValue ?? []).contains { $0["command"].stringValue?.hasSuffix(" --permission-hook claude") == true }
+            (group["hooks"].arrayValue ?? []).contains { TestHooks.commandLine(of: $0)?.hasSuffix(" --permission-hook claude") == true }
         })
         XCTAssertEqual(ours["matcher"].stringValue, "", "every tool the client would ask about")
         XCTAssertEqual(ours["hooks"].arrayValue?.first?["timeout"].numberValue, 86_400,
@@ -89,7 +91,7 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(groups.count, 2, "the handler stays where it was")
         XCTAssertEqual(groups.first?["matcher"].stringValue, "Bash")
         let handler = groups.first?["hooks"].arrayValue?.first
-        XCTAssertEqual(handler?["command"].stringValue, "'\(current.path)' --permission-hook claude")
+        XCTAssertEqual(handler.flatMap { TestHooks.commandLine(of: $0) }, HookCommand.make(executable: current, arguments: "--permission-hook claude"))
         XCTAssertEqual(handler?["timeout"].numberValue, 600)
         XCTAssertEqual(handler?["statusMessage"].stringValue, "Asking the HUD")
 
@@ -111,8 +113,8 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
         try PermissionHooks.configure(.qoder, enabled: true, executable: URL(fileURLWithPath: "/tmp/hud"), home: home)
         let settings = try ProviderJSON.read(Data(contentsOf: home.appendingPathComponent(".qoder/settings.json")))
         let commands = (settings["hooks"]["PermissionRequest"].arrayValue ?? [])
-            .flatMap { $0["hooks"].arrayValue ?? [] }.compactMap { $0["command"].stringValue }
-        XCTAssertEqual(commands, ["'/tmp/hud' --permission-hook qoderCN".replacingOccurrences(of: "qoderCN", with: "qoder")],
+            .flatMap { $0["hooks"].arrayValue ?? [] }.compactMap { TestHooks.commandLine(of: $0) }
+        XCTAssertEqual(commands, [HookCommand.make(executable: URL(fileURLWithPath: "/tmp/hud"), arguments: "--permission-hook qoder")],
                        "the fork ships Claude Code's schema unchanged, so one handler serves it")
     }
 
@@ -147,14 +149,15 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(try Data(contentsOf: hooks), installed, "repeated startup must not change hook trust hashes")
         let object = try XCTUnwrap(try ProviderJSON.read(installed).objectValue)
         XCTAssertEqual(PermissionHooks.commands(in: object, source: .codex),
-                       ["'\(executable.path)' --permission-hook codex"], "one handler serves both Codex clients")
+                       [HookCommand.make(executable: executable, arguments: "--permission-hook codex")], "one handler serves both Codex clients")
         XCTAssertTrue(PermissionHooks.isActive(.codex, home: home))
         XCTAssertEqual(try Data(contentsOf: config), originalConfig, "a disabled hook feature stays disabled")
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("settings.json").path))
 
         try PermissionHooks.configure(.codex, enabled: true, executable: URL(fileURLWithPath: "/tmp/other-hud"), home: home)
         XCTAssertEqual(PermissionHooks.commands(in: try PermissionHooks.configuration(.codex, home: home), source: .codex),
-                       ["'/tmp/other-hud' --permission-hook codex"], "another copy that runs takes the handler over")
+                       [HookCommand.make(executable: URL(fileURLWithPath: "/tmp/other-hud"), arguments: "--permission-hook codex")],
+                       "another copy that runs takes the handler over")
         try PermissionHooks.configure(.codex, enabled: false, executable: executable, home: home)
         XCTAssertEqual(try ProviderJSON.read(Data(contentsOf: hooks)),
                        try ProviderJSON.read(JSONSerialization.data(withJSONObject: original)), "other hooks are preserved")
@@ -168,11 +171,19 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
                       URL(fileURLWithPath: "/private/var/folders/x1/T/AppTranslocation/5D1C/d/Agent HUD.app/Contents/MacOS/Agent HUD"),
                       URL(fileURLWithPath: "/Volumes/Agent HUD/Agent HUD.app/Contents/MacOS/Agent HUD"),
                       URL(fileURLWithPath: "/Users/me/.Trash/Agent HUD.app/Contents/MacOS/Agent HUD")]
-        for source in PermissionHooks.Source.allCases where source.usesHook {
+        #if os(Windows)
+        // Windows' transient places (HookCommand.isTransient): a zip's Explorer copy, a network share.
+        let transient = [FileManager.default.temporaryDirectory.appendingPathComponent("Temp1_Agent HUD.zip/Agent HUD/agenthud-engine.exe"),
+                         URL(fileURLWithPath: #"\\server\share\Agent HUD\agenthud-engine.exe"#)]
+        #else
+        let transient = [others[2], others[1]]
+        #endif
+        for source in PermissionHooks.Source.allCases
+        where source.usesHook && TestHooks.installs(arguments: PermissionHooks.arguments(source)) {
             let home = try directory(), file = source.configuration(home: home)
             let ours = { HookCommand.make(executable: $0, arguments: "--permission-hook \(source.rawValue)") }
             let installed = { PermissionHooks.commands(in: try PermissionHooks.configuration(source, home: home), source: source) }
-            for running in [others[2], others[1]] {
+            for running in transient {
                 XCTAssertThrowsError(try PermissionHooks.configure(source, enabled: true, executable: running, home: home))
                 XCTAssertFalse(FileManager.default.fileExists(atPath: file.path), "\(source): an app running from \(running.path) adds nothing")
             }
@@ -183,7 +194,8 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
             try PermissionHooks.configure(source, enabled: true, executable: current, home: home)
             XCTAssertEqual(try installed(), [ours(current)], "\(source): the copy that runs takes over every handler, in the first one's place")
             XCTAssertEqual(try PermissionHooks.configuration(source, home: home),
-                           try PermissionHooks.updating([:], source: source, command: ours(current)))
+                           TestHooks.asRead(try PermissionHooks.updating([:], source: source, command: ours(current)),
+                                            arguments: PermissionHooks.arguments(source)))
 
             try JSONEncoder().encode(ProviderJSON.object(every)).write(to: file)
             try PermissionHooks.configure(source, enabled: false, executable: current, home: home)
@@ -215,7 +227,7 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
 
         let conversations = AntigravitySessions.home(home).appendingPathComponent("antigravity-cli/conversations")
         try FileManager.default.createDirectory(at: conversations, withIntermediateDirectories: true)
-        XCTAssertTrue(source.isInstalled(home: home))
+        XCTAssertEqual(source.isInstalled(home: home), PlatformSupport.supports(.antigravity), "absent on Windows (D-036)")
         let file = source.configuration(home: home), executable = URL(fileURLWithPath: "/tmp/hud")
         XCTAssertEqual(file, CompletionHooks.Source.antigravity.configuration(home: home))
         for enabled in [true, false] {
@@ -504,7 +516,9 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
     func testCodeBuddyAndWorkBuddyAnswerOnceWithoutRuleUpdates() throws {
         let home = try directory()
         let executable = URL(fileURLWithPath: "/tmp/hud")
-        for (source, folder) in [(PermissionHooks.Source.codebuddy, ".codebuddy"), (.workbuddy, ".workbuddy")] {
+        // WorkBuddy is absent on Windows (D-036): its half is macOS's.
+        for (source, folder) in [(PermissionHooks.Source.codebuddy, ".codebuddy"), (.workbuddy, ".workbuddy")]
+        where TestHooks.installs(arguments: PermissionHooks.arguments(source)) {
             try FileManager.default.createDirectory(at: home.appendingPathComponent(folder), withIntermediateDirectories: true)
             XCTAssertFalse(source.isInstalled(home: home), "a settings folder alone can be the IDE extension's")
             try FileManager.default.createDirectory(at: home.appendingPathComponent("\(folder)/projects"), withIntermediateDirectories: true)
@@ -512,7 +526,8 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
             try PermissionHooks.configure(source, enabled: true, executable: executable, home: home)
             let settings = try ProviderJSON.read(Data(contentsOf: home.appendingPathComponent("\(folder)/settings.json")))
             let handler = settings["hooks"]["PermissionRequest"].arrayValue?.first?["hooks"].arrayValue?.first
-            XCTAssertEqual(handler?["command"].stringValue, "'/tmp/hud' --permission-hook \(source.rawValue)")
+            XCTAssertEqual(handler.flatMap { TestHooks.commandLine(of: $0) },
+                           HookCommand.make(executable: executable, arguments: "--permission-hook \(source.rawValue)"))
             XCTAssertEqual(handler?["timeout"].numberValue, 86_400, "CodeBuddy counts hook timeouts in seconds")
         }
 
@@ -631,7 +646,8 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
         try PermissionHooks.configure(.qwen, enabled: true, executable: URL(fileURLWithPath: "/tmp/hud"), home: home)
         let settings = try ProviderJSON.read(Data(contentsOf: home.appendingPathComponent(".qwen/settings.json")))
         let handler = settings["hooks"]["PermissionRequest"].arrayValue?.first?["hooks"].arrayValue?.first
-        XCTAssertEqual(handler?["command"].stringValue, "'/tmp/hud' --permission-hook qwen")
+        XCTAssertEqual(handler.flatMap { TestHooks.commandLine(of: $0) },
+                       HookCommand.make(executable: URL(fileURLWithPath: "/tmp/hud"), arguments: "--permission-hook qwen"))
         XCTAssertEqual(handler?["timeout"].numberValue, 86_400_000, "Qwen reads 1000 or more as milliseconds on every version")
 
         let shell = try XCTUnwrap(try PermissionRequest.parse(JSONSerialization.data(withJSONObject: payload(tool: "run_shell_command")),
@@ -856,6 +872,10 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
 
     /// Connects the way the hook does and returns the descriptor, or nil when nothing is listening.
     private func connect(to path: String) -> Int32? {
+        #if os(Windows)
+        // The hook's own client: the pipe that serves the path (NamedPipes.swift).
+        return UnixSocket.connect(to: path)
+        #else
         let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
         guard descriptor >= 0 else { return nil }
         var address = sockaddr_un()
@@ -871,6 +891,7 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
         }
         guard connected == 0 else { close(descriptor); return nil }
         return descriptor
+        #endif
     }
 
     /// The listener comes up on the main queue, so the first connection waits for it the way a hook would retry.
@@ -880,12 +901,21 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
             try await Task.sleep(for: .milliseconds(10))
             opened = connect(to: path)
         }
+        #if os(Windows)
+        let descriptor = try XCTUnwrap(opened, "the HUD is listening at \(path)")
+        #else
         let descriptor = try XCTUnwrap(opened, "the HUD is listening at \(path): \(String(cString: strerror(errno)))")
+        #endif
         var payload = body
         payload[PermissionHookClient.sourceKey] = source.rawValue
         let data = try JSONSerialization.data(withJSONObject: payload)
+        #if os(Windows)
+        // One message, which the HUD reads whole: there is no half-close on a pipe.
+        _ = UnixSocket.send(descriptor, data)
+        #else
         _ = data.withUnsafeBytes { Darwin.send(descriptor, $0.baseAddress, $0.count, 0) }
         shutdown(descriptor, SHUT_WR)
+        #endif
         return descriptor
     }
 
@@ -935,6 +965,26 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
         let path = try directory().appendingPathComponent("permission.sock").path
         let requests = PermissionRequests.shared
         addTeardownBlock { Task { @MainActor in requests.stop() } }
+        #if os(Windows)
+        // Another copy serves the channel: its pipe is the path's first instance (NamedPipes.swift), so this one's
+        // start opens nothing and its stop takes nothing away.
+        let other = PermissionRequests()
+        other.start(path: path)
+        requests.start(path: path)
+        requests.stop()
+        let first = try await ask(path, payload())
+        for _ in 0..<200 where other.pending.count != 1 { try await Task.sleep(for: .milliseconds(10)) }
+        XCTAssertEqual(other.pending.count, 1, "the copy that serves the channel still gets the request")
+        XCTAssertTrue(requests.pending.isEmpty)
+        close(first)
+        other.stop()
+
+        requests.start(path: path)
+        let client = try await ask(path, payload())
+        try await waitForPending(1, "once the first is gone, the channel is this one's")
+        close(client)
+        requests.stop()
+        #else
         // Another process serves the channel: it holds the lock and its socket is at the path.
         let other = open(path + ".lock", O_CREAT | O_RDWR, 0o600)
         XCTAssertEqual(flock(other, LOCK_EX | LOCK_NB), 0)
@@ -950,6 +1000,7 @@ final class PermissionHookTests: XCTestCase, @unchecked Sendable {
         close(client)
         requests.stop()
         XCTAssertFalse(FileManager.default.fileExists(atPath: path), "and it removes the socket it made")
+        #endif
     }
 
     @MainActor

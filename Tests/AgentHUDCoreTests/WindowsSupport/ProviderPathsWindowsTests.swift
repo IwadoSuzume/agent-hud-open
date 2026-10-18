@@ -100,7 +100,7 @@ final class ProviderPathsWindowsTests: XCTestCase {
                            "reading": ["readAtMs": fixture.milliseconds(-3600), "usage": usage]],
                           key: GrokBotCache.quotaKey(account: fixture.account), schema: 2)
         _ = try fixture.writeRoster()
-        XCTAssertNotNil(try GrokBotQuota.read(in: fixture.directory, now: fixture.now), "the fixture is a quota macOS reads")
+        XCTAssertNotNil(GrokBotQuota.read(in: fixture.directory, now: fixture.now), "the fixture is a quota macOS reads")
 
         // The CLI is not signed in: on macOS the Bot's cached quota answers; here the CLI's failure stands.
         let cli = try directory()
@@ -108,7 +108,7 @@ final class ProviderPathsWindowsTests: XCTestCase {
         client.clock = { fixture.now }
         do {
             let quota = try await client.fetch()
-            XCTFail("the Bot's cache answered for the CLI: \(quota.client)")
+            XCTFail("the Bot's cache answered for the CLI: \(String(describing: quota.client))")
         } catch {
             XCTAssertEqual(error as? UsageProviderError, ProviderFailure.login("Grok CLI"), "the CLI's own failure stands")
         }
@@ -134,7 +134,8 @@ final class ProviderPathsWindowsTests: XCTestCase {
         let planted = home.appendingPathComponent(".bun/install/global/node_modules").appendingPathComponent(DeepSeekCredentialLocator.package)
         try FileManager.default.createDirectory(at: planted.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("module.exports = {}".utf8).write(to: planted)
-        XCTAssertNil(DeepSeekCredentialLocator.module(home: home), "a module under Bun's folder is never loaded")
+        // Not nil: npm's folders are the profile's (temporary under test.ps1, the user's in a bare `swift test`).
+        XCTAssertNotEqual(DeepSeekCredentialLocator.module(home: home)?.path, planted.path, "a module under Bun's folder is never loaded")
     }
 
     func testCursorIsReadFromItsRoamingFolder() {

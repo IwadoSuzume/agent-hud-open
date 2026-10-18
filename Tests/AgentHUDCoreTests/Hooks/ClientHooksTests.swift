@@ -16,7 +16,7 @@ final class ClientHooksTests: XCTestCase, @unchecked Sendable {
     private func commands(_ url: URL) throws -> [String] {
         let hooks = try ProviderJSON.read(Data(contentsOf: url))["hooks"]
         return (hooks.objectValue ?? [:]).values.flatMap { $0.arrayValue ?? [] }
-            .flatMap { $0["hooks"].arrayValue ?? [] }.compactMap { $0["command"].stringValue }.sorted()
+            .flatMap { $0["hooks"].arrayValue ?? [] }.compactMap { TestHooks.commandLine(of: $0) }.sorted()
     }
 
     func testTheSwitchIsOnUntilTurnedOff() throws {
@@ -43,16 +43,17 @@ final class ClientHooksTests: XCTestCase, @unchecked Sendable {
         let executable = URL(fileURLWithPath: "/Applications/Agent HUD.app/Contents/MacOS/Agent HUD")
         SessionObservers.configure(executable: executable, enabled: true, home: home)
         let qwen = home.appendingPathComponent(".qwen/settings.json")
-        XCTAssertEqual(try commands(claude), ["'\(executable.path)' --attention-hook claude", "'\(executable.path)' --permission-hook claude",
-                                              "'\(executable.path)' --session-origin-hook claude", "'\(executable.path)' --session-origin-hook claude",
-                                              "'\(executable.path)' --session-origin-hook claude",
-                                              "~/bin/lint", "~/bin/prompt-log", "~/bin/session-log"],
+        let ours = { HookCommand.make(executable: executable, arguments: $0) }
+        XCTAssertEqual(try commands(claude), [ours("--attention-hook claude"), ours("--permission-hook claude"),
+                                              ours("--session-origin-hook claude"), ours("--session-origin-hook claude"),
+                                              ours("--session-origin-hook claude"),
+                                              "~/bin/lint", "~/bin/prompt-log", "~/bin/session-log"].sorted(),
                        "approval, notification, both origin callbacks and compaction, which runs the origin command, beside the user's hooks, all the running copy's")
         let installed = try ProviderJSON.read(Data(contentsOf: claude))
         for event in ClaudeSessionOrigins.events {
             XCTAssertEqual((installed["hooks"][event].arrayValue ?? []).flatMap { $0["hooks"].arrayValue ?? [] }
-                .compactMap { $0["command"].stringValue }.filter { $0.hasSuffix(" --session-origin-hook claude") },
-                           ["'\(executable.path)' --session-origin-hook claude"], "one origin callback under each event")
+                .compactMap { TestHooks.commandLine(of: $0) }.filter { $0.hasSuffix(" --session-origin-hook claude") },
+                           [ours("--session-origin-hook claude")], "one origin callback under each event")
         }
         XCTAssertEqual(try ProviderJSON.read(Data(contentsOf: claude))["hooks"]["Notification"].arrayValue?.first?["matcher"].stringValue,
                        "permission_prompt", "the handler taken over keeps its matcher")

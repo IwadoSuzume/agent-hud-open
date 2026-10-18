@@ -9,7 +9,8 @@ import WinSDK
 /// service `gh:<host>` and an empty user for the active account (cli/cli `internal/config`), so the active token of
 /// github.com is the credential `gh:github.com:` (docs/windows-port/SUPPORT_MATRIX.md).
 enum WindowsCredentials {
-    /// The secret of the generic credential whose target is exactly `target`, as UTF-8; nil when there is none.
+    /// The secret of the generic credential whose target is exactly `target`, as UTF-8; nil when there is none or it is
+    /// not UTF-8, as the keychain read is on macOS.
     static func genericSecret(target: String) -> String? {
         var credential: PCREDENTIALW?
         let found = Win32.withWide(target) { CredReadW($0, DWORD(CRED_TYPE_GENERIC), 0, &credential) }
@@ -17,7 +18,7 @@ enum WindowsCredentials {
         defer { CredFree(credential) }
         let size = Int(credential.pointee.CredentialBlobSize)
         guard size > 0, size <= 64 * 1024, let blob = credential.pointee.CredentialBlob else { return nil }
-        return String(decoding: UnsafeBufferPointer(start: blob, count: size), as: UTF8.self)
+        return String(bytes: UnsafeBufferPointer(start: blob, count: size), encoding: .utf8)
     }
 }
 

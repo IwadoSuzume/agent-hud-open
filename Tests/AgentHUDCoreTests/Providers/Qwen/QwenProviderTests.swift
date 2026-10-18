@@ -109,7 +109,8 @@ final class QwenProviderTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(written["$version"].numberValue, 4)
         XCTAssertEqual(written["security"]["auth"]["selectedType"].stringValue, "openai")
         let handler = written["hooks"]["Stop"].arrayValue?.first?["hooks"].arrayValue?.first
-        XCTAssertEqual(handler?["command"].stringValue, "'/tmp/hud' --completion-hook qwen")
+        XCTAssertEqual(handler.flatMap { TestHooks.commandLine(of: $0) },
+                       HookCommand.make(executable: URL(fileURLWithPath: "/tmp/hud"), arguments: "--completion-hook qwen"))
         XCTAssertEqual(handler?["timeout"].numberValue, 5000, "five seconds on every Qwen version")
     }
 }

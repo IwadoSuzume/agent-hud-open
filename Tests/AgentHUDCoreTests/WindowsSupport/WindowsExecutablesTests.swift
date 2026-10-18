@@ -23,6 +23,23 @@ final class WindowsExecutablesTests: XCTestCase {
         return url
     }
 
+    /// A hook's host is told by its ancestry: the native engine's process shows `claude.exe`, in whatever case, and
+    /// the candidates match it once resolved to that program (M4 review round 4).
+    func testClaudesEngineIsRecognisedAmongAHooksAncestors() throws {
+        let home = try directory()
+        let engine = try program(".local/bin/claude.exe", in: home)
+        let paths = ClaudeEngineLocator.processPaths(home: home, path: "")
+        XCTAssertEqual(paths.map { $0.lowercased() }, [engine.path.lowercased()])
+        let shown = engine.path.uppercased()
+        let ancestors = [HookProcessOrigins.Ancestor(executable: shown, arguments: [shown, "-p", "list the folder"])]
+        XCTAssertEqual(ClaudeSessionOrigins.engineArguments(ancestors: ancestors, executablePaths: paths)?.dropFirst().first, "-p")
+        XCTAssertTrue(ClaudeHeadlessRuns.headless(ancestors: ancestors, environment: ["CLAUDE_CODE_SESSION_ATTENDED": "0"],
+                                                  executablePaths: paths), "a print-mode run asks no one")
+        let other = try program("Tools/claude-helper.exe", in: home)
+        XCTAssertNil(ClaudeSessionOrigins.engineArguments(ancestors: [.init(executable: other.path, arguments: [other.path, "-p"])],
+                                                          executablePaths: paths), "another program is no engine")
+    }
+
     func testPathEntriesAreAbsoluteFoldersSeparatedBySemicolons() {
         let found = Executables.onPath("codex", path: #"C:\Tools;;relative\bin;"D:\Quoted Folder";\\server\share\bin;/usr/bin"#)
         XCTAssertEqual(found.map { $0.lastPathComponent }, ["codex.exe", "codex.exe", "codex.exe"])

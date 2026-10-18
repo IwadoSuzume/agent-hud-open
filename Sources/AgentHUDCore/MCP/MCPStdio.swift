@@ -21,7 +21,12 @@ enum MCPStdio {
 
     /// Serves standard input until it ends and returns the process's exit status.
     static func run() -> Int32 {
-        #if !os(Windows)
+        #if os(Windows)
+        // Messages are bytes, as on macOS: the C runtime's text mode would end each line with CR LF and stop reading
+        // at a Ctrl-Z.
+        _ = _setmode(STDIN_FILENO, _O_BINARY)
+        _ = _setmode(STDOUT_FILENO, _O_BINARY)
+        #else
         // A client that went away must end the process through a failed write, not a signal.
         signal(SIGPIPE, SIG_IGN)
         #endif

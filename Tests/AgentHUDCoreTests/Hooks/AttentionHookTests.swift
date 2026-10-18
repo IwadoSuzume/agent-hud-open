@@ -77,12 +77,12 @@ final class AttentionHookTests: XCTestCase, @unchecked Sendable {
         let updated = try XCTUnwrap(try ProviderJSON.read(Data(contentsOf: settings)).objectValue)
         XCTAssertEqual(updated["model"]?.stringValue, "opus", "nothing else in the file is touched")
         let commands = (updated["hooks"]?["Notification"].arrayValue ?? []).flatMap { $0["hooks"].arrayValue ?? [] }
-            .compactMap { $0["command"].stringValue }
+            .compactMap { TestHooks.commandLine(of: $0) }
         XCTAssertEqual(commands.count, 2)
         XCTAssertTrue(commands.contains("say hi"))
         XCTAssertTrue(commands.contains { $0.hasSuffix(" --attention-hook claude") })
         let ours = (updated["hooks"]?["Notification"].arrayValue ?? []).first { group in
-            (group["hooks"].arrayValue ?? []).contains { $0["command"].stringValue?.hasSuffix(" --attention-hook claude") == true }
+            (group["hooks"].arrayValue ?? []).contains { TestHooks.commandLine(of: $0)?.hasSuffix(" --attention-hook claude") == true }
         }
         XCTAssertEqual(ours?["matcher"].stringValue, "permission_prompt|agent_needs_input",
                        "the client filters by notification type, so a sign-in notice never reads as a request")

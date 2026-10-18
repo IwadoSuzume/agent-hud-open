@@ -226,6 +226,10 @@ public final class DeepSeekQuestionObserver {
     /// The event stream: one downlink WebSocket per host, whose server pushes questions and resolutions without
     /// being polled. The connection ends when the socket does; the caller reconnects through `connect` again.
     static func stream(port: Int, onFrame: @escaping @Sendable (ProviderJSON) -> Void, shouldStop: @escaping @MainActor @Sendable () -> Bool) async {
+        #if os(Windows)
+        // swift-corelibs' WebSocket ends a quiet stream on Windows: WinHTTP's (DeepSeekQuestionObserver+Windows.swift).
+        await windowsStream(port: port, onFrame: onFrame, shouldStop: shouldStop)
+        #else
         guard let url = URL(string: "ws://127.0.0.1:\(port)/api/events.mux") else { return }
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
@@ -246,5 +250,6 @@ public final class DeepSeekQuestionObserver {
             socket.cancel(with: .goingAway, reason: nil)
             session.invalidateAndCancel()
         }
+        #endif
     }
 }

@@ -5,7 +5,8 @@ import WinSDK
 
 /// DeepSeekQuestionObserverTests' idle Harness host on Winsock, with the API of the macOS one in that file: on
 /// 127.0.0.1 and a port the system picks, the WebSocket handshake completes, then the host stays silent until the
-/// client closes its socket.
+/// client closes its socket. On Windows it can also send frames and keeps what the client sent after the handshake
+/// (WindowsWebSocketTests).
 final class IdleQuestionHost: @unchecked Sendable {
     let port: Int
     private let listener: SOCKET
@@ -14,7 +15,10 @@ final class IdleQuestionHost: @unchecked Sendable {
     private var stopped = false
     private var opened = false
     private var ended = false
+    private var after: [UInt8] = []
     var connected: Bool { lock.withLock { opened } }
+    /// The bytes the client sent after the handshake: its frames, masked as a client's are.
+    var received: [UInt8] { lock.withLock { after } }
     var disconnected: Bool { lock.withLock { ended } }
 
     init() throws {
@@ -60,6 +64,14 @@ final class IdleQuestionHost: @unchecked Sendable {
         closesocket(listener)
     }
 
+    /// Sends one unmasked server frame (`FIN` set unless `final` is false) once the handshake is done; false otherwise.
+    @discardableResult
+    func send(opcode: UInt8, _ payload: [UInt8], final: Bool = true) -> Bool {
+        guard let socket = lock.withLock({ opened ? client : nil }), payload.count < 126 else { return false }
+        let frame = [(final ? 0x80 : 0) | opcode, UInt8(payload.count)] + payload
+        return frame.withUnsafeBytes { WinSDK.send(socket, $0.baseAddress!.assumingMemoryBound(to: CChar.self), Int32($0.count), 0) } == Int32(frame.count)
+    }
+
     private func receive(_ socket: SOCKET, _ buffer: inout [UInt8]) -> Int32 {
         let count = Int32(buffer.count)
         return buffer.withUnsafeMutableBytes { recv(socket, $0.baseAddress!.assumingMemoryBound(to: CChar.self), count, 0) }
@@ -91,11 +103,18 @@ final class IdleQuestionHost: @unchecked Sendable {
         let accept = Data(Insecure.SHA1.hash(data: Data(challenge.utf8))).base64EncodedString()
         let response = Array(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n"
                               + "Connection: Upgrade\r\nSec-WebSocket-Accept: \(accept)\r\n\r\n").utf8)
-        let sent = response.withUnsafeBytes { send(socket, $0.baseAddress!.assumingMemoryBound(to: CChar.self), Int32($0.count), 0) }
+        let sent = response.withUnsafeBytes { WinSDK.send(socket, $0.baseAddress!.assumingMemoryBound(to: CChar.self), Int32($0.count), 0) }
         guard sent == Int32(response.count) else { return }
         lock.withLock { opened = true }
         var bytes = [UInt8](repeating: 0, count: 256)
-        while receive(socket, &bytes) > 0 { }
+        while true {
+            let count = receive(socket, &bytes)
+            // The 2 s receive timeout only bounds the handshake; a quiet client is waited for until it goes or the
+            // host stops.
+            if count < 0, WSAGetLastError() == WSAETIMEDOUT, !lock.withLock({ stopped }) { continue }
+            guard count > 0 else { break }
+            lock.withLock { after += bytes[..<Int(count)] }
+        }
     }
 
     private enum Failure: Error { case socket }

@@ -5,7 +5,8 @@ A fact without a source is not used: the client, or that part of it, is **not su
 as absent (`PlatformSupport`, so it is neither read nor given hooks), and Settings says so (M7).
 
 Status: ✅ supported, tested on Windows with fixtures · 🔶 not supported on Windows (reason given) · ⏳ planned, with
-its milestone. State at M4 (2026-10-17).
+its milestone. State at M5 (2026-10-18). Hook forms per client: D-037, each run through its client's shell in
+`HookFormsWindowsTests`.
 
 Columns: **Sessions/usage** (local records → sessions, tokens, ledger), **Quota** (account quota or balance request,
 the same requests the macOS build makes, over WinHTTP: D-014), **Approvals** (permission hook or native requests),
@@ -13,25 +14,26 @@ the same requests the macOS build makes, over WinHTTP: D-014), **Approvals** (pe
 
 | Client | Windows location (default; override) | Sessions/usage | Quota | Approvals | Completion | Jump |
 | --- | --- | --- | --- | --- | --- | --- |
-| Claude Code | `%USERPROFILE%\.claude`, `.claude.json`; `CLAUDE_CONFIG_DIR` | ✅ | ✅ engine `get_usage` | ⏳ M5 | ⏳ M5 | 🔶 ¹ |
+| Claude Code | `%USERPROFILE%\.claude`, `.claude.json`; `CLAUDE_CONFIG_DIR` | ✅ | ✅ engine `get_usage` | ✅ hook, exec form ¹⁰ | ✅ records | 🔶 ¹ |
 | Claude desktop app (its Code sessions and its downloaded engine) | — | 🔶 ² | — | — | — | 🔶 |
-| Codex | `%USERPROFILE%\.codex`; `CODEX_HOME` | ✅ | ✅ `app-server` over stdio | ⏳ M5 | ⏳ M5 | 🔶 ¹ |
+| Codex | `%USERPROFILE%\.codex`; `CODEX_HOME` | ✅ | ✅ `app-server` over stdio | ✅ hook, `%ComSpec% /C` line | ✅ records | 🔶 ¹ |
 | Codex desktop app (IPC, daemon origins) | — | 🔶 ³ | 🔶 ³ | 🔶 ³ | — | 🔶 |
-| GitHub Copilot CLI | `%USERPROFILE%\.copilot`; `COPILOT_HOME` | ✅ | ✅ GitHub CLI sign-in | ⏳ M5 | ⏳ M5 | 🔶 ¹ |
+| GitHub Copilot CLI | `%USERPROFILE%\.copilot`; `COPILOT_HOME` | ✅ | ✅ GitHub CLI sign-in | — | ✅ `agentStop` hook, `exec` field | 🔶 ¹ |
 | Cursor | `%APPDATA%\Cursor\User\globalStorage\state.vscdb` (the agent CLI's `~/.cursor` chat names: 🔶 ⁸) | ✅ | ✅ | — | 🔶 ⁹ | 🔶 ¹ |
 | OpenCode (+ OpenCode Go quota) | data `%USERPROFILE%\.local\share\opencode`, config `%USERPROFILE%\.config\opencode\opencode.json(c)`; `XDG_DATA_HOME`, `XDG_CONFIG_HOME` | ✅ | ✅ | — | ✅ plugin (Node) | 🔶 ¹ |
 | Pi | `%USERPROFILE%\.pi\agent`; `PI_CODING_AGENT_DIR` | ✅ | — | — | ✅ extension (Node) | 🔶 ¹ |
 | Kimi Code / GLM (quota from client configs) | Kimi `%USERPROFILE%\.kimi-code`; `KIMI_CODE_HOME` (the older `~/.kimi` is not read) | ✅ | ✅ | — | — | 🔶 ¹ |
-| Qwen Code | `%USERPROFILE%\.qwen`; `QWEN_HOME` | ✅ | — | — | ⏳ M5 | 🔶 ¹ |
-| CodeBuddy Code | `%USERPROFILE%\.codebuddy`; `CODEBUDDY_CONFIG_DIR` | ✅ | — | — | ⏳ M5 | 🔶 ¹ |
+| Qwen Code | `%USERPROFILE%\.qwen`; `QWEN_HOME` | ✅ | — | ✅ hook, `"shell": "powershell"` | ✅ `Stop` hook, PowerShell | 🔶 ¹ |
+| CodeBuddy Code | `%USERPROFILE%\.codebuddy`; `CODEBUDDY_CONFIG_DIR` | ✅ | — | ✅ hook, Git Bash | ✅ `Stop` hook, Git Bash | 🔶 ¹ |
 | OpenClaw | `%USERPROFILE%\.openclaw`; `OPENCLAW_STATE_DIR` | ✅ | — | — | — | 🔶 ¹ |
 | Hermes Agent | `%USERPROFILE%\.hermes`; `HERMES_HOME` | ✅ ⁴ | — | — | — | 🔶 ¹ |
 | Grok CLI | `%USERPROFILE%\.grok`; `GROK_HOME` | ✅ | ✅ local quota cache | — | — | 🔶 ¹ |
 | Grok Bot (desktop) | — | 🔶 ² | 🔶 ² | — | — | 🔶 |
-| DeepSeek Harness CLI (`dsh`) | `%USERPROFILE%\.dsh`; `DSH_HOME`; package from npm's global folder | ✅ (Node ≥ 22.19 for compressed logs) | ✅ balance | ⏳ M5 ⁵ | — | 🔶 ¹ |
+| DeepSeek Harness CLI (`dsh`) | `%USERPROFILE%\.dsh`; `DSH_HOME`; package from npm's global folder | ✅ (Node ≥ 22.19 for compressed logs) | ✅ balance | ✅ question stream ⁵ | ✅ records | 🔶 ¹ |
 | DeepSeek Harness desktop app | — | 🔶 ² | 🔶 ² | 🔶 ² | — | 🔶 |
 | Antigravity / agy | — | 🔶 ⁶ | 🔶 ⁶ | 🔶 ⁶ | 🔶 ⁶ | 🔶 |
-| Qoder, Qoder CN, QoderWork (approvals only) | `%USERPROFILE%\.qoder`, `.qoder-cn`, `.qoderwork` to be sourced | — | — | ⏳ M5 (unsupported unless sourced) | — | 🔶 |
+| Qoder CLI (approvals only) | `%USERPROFILE%\.qoder` ¹¹ | — | — | ✅ hook, exec form ¹¹ | — | 🔶 |
+| Qoder CN, QoderWork (approvals only) | — | — | — | 🔶 ¹¹ | — | 🔶 |
 | ZCode | — | 🔶 ⁷ | — | — | — | 🔶 |
 | WorkBuddy | — | 🔶 ⁷ | — | — | — | 🔶 |
 
@@ -45,8 +47,8 @@ the same requests the macOS build makes, over WinHTTP: D-014), **Approvals** (pe
 3. The Codex desktop app's IPC socket and daemon are macOS mechanisms; `CodexDesktopIPC` is always unavailable on
    Windows (D-006, Platform/Windows/CodexDesktopIPC+Windows.swift).
 4. Hermes Agent calls its native Windows build an early beta.
-5. The question observer works over WebSocket; swift-corelibs' WebSocket ends a quiet stream on Windows, so M5 gives it
-   a WinHTTP WebSocket (SKIPPED_TESTS.md).
+5. The question observer follows the Harness web host's WebSocket over WinHTTP (`WindowsWebSocket`, D-040):
+   swift-corelibs' WebSocket ends a quiet stream on Windows.
 6. Only community reports place Antigravity's files and processes on Windows (`%LOCALAPPDATA%\Programs\Antigravity`,
    `language_server_windows_x64.exe`, `%USERPROFILE%\.gemini\antigravity`); no Google documentation was found.
    `PlatformSupport.supports(.antigravity)` is false: no folder is read and no process is listed.
@@ -56,6 +58,13 @@ the same requests the macOS build makes, over WinHTTP: D-014), **Approvals** (pe
 8. Cursor's agent CLI keeps its chats and ACP sessions in `~/.cursor` on macOS; no source places them on Windows, so
    session names there come from the editor's database alone.
 9. No source gives the shell Cursor runs a hook's command in on Windows (its docs name none); M5 gives it no hook there.
+10. Claude Code finds its host by the hook's ancestry; on Windows the native `claude.exe` is recognised, an npm install
+    (`claude.cmd` starting `node.exe`) is not, so a headless npm run's requests stay on the HUD until the client's own
+    limit.
+11. Qoder CLI: user settings `~/.qoder/settings.json` (Core reads the default only, as on macOS, not `QODER_CONFIG_DIR`) — Qoder docs, *CLI settings
+    reference* (https://docs.qoder.com/cli/settings-reference) and *CLI Hooks* (https://docs.qoder.com/en/cli/hooks),
+    whose Windows notes give the exec form (`command` + `args`) run without a shell. Qoder CN's and QoderWork's docs
+    say nothing of Windows: no hook (D-037), and their folders are not taken as an installed client.
 
 ## Executables (D-019)
 

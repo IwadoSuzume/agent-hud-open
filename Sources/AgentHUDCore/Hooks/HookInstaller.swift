@@ -21,6 +21,16 @@ public struct HookInstaller: Sendable {
     /// The settings, empty when the file is missing or empty. A file over `configurationLimit`, or one whose content is
     /// not a JSON object, throws.
     public func read() throws -> [String: JSONValue] {
+        #if os(Windows)
+        // Agent HUD's handlers in a client's own form, as the command lines the shared code reads (HookCommand+Windows).
+        return HookCommand.commandLines(try contents(), arguments: arguments)
+        #else
+        return try contents()
+        #endif
+    }
+
+    /// The file's settings as they are written.
+    private func contents() throws -> [String: JSONValue] {
         guard FileManager.default.fileExists(atPath: configuration.path) else { return [:] }
         let data = try Data(contentsOf: configuration)
         guard data.count <= Self.configurationLimit else { throw ProviderFailure.limit }
@@ -43,9 +53,19 @@ public struct HookInstaller: Sendable {
                           willWrite: () -> Void = {}) throws {
         guard enabled || FileManager.default.fileExists(atPath: configuration.path) else { return }
         if enabled { try HookCommand.checkInstall(executable: executable) }
+        #if os(Windows)
+        // A client whose Windows hook shell no source gives is never given a handler; one already there can be taken out.
+        if enabled, HookCommand.windowsForm(arguments: arguments) == nil { throw HookCommand.unsupportedOnWindows }
+        let original = try contents()
+        let lines = HookCommand.commandLines(original, arguments: arguments)
+        let changed = try updating(lines, enabled ? HookCommand.make(executable: executable, arguments: arguments) : nil)
+        let updated = HookCommand.clientForms(changed, arguments: arguments)
+        guard updated != original else { return }
+        #else
         let object = try read()
         let updated = try updating(object, enabled ? HookCommand.make(executable: executable, arguments: arguments) : nil)
         guard updated != object else { return }
+        #endif
         willWrite()
         try HookSettings.write(updated, to: configuration)
     }

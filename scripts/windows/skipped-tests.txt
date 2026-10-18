@@ -38,9 +38,12 @@ DeepSeekDesktopTests/testTheBalanceHelperReadsTheCredentialThroughTheDesktopApp
 DeepSeekDesktopTests/testTheDesktopAppIsFoundByNameAndRunAsNode
 DeepSeekDesktopTests/testWithoutACLIInstallTheDesktopAppSuppliesThePackageAndItsRuntime
 
-# Approvals (M5): swift-corelibs' URLSessionWebSocketTask ends a quiet stream on Windows; M5 gives the observer a
-# WinHTTP WebSocket.
-DeepSeekQuestionObserverTests/testCancellingIdleWebSocketClosesTheConnectionWithoutAHostFrame
+# Hooks: macOS's transient places (/Volumes, App Translocation), and Antigravity, which has no Windows hooks (D-036,
+# D-037); Windows variants in WindowsSupport/HookFormsWindowsTests.
+CompletionHooksTests/testTheRunningAppTakesOverAHandlerAnotherCopyWrote
+AttentionHookTests/testTheRunningAppTakesOverEveryHandlerAndSwitchingOffTakesThemAllOut
+CompletionHooksTests/testAntigravityKeepsTheEntryAsTheUserLeftItAndOnlyMovesTheCommand
+PermissionHookTests/testZCodeNestsItsHookAndTurnsHooksOnOnlyWhenUnset
 
 # Hooks and MCP (M5): POSIX permission bits, macOS bundle paths in the instance lock.
 ClientHooksTests/testASettingsFileKeptAsALinkIsWrittenWhereItLeadsAndKeepsItsPermissions

@@ -165,7 +165,7 @@ final class CompletionHooksTests: XCTestCase, @unchecked Sendable {
 
     func testInstallationPreservesOtherHooksAndCanBeRemoved() throws {
         let home = try directory(), executable = home.appendingPathComponent("Agent's HUD.app/Contents/MacOS/Agent HUD")
-        for source in CompletionHooks.Source.allCases {
+        for source in CompletionHooks.Source.allCases where TestHooks.installs(arguments: CompletionHooks.arguments(source)) {
             let url = source.configuration(home: home)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             let original = source == .cursor ? #"{"version":1,"hooks":{"stop":[{"command":"other-command"}],"sessionStart":[]}}"#

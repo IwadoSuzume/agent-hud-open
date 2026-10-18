@@ -1,5 +1,9 @@
 import AgentHUDSupport
+#if canImport(Darwin)
 import Darwin
+#else
+import WinSDK
+#endif
 import Foundation
 import XCTest
 @testable import AgentHUDCore
@@ -41,6 +45,18 @@ final class MCPAppChannelTests: XCTestCase {
 
     /// A socket at `path` made without the application: bound, and listening when asked to.
     private func bareSocket(at path: String, listening: Bool) throws -> Int32 {
+        #if os(Windows)
+        // The pipe that serves the path, made by hand: a client's connection is taken, and nothing ever reads or answers.
+        // There is no Windows counterpart of a socket bound but not listening: a pipe exists only while it is served.
+        XCTAssertTrue(listening, "a pipe is always listening")
+        let name = try XCTUnwrap(NamedPipes.name(for: path, creating: true))
+        let mode = DWORD(PIPE_TYPE_MESSAGE) | DWORD(PIPE_READMODE_MESSAGE) | DWORD(PIPE_WAIT) | DWORD(PIPE_REJECT_REMOTE_CLIENTS)
+        let handle = Win32.withWide(name) { CreateNamedPipeW($0, DWORD(PIPE_ACCESS_DUPLEX), mode, 4, 64 * 1024, 64 * 1024, 0, nil) }
+        let pipe = try XCTUnwrap(handle == Win32.invalidHandle ? nil : handle, "CreateNamedPipeW: \(GetLastError())")
+        let descriptor = _open_osfhandle(Int(bitPattern: pipe), 0)
+        XCTAssertGreaterThanOrEqual(descriptor, 0)
+        return descriptor
+        #else
         let descriptor = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
         XCTAssertGreaterThanOrEqual(descriptor, 0)
         var address = sockaddr_un()
@@ -55,6 +71,7 @@ final class MCPAppChannelTests: XCTestCase {
         XCTAssertEqual(bound, 0, String(cString: strerror(errno)))
         if listening { XCTAssertEqual(listen(descriptor, 4), 0) }
         return descriptor
+        #endif
     }
 
     func testACallTravelsToTheApplicationAndItsReplyBack() async throws {
@@ -197,10 +214,13 @@ final class MCPAppChannelTests: XCTestCase {
         try Data().write(to: URL(fileURLWithPath: path))
         XCTAssertEqual(MCPAppClient.call(request, socket: path), .notRunning, "a file that is no socket")
         try FileManager.default.removeItem(atPath: path)
-        // What an application that crashed leaves behind: its socket, with nobody accepting.
+        #if !os(Windows)
+        // What an application that crashed leaves behind: its socket, with nobody accepting. (On Windows its pipe goes
+        // with the process, which leaves nothing, the first case above.)
         close(try bareSocket(at: path, listening: false))
         XCTAssertTrue(FileManager.default.fileExists(atPath: path))
         XCTAssertEqual(MCPAppClient.call(request, socket: path), .notRunning, "a socket nothing accepts on")
+        #endif
         XCTAssertEqual(MCPAppClient.call(request, socket: path + String(repeating: "x", count: 120)), .notRunning)
     }
 

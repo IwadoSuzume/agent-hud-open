@@ -11,6 +11,16 @@ public enum ClaudeEngineLocator {
         cli(home: home, path: path) + (PlatformSupport.supportsDesktopApps ? desktop(home: home) : [])
     }
 
+    /// The executable paths a running engine's process shows, for telling a hook's host by its ancestry
+    /// (`ClaudeSessionOrigins.engineArguments`). On Windows a candidate is the program it names (`.exe` added, D-019).
+    static func processPaths(home: URL, path: String) -> Set<String> {
+        #if os(Windows)
+        Set(candidates(home: home, path: path).compactMap(WindowsExecutables.program).map(\.path))
+        #else
+        Set(candidates(home: home, path: path).map { $0.resolvingSymlinksInPath().path })
+        #endif
+    }
+
     /// The CLI's install places and `PATH`, without the desktop app's engines.
     static func cli(home: URL, path: String) -> [URL] {
         #if os(Windows)

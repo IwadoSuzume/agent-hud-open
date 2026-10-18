@@ -9,8 +9,8 @@ not listed here counts as a failure. Three mechanisms, each listed below:
 3. **Runtime skips** — tests that skip themselves (`XCTSkip`) on every platform when an opt-in variable or a tool is
    missing.
 
-State at M4 round 3 (2026-10-17, Windows 11 26200, Swift 6.4.1): 1338 pass, 4 runtime skips, 31 listed skips, 9 excluded
-files, 0 failures.
+State at M5 (2026-10-18, Windows 11 26200, Swift 6.4.1, `test.ps1`): 1421 pass, 4 runtime skips, 34 listed skips,
+7 excluded files, 0 failures.
 
 ## AgentHUDSupportTests
 
@@ -24,8 +24,6 @@ and the NIST and golden tests are its Windows counterpart.
 | `System/UnixSocketListenerTests.swift` | AF_UNIX socket files, `stat`, `S_IFSOCK` | `WindowsSupport/NamedPipesTests` (9 tests) | permanent |
 | `System/ChildProcessTests.swift` | `/bin/sh` children, signals | `WindowsSupport/ChildProcessWindowsTests` (13) | permanent |
 | `System/InstanceLockTests.swift` | macOS bundle paths, `flock` | `WindowsSupport/InstanceLockWindowsTests` (5) | permanent |
-| `MCP/MCPAppChannelTests.swift` | raw AF_UNIX squatter sockets | to port to pipes | M5 |
-| `Hooks/Permission/PermissionHookTests.swift` | raw AF_UNIX client, `flock` (most cases are pure logic) | split: logic on Windows, socket cases on pipes | M5 |
 | `Providers/Codex/CodexDaemonOriginTransportTests.swift` | unix-socket daemon stand-in | none: the feature is not supported on Windows (SUPPORT_MATRIX) | permanent |
 | `Providers/Codex/CodexDesktopTestServer.swift` | unix-socket Desktop stand-in (helper of the next two) | none, as above | permanent |
 | `Providers/Codex/CodexDesktopPermissionsTests.swift` | uses the server above | none, as above | permanent |
@@ -45,9 +43,11 @@ and the NIST and golden tests are its Windows counterpart.
 | `MCPClientTests/testAClientIsFoundWhereItsCommandIsInstalled`, `…/testACommandRunsFromTheHomeFolderAndIsStoppedWhenItTakesTooLong` | macOS install places; `/bin/sh` and `/bin/sleep` as the commands | `ProviderEnginesWindowsTests` (same names) | permanent |
 | `AdditionalProviderTests/testAntigravityDirectoryScanExcludesSummariesAndKeepsConversationLayouts`, `GrokBotQuotaTests/testFailedCLIUsesBotCacheAndUnlinkedCLIKeepsItsAccount`, `GrokBotRoutineRunsTests/testRunsSurviveARelaunchAndLeaveWithTheLedgerRetention`, `…/testServiceIsAskedOnlyAboutAnUnexplainedSubagentConversationOfARosteredAccount`, `…/testUnlistedConversationIsAskedAboutTwiceAndAFailedReadDoesNotCount`, `GrokBotUsageTests/testAListedBotKeepsItsOlderRunsWhileAnOldRunNoBotClaimsLeavesTheMonth`, `…/testRoutineRunBecomesASubagentOfItsBotAndCountsInItsTotalOnce`, `…/testRunOfABotWithoutBillingOfItsOwnNestsAndARunOfAnUnknownBotStaysApart`, `GrokClientSeparationTests/testCLIAndBotInstallationEvidenceStaySeparate`, `ZCodeProviderTests/testRowIdentityCountsOneRequestOnceAcrossCopies` | they read Antigravity's, ZCode's or Grok Bot's folders, none of which a source places on Windows: the Windows build never reads them (D-036) | `ProviderPathsWindowsTests.testClientsWithoutAWindowsSourceAreNeverRead`, `…testTheMacDesktopAppsLocationsAreNeverUsed`, `…testGrokBotsCacheIsNeverAskedOnWindows` (the Grok Bot ones) | permanent |
 | `DeepSeekDesktopTests` ×3 (`testTheBalanceHelperReadsTheCredentialThroughTheDesktopApp`, `testTheDesktopAppIsFoundByNameAndRunAsNode`, `testWithoutACLIInstallTheDesktopAppSuppliesThePackageAndItsRuntime`) | the DeepSeek Harness desktop app, which no source places on Windows: the Windows build never looks for it (D-036) | `ProviderPathsWindowsTests.testClientsWithoutAWindowsSourceAreNeverRead` | permanent |
-| `DeepSeekQuestionObserverTests/testCancellingIdleWebSocketClosesTheConnectionWithoutAHostFrame` | swift-corelibs' `URLSessionWebSocketTask` ends a stream on which the host sends nothing ("Empty reply from server"), measured against the Winsock host `IdleQuestionHost+Windows.swift` | the observer's WebSocket on WinHTTP | M5 |
-| `ClientHooksTests/testASettingsFileKeptAsALinkIsWrittenWhereItLeadsAndKeepsItsPermissions` | POSIX permission bits | an ACL-keeping test (D-023) | M5 |
-| `MCPToolsOffTests/testABundledHolderCountsByTheDataDirectoryItsBundleNames`, `…/testAnUnservedSocketIsOffWhileTheApplicationHoldsTheLockAndNotRunningOtherwise` | macOS bundle paths in the instance lock's holder | Windows holder record tests (D-009) | M5 |
+| `CompletionHooksTests/testTheRunningAppTakesOverAHandlerAnotherCopyWrote`, `AttentionHookTests/testTheRunningAppTakesOverEveryHandlerAndSwitchingOffTakesThemAllOut` | macOS's transient places (`/Volumes`, App Translocation) and POSIX command lines | `HookFormsWindowsTests.testTheRunningEngineTakesOverAHandlerAnotherCopyWrote`, `…/testAZipsCopyRemovableAndNetworkPlacesAreTransient` | permanent |
+| `CompletionHooksTests/testAntigravityKeepsTheEntryAsTheUserLeftItAndOnlyMovesTheCommand`, `PermissionHookTests/testZCodeNestsItsHookAndTurnsHooksOnOnlyWhenUnset` | install hooks for Antigravity and ZCode, which have no Windows hook (D-036, D-037) | `HookFormsWindowsTests.testClientsWithoutAWindowsHookShellAreGivenNoHandler`; `ProviderPathsWindowsTests.testClientsWithoutAWindowsSourceAreNeverRead` | permanent |
+| `ClientHooksTests/testASettingsFileKeptAsALinkIsWrittenWhereItLeadsAndKeepsItsPermissions` | POSIX permission bits | `HookFormsWindowsTests.testASettingsFileKeptAsALinkIsWrittenWhereItLeadsAndKeepsItsSecurity` (the DACL, D-023) | permanent |
+| `MCPToolsOffTests/testABundledHolderCountsByTheDataDirectoryItsBundleNames`, `…/testAnUnservedSocketIsOffWhileTheApplicationHoldsTheLockAndNotRunningOtherwise` | macOS bundle paths in the instance lock's holder | `MCPToolsOffWindowsTests` (2: the `<executable>
+<pid>` record, D-009) | permanent |
 
 ## 3. Runtime skips (all platforms)
 

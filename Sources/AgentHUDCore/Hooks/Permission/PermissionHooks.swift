@@ -145,6 +145,10 @@ public enum PermissionHooks {
                                 fileManager: FileManager = .default) -> Bool {
             // A client this platform does not support is absent, and so is given no hook (PlatformSupport).
             if let additional = AdditionalSource(rawValue: rawValue), !PlatformSupport.supports(additional) { return false }
+            #if os(Windows)
+            // An approval client is only there for Agent HUD with a way to run its hook (HookCommand+Windows, D-037).
+            if usesHook, HookCommand.windowsForm(arguments: PermissionHooks.arguments(self)) == nil { return false }
+            #endif
             switch self {
             case .claude:
                 // The engine where its installers put it for this home; this process's PATH says nothing about the home.

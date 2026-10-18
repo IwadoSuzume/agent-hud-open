@@ -71,7 +71,9 @@ final class CompactionHookTests: XCTestCase, @unchecked Sendable {
         let groups = updated["hooks"]?["PreCompact"].arrayValue ?? []
         XCTAssertEqual(groups.count, 2)
         let ours = groups.first { group in
-            (group["hooks"].arrayValue ?? []).contains { $0["command"].stringValue == "'\(executable.path)' --session-origin-hook claude" }
+            (group["hooks"].arrayValue ?? []).contains {
+                TestHooks.commandLine(of: $0) == HookCommand.make(executable: executable, arguments: "--session-origin-hook claude")
+            }
         }
         XCTAssertEqual(ours?["matcher"].stringValue, "auto", "a /compact the user types runs while the session waits, and is not shown")
         XCTAssertEqual(ours?["hooks"].arrayValue?.first?["async"], .bool(true), "a report: the client compacts without waiting for the app")
@@ -80,7 +82,7 @@ final class CompactionHookTests: XCTestCase, @unchecked Sendable {
         let other = URL(fileURLWithPath: "/Applications/Agent HUD Open.app/Contents/MacOS/Agent HUD Open")
         try CompactionHooks.configure(.claude, enabled: true, executable: other, home: home)
         XCTAssertEqual(CompactionHooks.commands(in: try CompactionHooks.configuration(.claude, home: home), source: .claude),
-                       ["'\(other.path)' --session-origin-hook claude"], "the copy that runs takes the handler over")
+                       [HookCommand.make(executable: other, arguments: "--session-origin-hook claude")], "the copy that runs takes the handler over")
 
         try CompactionHooks.configure(.claude, enabled: false, executable: other, home: home)
         XCTAssertFalse(CompactionHooks.isActive(.claude, home: home))
