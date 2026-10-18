@@ -35,7 +35,12 @@ announces in `hello`. A reader ignores fields it does not know. Times are intege
 2. The engine sends `state` whenever anything shown changed (coalesced to at most one per 100 ms), and `event` for
    each thing the HUD presents once (a quota alert, reset credits, a finished turn).
 3. The shell sends `refresh`, `answer`, `update-settings` and `quit` as the user acts. The engine never waits for the
-   shell: a slow reader only delays its own lines.
+   shell: its lines are written by a thread of their own, so a slow, hung or gone reader holds that thread only, never
+   the engine's work (taking hooks' requests, letting unanswered ones go after the hold time). A `state` not yet
+   written gives way to a newer one; other lines wait in order, at most 256, the oldest dropped first. On exit the
+   engine waits at most 2 s for its last lines (`lock-held` before status 3).
+4. The engine reads each line as it ends with `\n`; a line over the limit is dropped up to its end and answered with
+   `error`. The fixtures are LF-only (`.gitattributes`), and both test sides refuse a CR in them.
 
 ## Engine → shell
 
@@ -71,7 +76,14 @@ The whole of what the HUD shows, every time (a reader keeps the last one only):
 `forecastHint`); `sessions` (one per `ReportView.sessions` entry: `id`, `agentId`, `task`, `project`, `phase`
 (`running`, `waitingForApproval`, `idle`, `unverified`), `phaseText`, `startedAt`, `lastEventAt`, `message`,
 `liveStatus`, `tokensIn`, `tokensOut`, `cacheReadTokens`, `tokensText`). Every `…Text` is Core's formatting in the
-resolved language.
+resolved language, by the rules the macOS panel uses: `resetText` is `AgentRow.resetLabel` ("Pending update" once a
+reset's time has passed, "—" for an account that is not current), `phaseText` is `UsageStore.sessionStatusLabel`
+("Needs approval", "Status out of date", "Live status off", or the running or idle time), `project` is
+`SessionProject`'s title (a repository's worktrees share it).
+
+Version 1.0 does not carry the balances (`billing`), the grouping of rows into accounts, the account and source
+notices, or the token columns of the last 24 hours. The shell shows none of them until a minor version adds them, and
+never works them out from the fields above (grouping rows by `vendor`, summing sessions' tokens): those are Core's rules.
 
 An approval: `id`, `source`, `vendor`, `sessionID`, `toolName`, `summary`, `detail`, `project`, `path`, `removed`,
 `added`, `at`, `isQuestion`, `questions` (`[{key, question, header, multiSelect, options: [{label, description}]}]`),
@@ -82,7 +94,8 @@ offers none — then the shell shows no such button).
 
 `{"v":1,"type":"event","event":{"kind":"…", …}}` with `kind` one of `quotaAlert` (`id`, `alert` — `exhaustion` or
 `reset` —, `agentId`, `vendor`, `model`, `preview`, `timeToExhaust` in seconds or null, `timeToExhaustText`,
-`alsoExhausted` — the ids of other agents out of quota), `resetCredits` (`id`, `added`, `preview`), `completion`
+`alsoExhausted` — the ids of other agents out of quota), `resetCredits` (`id`, `added`, `preview`, `provider`,
+`accountLabel` — whose account gained them), `completion`
 (`id`, `sessionID`, `vendor`, `task`, `model`, `startedAt`, `completedAt`). The engine decides what is an event
 (`IslandEventTracker`); the shell only shows it. The sentences the macOS Desktop composes around these facts reach the
 shell through `ShellStrings` with M7 (D-043).
@@ -98,7 +111,7 @@ shell through `ShellStrings` with M7 (D-043).
 | `hello` | `minor`, `shell: {version}` | starts the exchange |
 | `refresh` | — | `UsageStore.refresh()` |
 | `answer` | `id`, `decision` (`allow`, `deny`, `allowAlways`, `answer`, `approvePlan`, `keepPlanning`, `leave`); `answers` for `answer` (`{key: {selected: [label], custom: text or null}}`); `acceptEdits` for `approvePlan`; `note` for `keepPlanning` | `PermissionRequests.resolve` with Core's own `alwaysAllow` value for `allowAlways`; an unknown id is ignored, as on macOS |
-| `update-settings` | `patch` (an object of `Settings` fields) | merged into Core's encoding of the current settings and decoded by Core; a patch Core cannot decode is answered with `error` and changes nothing |
+| `update-settings` | `patch` (an object of `Settings` fields) | merged into Core's encoding of the current settings and decoded by Core; a patch naming a field `Settings` does not have, or one Core cannot decode, is answered with `error` and changes nothing. Core's decoder corrects some values instead of refusing them, as it does for the macOS app's own preferences (an unknown `appearance` becomes `system`, an `approvalWaitMinutes` outside its choices becomes 10): the next `state` shows what was kept |
 | `quit` | — | lets every waiting approval go back to its client and exits 0 |
 
 The HUD never answers for the user: only an `answer` the shell sends because the user chose resolves a request, and

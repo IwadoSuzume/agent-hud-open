@@ -67,26 +67,76 @@ if re.search(r"\.package\s*\(", manifest):
 
 # The Windows shell's .NET projects (docs/windows-port, TASK.md G6): only the packages recorded in DECISIONS.md and
 # THIRD_PARTY_NOTICES.txt, at their recorded versions, and only in test projects; no feed other than nuget.org.
+import xml.etree.ElementTree as ElementTree
+
 allowed_packages = {("Microsoft.NET.Test.Sdk", "18.0.1"), ("MSTest.TestAdapter", "4.0.2"), ("MSTest.TestFramework", "4.0.2")}
+allowed_sdks = {"Microsoft.NET.Sdk", "Microsoft.NET.Sdk.WindowsDesktop"}
+msbuild_suffixes = {".csproj", ".fsproj", ".vbproj", ".proj", ".props", ".targets"}
+# The one NuGet configuration the repository may hold: every inherited feed cleared, nuget.org alone, every package
+# mapped to it (D-042).
+nuget_config = """<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+  <packageSourceMapping>
+    <clear />
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>
+"""
 notices = (ROOT / "THIRD_PARTY_NOTICES.txt").read_text(encoding="utf-8")
 decisions = (ROOT / "docs/windows-port/DECISIONS.md").read_text(encoding="utf-8")
+
+
+def local(tag):
+    return tag.rsplit("}", 1)[-1]
+
+
 for name in sorted(set(filter(None, paths))):
-    if not name.startswith("windows/"):
+    path = ROOT / name
+    if not path.is_file():
         continue
-    if Path(name).name.lower() in {"nuget.config", "packages.config"}:
-        failures.append(f"{name}: the projects restore from nuget.org alone, through PackageReference")
-    if not name.endswith(".csproj"):
+    lowered = Path(name).name.lower()
+    if lowered == "packages.config":
+        failures.append(f"{name}: packages come through PackageReference only")
+    if lowered == "nuget.config":
+        if name != "windows/nuget.config" or path.read_text(encoding="utf-8").replace("\r\n", "\n") != nuget_config:
+            failures.append(f"{name}: only windows/nuget.config, clearing every feed for nuget.org alone, is allowed")
         continue
-    project = (ROOT / name).read_text(encoding="utf-8")
-    for package, version in re.findall(r'<PackageReference\s+Include="([^"]+)"\s+Version="([^"]+)"', project):
+    if path.suffix.lower() not in msbuild_suffixes:
+        continue
+    try:
+        project = ElementTree.parse(path).getroot()
+    except ElementTree.ParseError as error:
+        failures.append(f"{name}: not readable as MSBuild XML ({error})")
+        continue
+    for sdk in filter(None, (project.get("Sdk") or "").split(";")):
+        if sdk.strip() not in allowed_sdks:
+            failures.append(f"{name}: SDK {sdk.strip()} is not allowed")
+    for element in project.iter():
+        tag = local(element.tag)
+        if tag in {"Sdk", "Import"} and element.get("Sdk" if tag == "Import" else "Name") not in (None, *allowed_sdks):
+            failures.append(f"{name}: SDK {element.get('Sdk') or element.get('Name')} is not allowed")
+        if tag in {"PackageVersion", "GlobalPackageReference", "PackageDownload"}:
+            failures.append(f"{name}: {tag} is not used; each test project names its packages")
+        if tag != "PackageReference":
+            continue
+        package = element.get("Include") or element.get("Update")
+        version = element.get("Version") or next((local(child.tag) == "Version" and (child.text or "").strip() or None
+                                                  for child in element if local(child.tag) == "Version"), None)
+        if not package or not version:
+            failures.append(f"{name}: every package reference names its package and version")
+            continue
         if (package, version) not in allowed_packages:
             failures.append(f"{name}: package {package} {version} is not on the recorded list")
         elif not name.endswith(".Tests.csproj"):
             failures.append(f"{name}: package {package} belongs in a test project only")
         if f"{package} {version}" not in notices or package not in decisions:
             failures.append(f"{name}: {package} {version} must be named in THIRD_PARTY_NOTICES.txt and DECISIONS.md")
-    if re.search(r"<PackageReference\s+Include=\"[^\"]+\"(?![^>]*Version=)", project):
-        failures.append(f"{name}: every package reference names its version")
 
 # Verify ignore rules without creating any secret-shaped files.
 ignored = [".env", "signing/local.env", "config/service.local.json", "AuthKey_example.p8", "certificate.p12",

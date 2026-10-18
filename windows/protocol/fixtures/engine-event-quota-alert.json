@@ -1,0 +1,1 @@
+{"event":{"agentId":"account:edb0566a360b1bd94b9436b5b9e476dbb0df9547f720cd4684fe03f273712bf7/claude-session","alert":"exhaustion","alsoExhausted":[],"id":"00000000-0000-0000-0000-000000000000","kind":"quotaAlert","model":"window.session","preview":false,"timeToExhaust":5400,"timeToExhaustText":"1h 30m","vendor":"Claude"},"type":"event","v":1}

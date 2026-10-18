@@ -19,6 +19,12 @@ jobs:
   swift:
     runs-on: windows-latest
     timeout-minutes: 60
+    # No telemetry or update checks from the .NET CLI or the testing platform in any step (DECISIONS.md D-042).
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+      DOTNET_CLI_WORKLOAD_UPDATE_NOTIFY_DISABLE: '1'
+      DOTNET_NOLOGO: '1'
     defaults:
       run:
         shell: pwsh

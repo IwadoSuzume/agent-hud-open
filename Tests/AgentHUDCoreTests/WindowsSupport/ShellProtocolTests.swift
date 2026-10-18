@@ -14,24 +14,39 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
     private static let fixtures = root.appendingPathComponent("windows/protocol/fixtures", isDirectory: true)
     /// A fixed moment, so that every time and countdown in the fixtures is the same on every machine.
     private static let now = Date(timeIntervalSince1970: 1_792_000_000)
-    private static var utc: Calendar {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        return calendar
-    }
 
     private var language: AppLanguage = .system
+    private var zone = TimeZone.current
 
+    /// English and UTC, so that a fixture is the same on every machine: the engine's labels (a reset more than a day
+    /// off, by weekday and time) follow the process's time zone, as the macOS panel's do.
     override func setUp() {
         language = L10n.language
         L10n.setLanguage(.en)
+        zone = NSTimeZone.default
+        NSTimeZone.default = TimeZone(identifier: "UTC")!
     }
 
-    override func tearDown() { L10n.setLanguage(language) }
+    override func tearDown() {
+        L10n.setLanguage(language)
+        NSTimeZone.default = zone
+    }
 
+    /// `message` with the random `id` of an alert or a grant (a `UUID` Core draws) replaced by a fixed one.
+    private func fixingID(_ message: JSONValue) -> JSONValue {
+        guard case .object(var fields) = message, case .object(var event)? = fields["event"] else { return message }
+        event["id"] = .string("00000000-0000-0000-0000-000000000000")
+        fields["event"] = .object(event)
+        return .object(fields)
+    }
+
+    /// The fixture's one line without its LF; a fixture with a CR anywhere (a checkout that converted it) fails, as it
+    /// does in the C# tests and `check-protocol.py`.
     private func fixture(_ name: String) throws -> Data {
         var data = try Data(contentsOf: Self.fixtures.appendingPathComponent(name))
-        while data.last == 0x0A || data.last == 0x0D { data.removeLast() }
+        XCTAssertEqual(data.last, 0x0A, "\(name) ends with LF")
+        if data.last == 0x0A { data.removeLast() }
+        XCTAssertFalse(data.contains(0x0D) || data.contains(0x0A), "\(name) is one line, with no CR")
         return data
     }
 
@@ -58,24 +73,59 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         try assertMatches(ShellProtocol.lockHeld(holder: URL(fileURLWithPath: #"C:\Program Files\Agent HUD\agenthud-engine.exe"#)),
                           "engine-lock-held.json")
         try assertMatches(ShellProtocol.error("unknown type nap"), "engine-error.json")
+    }
 
-        let agents = DemoData.everyAgent, settings = Settings()
+    /// The state as the engine builds it: a store on a fixed clock over the demo's report, with the demo's requests
+    /// waiting (so sessions show "Needs approval"), plus a question and a plan, which the demo has none of.
+    @MainActor
+    func testTheStateIsTheSharedFixture() throws {
+        let agents = DemoData.everyAgent
+        let settings = SettingsStore(defaults: try XCTUnwrap(SettingsFile(url: nil)), defaultAgents: agents)
         let report = DemoUsageProvider.report(agents: agents, historyHours: 24, now: Self.now, stage: nil)
-        let approvals = DemoData.permissionRequests(now: Self.now)
-        let view = ReportView(report: report, agents: agents, settings: settings, approvals: approvals, now: Self.now)
-        XCTAssertFalse(view.rows.isEmpty)
-        XCTAssertFalse(view.sessions.isEmpty)
-        XCTAssertFalse(approvals.isEmpty)
-        try assertMatches(try ShellProtocol.state(view: view, generatedAt: report.generatedAt, settings: settings, paused: false,
-                                                  error: nil, approvals: approvals, calendar: Self.utc),
-                          "engine-state.demo.json")
+        let store = UsageStore(provider: DemoUsageProvider(), settings: settings, clock: { Self.now })
+        store.replace(report: report)
+        PermissionRequests.shared.seedDemo(now: Self.now)
+        defer { PermissionRequests.shared.showDemo([]) }
+        let question = PermissionRequest(
+            id: "demo-question", source: .claude, sessionID: "s1", toolName: "AskUserQuestion", summary: "Which database?",
+            detail: nil, cwd: "~/work/agent-hud",
+            questions: [PermissionQuestion(question: "Which database?", header: "Storage",
+                                           options: [.init(label: "SQLite", description: "One file"), .init(label: "Postgres")]),
+                        PermissionQuestion(question: "Anything else?", options: [], multiSelect: true)],
+            at: Self.now)
+        let plan = PermissionRequest(
+            id: "demo-plan", source: .claude, sessionID: "s1", toolName: "ExitPlanMode", summary: "Plan", detail: nil,
+            cwd: "~/work/agent-hud", answerInput: .object(["plan": .string("1. Read the ledger\n2. Split step 2")]), at: Self.now)
+        let approvals = PermissionRequests.shared.pending + [question, plan]
+        XCTAssertFalse(store.view.rows.isEmpty)
+        XCTAssertTrue(store.view.sessions.contains { $0.phase.state == .waitingForApproval }, "a demo request makes a session wait")
+        XCTAssertNotNil(plan.plan, "the plan request carries its plan")
+        let state = try ShellProtocol.state(store: store, approvals: approvals)
+        let sessions = state["panel"]["sessions"].arrayValue ?? []
+        XCTAssertTrue(sessions.contains { $0["phase"].stringValue == "waitingForApproval" && $0["phaseText"].stringValue == "Needs approval" },
+                      "the status words are UsageStore.sessionStatusLabel's")
+        try assertMatches(state, "engine-state.demo.json")
+    }
 
+    @MainActor
+    func testEventsAreTheSharedFixtures() throws {
+        let report = DemoUsageProvider.report(agents: DemoData.everyAgent, historyHours: 24, now: Self.now, stage: nil)
+        let snapshot = try XCTUnwrap(report.snapshots.first)
+        let agent = try XCTUnwrap(DemoData.everyAgent.first { $0.id == snapshot.agentId } ?? DemoData.everyAgent.first)
+        let alert = QuotaAlert(kind: .exhaustion, agent: agent, snapshot: snapshot, timeToExhaust: 5_400,
+                               otherExhaustedWindows: [], isPreview: false)
+        let account = try XCTUnwrap(DemoData.accounts(now: Self.now)["Codex"]?.first)
+        let grant = ResetCreditGrant(account: account, credits: DemoData.codexResetCredits(now: Self.now), added: 2)
         let completion = SessionCompletion(sessionID: "claude:demo-session", vendor: "Anthropic", turnID: "turn-7",
                                            task: "Anthropic · agent-hud", model: "claude-opus-4-1",
                                            startedAt: Self.now.addingTimeInterval(-90), completedAt: Self.now)
-        let events = ShellProtocol.events(IslandEventTracker.Update(completions: [completion]), now: Self.now)
-        XCTAssertEqual(events.count, 1)
-        try assertMatches(events[0], "engine-event-completion.json")
+        let events = ShellProtocol.events(IslandEventTracker.Update(completions: [completion], quotaAlerts: [alert],
+                                                                    resetCreditGrants: [grant]), now: Self.now)
+        XCTAssertEqual(events.count, 3)
+        try assertMatches(fixingID(events[0]), "engine-event-quota-alert.json")
+        try assertMatches(fixingID(events[1]), "engine-event-reset-credits.json")
+        try assertMatches(events[2], "engine-event-completion.json")
+        XCTAssertEqual(events[0]["event"]["timeToExhaustText"].stringValue, Countdown.forecast(5_400))
     }
 
     /// Every message the engine sends is the current major version with a type, as the shell requires (D-022).

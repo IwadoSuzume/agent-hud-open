@@ -1,0 +1,3 @@
+# The shell protocol's schema and fixtures are bytes both readers compare exactly: one LF-ended line each, never
+# converted at checkout (docs/windows-port/PROTOCOL.md; Git for Windows defaults to core.autocrlf=true).
+windows/protocol/** -text

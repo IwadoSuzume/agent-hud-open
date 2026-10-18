@@ -62,7 +62,7 @@ public abstract record HudEvent(string Id);
 public sealed record QuotaAlertEvent(string Id, string Alert, string AgentId, string Vendor, string Model, bool Preview,
                                      long? TimeToExhaust, string? TimeToExhaustText,
                                      IReadOnlyList<string> AlsoExhausted) : HudEvent(Id);
-public sealed record ResetCreditsEvent(string Id, int Added, bool Preview) : HudEvent(Id);
+public sealed record ResetCreditsEvent(string Id, int Added, bool Preview, string Provider, string? AccountLabel) : HudEvent(Id);
 public sealed record CompletionEvent(string Id, string SessionId, string Vendor, string Task, string Model,
                                      DateTimeOffset? StartedAt, DateTimeOffset CompletedAt) : HudEvent(Id);
 
@@ -74,7 +74,19 @@ public static class EngineMessage
     /// ignored (a later minor version); anything else wrong throws <see cref="ProtocolRejectedException"/>.</summary>
     public static object Parse(string line)
     {
+        try { return ParseLine(line); }
+        // A number out of range, a key given twice (System.Text.Json raises these when the field is read): a line the
+        // shell does not take, like any other malformed one.
+        catch (Exception error) when (error is OverflowException or ArgumentException or InvalidOperationException or FormatException)
+        {
+            throw Rejected($"malformed line: {error.Message}");
+        }
+    }
+
+    static object ParseLine(string line)
+    {
         if (Encoding.UTF8.GetByteCount(line) > ProtocolVersion.LineLimit) throw Rejected("line over the limit");
+        if (line.Contains('\n') || line.Contains('\r')) throw Rejected("more than one line");
         JsonObject message;
         try { message = JsonNode.Parse(line) as JsonObject ?? throw Rejected("not a JSON object"); }
         catch (JsonException) { throw Rejected("not JSON"); }
@@ -138,7 +150,8 @@ public static class EngineMessage
         "quotaAlert" => new QuotaAlertEvent(Text(e, "id"), Text(e, "alert"), Text(e, "agentId"), Text(e, "vendor"),
             Text(e, "model"), Bool(e, "preview"), OptLong(e, "timeToExhaust"), OptText(e, "timeToExhaustText"),
             Texts(e, "alsoExhausted")),
-        "resetCredits" => new ResetCreditsEvent(Text(e, "id"), Int(e, "added"), Bool(e, "preview")),
+        "resetCredits" => new ResetCreditsEvent(Text(e, "id"), Int(e, "added"), Bool(e, "preview"), Text(e, "provider"),
+            OptText(e, "accountLabel")),
         "completion" => new CompletionEvent(Text(e, "id"), Text(e, "sessionID"), Text(e, "vendor"), Text(e, "task"),
             Text(e, "model"), OptTime(e, "startedAt"), Time(e, "completedAt")),
         var kind => throw Rejected($"unknown event {kind}"),

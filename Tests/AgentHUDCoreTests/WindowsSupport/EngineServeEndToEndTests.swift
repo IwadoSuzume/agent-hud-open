@@ -32,9 +32,10 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
         private var received: [Data] = []
         private var pending = Data()
 
-        init(_ engine: URL, _ arguments: [String]) throws {
+        init(_ engine: URL, _ arguments: [String], environment: [String: String]? = nil) throws {
             process.executableURL = engine
             process.arguments = ["--serve"] + arguments
+            if let environment { process.environment = environment }
             process.standardInput = input
             process.standardOutput = output
             process.standardError = FileHandle.nullDevice
@@ -112,6 +113,95 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
             let value = try XCTUnwrap(try? JSONValue.parse(line), String(decoding: line, as: UTF8.self))
             XCTAssertEqual(value["v"], .integer(1))
         }
+    }
+
+    /// A real engine (not the demo) in a home of the test's own: it sets Claude Code's hook at start and only when the
+    /// switch changes afterwards (a hook the user took out stays out through clock ticks and other settings), and a
+    /// request a real hook process makes reaches the shell in `state`, is answered by the shell's `answer`, and the
+    /// hook prints that answer and ends with status 0 (TASK.md G7: only the user's answer resolves it).
+    func testARealRequestGoesThroughTheProtocolAndHooksChangeOnlyWithTheirSwitch() throws {
+        let engine = try engine()
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("HUD 引擎 home \(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home.appendingPathComponent(".claude/projects"), withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: home) }
+        let settingsFile = home.appendingPathComponent(".claude/settings.json")
+        var environment = ProcessInfo.processInfo.environment
+        environment["USERPROFILE"] = home.path.replacingOccurrences(of: "/", with: "\\")
+        environment.removeValue(forKey: "CLAUDE_CODE_SESSION_ATTENDED")
+
+        let served = try Served(engine, [], environment: environment)
+        defer { if served.process.isRunning { served.process.terminate() } }
+        served.send(#"{"v":1,"type":"hello","minor":0,"shell":{"version":"test"}}"#)
+        XCTAssertNotNil(served.next(type("state")))
+        func hooked() -> Bool { ((try? String(contentsOf: settingsFile, encoding: .utf8)) ?? "").contains("--permission-hook") }
+        XCTAssertTrue(hooked(), "the hook is set at start")
+
+        // The user takes the hook out by hand; a clock tick (10 s) and an unrelated setting leave it out.
+        try Data(#"{"model":"opus"}"#.utf8).write(to: settingsFile)
+        served.send(#"{"v":1,"type":"update-settings","patch":{"hoverDelayMs":500}}"#)
+        XCTAssertNotNil(served.next { $0["type"].stringValue == "state" && $0["settings"]["hoverDelayMs"] == .integer(500) })
+        Thread.sleep(forTimeInterval: 11)
+        XCTAssertFalse(hooked(), "nothing but the switch puts a hook back")
+        // The switch off and on again sets it once more.
+        served.send(#"{"v":1,"type":"update-settings","patch":{"clientHooks":false}}"#)
+        XCTAssertNotNil(served.next { $0["type"].stringValue == "state" && $0["settings"]["clientHooks"] == .bool(false) })
+        served.send(#"{"v":1,"type":"update-settings","patch":{"clientHooks":true}}"#)
+        XCTAssertNotNil(served.next { $0["type"].stringValue == "state" && $0["settings"]["clientHooks"] == .bool(true) })
+        let deadline = Date().addingTimeInterval(10)
+        while !hooked(), Date() < deadline { Thread.sleep(forTimeInterval: 0.1) }
+        XCTAssertTrue(hooked(), "turning the switch on sets the hook")
+
+        // A client asks through the hook it was given.
+        let hook = Process(), input = Pipe(), output = Pipe()
+        hook.executableURL = engine
+        hook.arguments = ["--permission-hook", "claude"]
+        hook.environment = environment
+        hook.standardInput = input
+        hook.standardOutput = output
+        hook.standardError = FileHandle.nullDevice
+        try hook.run()
+        defer { if hook.isRunning { hook.terminate() } }
+        let payload = try JSONSerialization.data(withJSONObject: [
+            "session_id": "through-the-shell", "hook_event_name": "PermissionRequest", "cwd": home.path,
+            "tool_name": "Bash", "tool_input": ["command": "dir", "description": "List the folder"]])
+        input.fileHandleForWriting.write(payload)
+        try input.fileHandleForWriting.close()
+        let asked = try XCTUnwrap(served.next {
+            $0["type"].stringValue == "state" && ($0["approvals"].arrayValue ?? []).contains { $0["sessionID"].stringValue == "through-the-shell" }
+        }, "the request reaches the shell")
+        let request = try XCTUnwrap(asked["approvals"].arrayValue?.first { $0["sessionID"].stringValue == "through-the-shell" })
+        XCTAssertTrue(hook.isRunning, "the hook waits for the user")
+        served.send(#"{"v":1,"type":"answer","id":"\#(try XCTUnwrap(request["id"].stringValue))","decision":"allow"}"#)
+        let answer = output.fileHandleForReading.readDataToEndOfFile()
+        hook.waitUntilExit()
+        XCTAssertEqual(hook.terminationStatus, 0)
+        XCTAssertEqual(try ProviderJSON.read(answer)["hookSpecificOutput"]["decision"]["behavior"].stringValue, "allow")
+
+        served.send(#"{"v":1,"type":"quit"}"#)
+        XCTAssertEqual(served.exitStatus(), 0)
+    }
+
+    /// A shell that stops reading cannot hold the engine: with its output never read, the engine still takes `quit`
+    /// and ends, as its writer waits on a thread of its own (PROTOCOL.md).
+    func testAShellThatNeverReadsCannotHoldTheEngine() throws {
+        let process = Process(), input = Pipe(), output = Pipe()
+        process.executableURL = try engine()
+        process.arguments = ["--serve", "--demo"]
+        process.standardInput = input
+        process.standardOutput = output // never read
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        defer { if process.isRunning { process.terminate() } }
+        input.fileHandleForWriting.write(Data(#"{"v":1,"type":"hello","minor":0,"shell":{"version":"test"}}"#.utf8 + [0x0A]))
+        // Enough refreshes for many states, far more than a pipe's buffer holds.
+        for _ in 0..<40 { input.fileHandleForWriting.write(Data(#"{"v":1,"type":"refresh"}"#.utf8 + [0x0A])) }
+        Thread.sleep(forTimeInterval: 3)
+        let started = Date()
+        input.fileHandleForWriting.write(Data(#"{"v":1,"type":"quit"}"#.utf8 + [0x0A]))
+        while process.isRunning, Date().timeIntervalSince(started) < 15 { Thread.sleep(forTimeInterval: 0.05) }
+        XCTAssertFalse(process.isRunning, "the engine ended though nobody read it")
+        XCTAssertLessThan(Date().timeIntervalSince(started), 8, "within the writer's 2 s drain, not the reader's pace")
+        if !process.isRunning { XCTAssertEqual(process.terminationStatus, 0) }
     }
 
     func testAnEngineThatFindsAnotherCopyRunningSaysWhichAndExits() throws {

@@ -41,7 +41,19 @@ public enum EngineServe {
         }
         let error = GetStdHandle(STD_ERROR_HANDLE)
         SetStdHandle(STD_OUTPUT_HANDLE, error)
-        _ = _dup2(2, 1)
+        // Descriptor 1 must leave the protocol pipe whatever happens: onto standard error, or, when there is none, onto
+        // the null device; failing both, the engine does not serve (D-022 fails closed).
+        if _dup2(2, 1) != 0 {
+            let device = Win32.withWide("NUL") {
+                CreateFileW($0, DWORD(GENERIC_WRITE), DWORD(FILE_SHARE_READ) | DWORD(FILE_SHARE_WRITE), nil, DWORD(OPEN_EXISTING), 0, nil)
+            }
+            let null = device.flatMap { $0 == Win32.invalidHandle ? nil : _open_osfhandle(Int(bitPattern: $0), _O_WRONLY) } ?? -1
+            guard null >= 0, _dup2(null, 1) == 0 else {
+                CloseHandle(kept)
+                return nil
+            }
+            _close(null)
+        }
         return kept
     }
 
@@ -57,8 +69,9 @@ public enum EngineServe {
         }
         let writer = ProtocolWriter(handle: output)
         let server = MainActor.assumeIsolated {
-            EngineServer(options: options, send: { writer.write($0) }, finish: { status in
-                writer.close()
+            EngineServer(options: options, send: { writer.write($0, replacing: $1) }, finish: { status in
+                // A live shell gets the last lines (`lock-held` before status 3); a stalled one holds the exit 2 s at most.
+                writer.drain(seconds: 2)
                 exit(status)
             })
         }
@@ -67,9 +80,7 @@ public enum EngineServe {
             readLines(from: input.handle) { line in
                 DispatchQueue.main.async { MainActor.assumeIsolated { server.receive(line) } }
             } tooLong: {
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated { server.receive(Data("{\"v\":0}".utf8)) } // answered with error
-                }
+                DispatchQueue.main.async { MainActor.assumeIsolated { server.lineTooLong() } }
             }
             DispatchQueue.main.async { MainActor.assumeIsolated { server.inputEnded() } }
         }
@@ -113,35 +124,76 @@ public enum EngineServe {
         }
     }
 
-    /// Writes whole lines to the protocol handle, one at a time, from any thread.
+    /// Writes whole lines to the protocol handle on a thread of its own, so that the engine never waits for the shell
+    /// (PROTOCOL.md): a slow, hung or gone reader holds this thread, never the main actor that takes the hooks' requests
+    /// and lets unanswered ones go after the hold time (G7). A `state` waiting to be written is replaced by a newer one
+    /// (the shell keeps the last only); other lines wait in order, at most `limit` of them, the oldest dropped first.
     final class ProtocolWriter: @unchecked Sendable {
+        static let limit = 256
         private let handle: Win32.SendableHandle
-        private let lock = NSLock()
+        private let condition = NSCondition()
+        private var queue: [(line: Data, replaceable: Bool)] = []
+        private var writing = false
         private var broken = false
 
-        init(handle: HANDLE) { self.handle = Win32.SendableHandle(handle: handle) }
+        init(handle: HANDLE) {
+            self.handle = Win32.SendableHandle(handle: handle)
+            let thread = Thread { [self] in run() }
+            thread.name = "app.agenthud.engine-output"
+            thread.start()
+        }
 
-        func write(_ line: Data) {
-            lock.lock()
-            defer { lock.unlock() }
+        /// Queues `line`; with `replacing`, a line queued the same way and not yet written gives way to it.
+        func write(_ line: Data, replacing: Bool) {
+            condition.lock()
+            defer { condition.unlock() }
             guard !broken else { return }
-            var offset = 0
+            if replacing, let index = queue.firstIndex(where: \.replaceable) { queue.remove(at: index) }
+            queue.append((line, replacing))
+            if queue.count > Self.limit, let index = queue.firstIndex(where: { !$0.replaceable }) { queue.remove(at: index) }
+            condition.signal()
+        }
+
+        /// Waits until every queued line is written, the reader is gone, or `seconds` pass.
+        func drain(seconds: Double) {
+            let deadline = Date().addingTimeInterval(seconds)
+            condition.lock()
+            defer { condition.unlock() }
+            while !broken, !queue.isEmpty || writing {
+                if !condition.wait(until: deadline) { return }
+            }
+        }
+
+        private func run() {
+            while true {
+                condition.lock()
+                while queue.isEmpty { condition.wait() }
+                let next = queue.removeFirst()
+                writing = true
+                condition.unlock()
+                let written = write(next.line)
+                condition.lock()
+                writing = false
+                // The shell went away: nothing more can reach it, and the input's end stops the engine.
+                if !written { broken = true; queue.removeAll() }
+                condition.broadcast()
+                condition.unlock()
+                if !written { return }
+            }
+        }
+
+        private func write(_ line: Data) -> Bool {
             let bytes = [UInt8](line)
+            var offset = 0
             while offset < bytes.count {
                 var written: DWORD = 0
                 let ok = bytes.withUnsafeBytes {
                     WriteFile(handle.handle, $0.baseAddress! + offset, DWORD(bytes.count - offset), &written, nil)
                 }
-                // The shell went away: nothing more can reach it, and the input's end will stop the engine.
-                guard ok, written > 0 else { broken = true; return }
+                guard ok, written > 0 else { return false }
                 offset += Int(written)
             }
-        }
-
-        func close() {
-            lock.lock()
-            defer { lock.unlock() }
-            FlushFileBuffers(handle.handle)
+            return true
         }
     }
 }

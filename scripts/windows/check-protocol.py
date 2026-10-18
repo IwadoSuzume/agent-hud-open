@@ -18,7 +18,7 @@ KEYWORDS = {"type", "const", "enum", "properties", "required", "additionalProper
             "minimum", "maximum", "minLength"}
 # Invalid fixtures whose fault is a rule between fields, which the schema does not express; the Swift and C# readers
 # refuse them (ShellProtocolTests, ProtocolTests).
-SEMANTIC = {"answer-plan-without-accept.json", "answer-empty-id.json"}
+SEMANTIC = {"answer-plan-without-accept.json"}
 
 
 class Invalid(Exception):

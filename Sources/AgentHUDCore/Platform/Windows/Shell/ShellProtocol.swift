@@ -25,13 +25,13 @@ public enum ShellProtocol {
 
     public static func error(_ text: String) -> JSONValue { message("error", ["message": .string(text)]) }
 
-    /// The whole of what the HUD shows.
-    /// The whole of what the HUD shows. `calendar` places a reset more than a day off on its weekday and time.
-    public static func state(view: ReportView, generatedAt: Date?, settings: Settings, paused: Bool, error: String?,
-                             approvals: [PermissionRequest], calendar: Calendar = .current) throws -> JSONValue {
-        message("state", ["generatedAt": time(generatedAt), "paused": .bool(paused), "error": text(error),
-                          "settings": try JSONValue.from(settings), "panel": panel(view, calendar: calendar),
-                          "approvals": .array(approvals.map(approval))])
+    /// The whole of what the HUD shows, as `store` shows it on macOS: its view, and its labels by the same rules
+    /// (`AgentRow.resetLabel`, `UsageStore.sessionStatusLabel`), so the shell has nothing to decide.
+    @MainActor
+    public static func state(store: UsageStore, approvals: [PermissionRequest]) throws -> JSONValue {
+        message("state", ["generatedAt": time(store.report?.generatedAt), "paused": .bool(store.isPaused),
+                          "error": text(store.lastError), "settings": try JSONValue.from(store.settings.settings),
+                          "panel": panel(store), "approvals": .array(approvals.map(approval))])
     }
 
     /// What the HUD presents once, as `IslandEventTracker` decided it.
@@ -49,6 +49,7 @@ public enum ShellProtocol {
             message("event", ["event": .object([
                 "kind": .string("resetCredits"), "id": .string(grant.id.uuidString.lowercased()),
                 "added": .integer(Int64(grant.added)), "preview": .bool(grant.isPreview),
+                "provider": .string(grant.account.account.provider), "accountLabel": text(grant.account.label),
             ])])
         } + update.completions.map { completion in
             message("event", ["event": .object([
@@ -68,17 +69,19 @@ public enum ShellProtocol {
 
     // MARK: Projections
 
-    static func panel(_ view: ReportView, calendar: Calendar) -> JSONValue {
-        .object([
+    @MainActor
+    static func panel(_ store: UsageStore) -> JSONValue {
+        let view = store.view
+        return .object([
             "now": time(view.now),
             "maxUsedPct": view.maxUsedPct.map(JSONValue.number) ?? .null,
             "glow": .array(view.glowSegments.map { .object(["vendor": .string($0.vendor), "level": .string($0.level.rawValue)]) }),
-            "agents": .array(view.rows.map { row in agent(row, view: view, calendar: calendar) }),
-            "sessions": .array(view.sessions.map { session($0, now: view.now) }),
+            "agents": .array(view.rows.map { row in agent(row, view: view) }),
+            "sessions": .array(view.sessions.map { session($0, statusText: store.sessionStatusLabel($0.session)) }),
         ])
     }
 
-    static func agent(_ row: AgentRow, view: ReportView, calendar: Calendar) -> JSONValue {
+    static func agent(_ row: AgentRow, view: ReportView) -> JSONValue {
         .object([
             "id": .string(row.id), "vendor": .string(row.agent.vendor), "model": .string(row.agent.model),
             "shortModel": text(row.agent.shortModel),
@@ -87,7 +90,9 @@ public enum ShellProtocol {
             "remainingPct": row.remainingPct.map(JSONValue.number) ?? .null,
             "weeklyRemainingPct": row.weeklyRemainingPct.map(JSONValue.number) ?? .null,
             "resetAt": time(row.resetAt),
-            "resetText": row.resetAt.map { .string(Countdown.resetLabel($0, now: view.now, calendar: calendar)) } ?? .null,
+            // "Pending update" for a reset whose time has passed (a passed deadline is no confirmed reset), "—" for an
+            // account not current, "<1m" within the minute: AgentRow's own rule, as the macOS panel shows it.
+            "resetText": .string(row.resetLabel(now: view.now)),
             "missingQuotaLabel": .string(row.missingQuotaLabel),
             "paletteIndex": .integer(Int64(row.paletteIndex)),
             "isCurrentAccount": .bool(row.isCurrentAccount),
@@ -95,13 +100,16 @@ public enum ShellProtocol {
         ])
     }
 
-    static func session(_ session: ReportView.Session, now: Date) -> JSONValue {
+    /// `statusText` is `UsageStore.sessionStatusLabel`: "Needs approval", "Status out of date", "Live status off" or
+    /// the running or idle time.
+    static func session(_ session: ReportView.Session, statusText: String) -> JSONValue {
         let live = session.session
+        let project = SessionProject(live)
         return .object([
             "id": .string(live.id), "agentId": .string(live.agentId), "task": .string(live.task),
-            "project": text(live.workingDirectory.map { URL(fileURLWithPath: $0).lastPathComponent }),
+            "project": text(project.path == nil ? nil : project.title),
             "phase": .string(session.phase.state.rawValue),
-            "phaseText": .string(Countdown.sessionLabel(session.phase, now: now)),
+            "phaseText": .string(statusText),
             "startedAt": time(live.startedAt), "lastEventAt": time(session.lastEventAt),
             "message": text(session.message), "liveStatus": .bool(session.liveStatus),
             "tokensIn": .integer(Int64(live.tokensIn)), "tokensOut": .integer(Int64(live.tokensOut)),

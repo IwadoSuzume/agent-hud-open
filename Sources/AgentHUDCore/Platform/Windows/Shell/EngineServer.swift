@@ -6,7 +6,8 @@ import Observation
 /// What `agenthud-engine --serve` runs for the Windows shell (PROTOCOL.md, D-041): the part of the macOS
 /// `DesktopApplication` that is not a window — the settings and the store, the approval channel, the client hooks and
 /// the observers — with what it would draw sent to the shell as protocol messages instead, and what the user does
-/// taken back from it. Commands arrive through `receive(_:)`, one line each; lines go out through `send`.
+/// taken back from it. Commands arrive through `receive(_:)`, one line each; lines go out through `send`. Each thing
+/// it reacts to is watched on its own, as `DesktopApplication` watches it: a setting acts only when it changes.
 @MainActor
 public final class EngineServer {
     public struct Options: Sendable {
@@ -21,22 +22,34 @@ public final class EngineServer {
         public init() {}
     }
 
+    /// What the engine does to the clients' hooks: `SessionObservers`' own calls; a test counts them.
+    public struct Hooks: Sendable {
+        public var configure: @MainActor @Sendable (URL, Bool) -> Void = { SessionObservers.configure(executable: $0, enabled: $1) }
+        public var observedClients: @MainActor @Sendable () -> Set<String> = { SessionObservers.observedClients() }
+        public var installObservers: @MainActor @Sendable () -> Void = { SessionObservers.installObservers() }
+        public init() {}
+    }
+
     private let options: Options
-    private let send: @Sendable (Data) -> Void
+    private let hooks: Hooks
+    private let send: @Sendable (Data, Bool) -> Void
     private let finish: @MainActor (Int32) -> Void
     private var instanceLock: InstanceLock?
     private(set) var settings: SettingsStore?
     private(set) var store: UsageStore?
     private var tracker = IslandEventTracker()
+    private var observedClients: Set<String> = []
     private var stateScheduled = false
     private var started = false
     private var stopped = false
-    private var language: AppLanguage?
     private let deepseekQuestions = DeepSeekQuestionObserver()
 
-    /// `send` writes one line to the shell; `finish` ends the process with a status, after `stop()`.
-    public init(options: Options, send: @escaping @Sendable (Data) -> Void, finish: @escaping @MainActor (Int32) -> Void) {
+    /// `send` writes one line to the shell, `true` for a line a newer one of its kind may replace before it is
+    /// written (`state`); `finish` ends the process with a status, after everything has stopped.
+    public init(options: Options, hooks: Hooks = Hooks(), send: @escaping @Sendable (Data, Bool) -> Void,
+                finish: @escaping @MainActor (Int32) -> Void) {
         self.options = options
+        self.hooks = hooks
         self.send = send
         self.finish = finish
     }
@@ -74,6 +87,9 @@ public final class EngineServer {
         }
     }
 
+    /// A line over the protocol's limit was dropped unread.
+    public func lineTooLong() { write(ShellProtocol.error("line longer than \(ShellProtocol.lineLimit) bytes")) }
+
     /// The shell's input ended: it quit or went away.
     public func inputEnded() { end(0) }
 
@@ -83,7 +99,7 @@ public final class EngineServer {
             switch InstanceLock.claim(at: options.lock, executable: options.executable) {
             case .acquired(let lock): instanceLock = lock
             case .held(let holder):
-                write(helloMessage(language: L10n.language))
+                write(helloMessage())
                 write(ShellProtocol.lockHeld(holder: holder))
                 return end(3)
             case .unavailable: break // as on macOS, the engine runs without one rather than not at all
@@ -99,55 +115,76 @@ public final class EngineServer {
         self.settings = settings
         self.store = store
         tracker = IslandEventTracker(startedAt: store.clock())
-        language = settings.settings.language
-        write(helloMessage(language: settings.settings.language))
+        write(helloMessage())
 
         PermissionRequests.shared.holdTime = TimeInterval(settings.settings.approvalWaitMinutes * 60)
         if options.demo {
             PermissionRequests.shared.seedDemo()
         } else {
-            if let executable = options.executable {
-                SessionObservers.configure(executable: executable, enabled: settings.settings.clientHooks)
-            }
+            if let executable = options.executable { hooks.configure(executable, settings.settings.clientHooks) }
+            observedClients = hooks.observedClients()
             PermissionRequests.shared.start()
             deepseekQuestions.setEnabled(settings.settings.clientHooks)
         }
-        observe()
+        watch()
         store.start()
         sendState()
     }
 
-    /// Re-arms after each change of anything the state shows, and of the settings the engine itself acts on.
-    private func observe() {
-        guard let store, let settings, !stopped else { return }
-        withObservationTracking {
-            _ = store.view
-            _ = store.isPaused
-            _ = settings.settings
-        } onChange: { [weak self] in
+    /// The watches `DesktopApplication.start` sets, each re-armed after every change and acting on its own value only.
+    private func watch() {
+        guard let store, let settings else { return }
+        // What the state shows: the view (report, agents, settings, approvals, waiting sessions, failures, time).
+        track({ _ = store.view; _ = store.isPaused }) { [weak self] in self?.scheduleState() }
+        track({ settings.settings.approvalWaitMinutes }) {
+            PermissionRequests.shared.holdTime = TimeInterval(settings.settings.approvalWaitMinutes * 60)
+        }
+        track({ settings.settings.language }) { [weak self] in
+            guard let self else { return }
+            L10n.setLanguage(settings.settings.language)
+            self.write(self.helloMessage())
+            Task { await self.store?.refresh() }
+        }
+        track({ settings.settings.clientHooks }) { [weak self] in
+            guard let self, !self.options.demo else { return }
+            if let executable = self.options.executable { self.hooks.configure(executable, settings.settings.clientHooks) }
+            self.deepseekQuestions.setEnabled(settings.settings.clientHooks)
+        }
+        // A client run for the first time creates its directory, and its observer goes in with the next report.
+        track({ _ = store.report }) { [weak self] in self?.installObserversForNewClients() }
+        // The island's events, on a new report or a change of the agents or of which clients' live status is on.
+        track({ _ = store.report; _ = settings.agents; _ = settings.settings.disabledLiveStatusSources }) { [weak self] in
+            self?.sendEvents()
+        }
+    }
+
+    private func installObserversForNewClients() {
+        guard !options.demo, let settings else { return }
+        let present = hooks.observedClients()
+        if settings.settings.clientHooks, !present.subtracting(observedClients).isEmpty { hooks.installObservers() }
+        observedClients = present
+    }
+
+    /// Calls `onChange` after each change of what `read` reads, re-arming every time.
+    private func track(_ read: @escaping @MainActor () -> Void, onChange: @escaping @MainActor () -> Void) {
+        guard !stopped else { return }
+        withObservationTracking(read) { [weak self] in
             Task { @MainActor in
-                guard let self else { return }
-                self.settingsChanged()
-                self.scheduleState()
-                self.observe()
+                guard let self, !self.stopped else { return }
+                onChange()
+                self.track(read, onChange: onChange)
             }
         }
     }
 
-    private func settingsChanged() {
-        guard let settings else { return }
-        PermissionRequests.shared.holdTime = TimeInterval(settings.settings.approvalWaitMinutes * 60)
-        if settings.settings.language != language {
-            language = settings.settings.language
-            L10n.setLanguage(settings.settings.language)
-            write(helloMessage(language: settings.settings.language))
-            Task { await self.store?.refresh() }
-        }
-        if !options.demo {
-            if let executable = options.executable {
-                SessionObservers.configure(executable: executable, enabled: settings.settings.clientHooks)
-            }
-            deepseekQuestions.setEnabled(settings.settings.clientHooks)
+    /// Calls `onChange` only when the value `read` returns changed, as macOS's `trackChanges` does.
+    private func track<Value: Equatable>(_ read: @escaping @MainActor () -> Value, onChange: @escaping @MainActor () -> Void) {
+        var previous = read()
+        track({ _ = read() }) {
+            let next = read()
+            guard next != previous else { return }
+            previous = next
+            onChange()
         }
     }
 
@@ -164,23 +201,23 @@ public final class EngineServer {
     }
 
     private func sendState() {
-        guard let store, let settings, !stopped else { return }
-        let view = store.view
+        guard let store, !stopped else { return }
         do {
-            write(try ShellProtocol.state(view: view, generatedAt: store.report?.generatedAt, settings: settings.settings,
-                                          paused: store.isPaused, error: store.lastError,
-                                          approvals: PermissionRequests.shared.pending))
+            write(try ShellProtocol.state(store: store, approvals: PermissionRequests.shared.pending))
         } catch {
             write(ShellProtocol.error("state: \(error)"))
         }
-        // As on macOS, a paused store or a failed pass presents nothing; the baselines wait for the next good report.
-        guard !store.isPaused, store.lastError == nil, let report = store.report else { return }
+    }
+
+    /// As on macOS, a paused store or a failed pass presents nothing; the baselines wait for the next good report.
+    private func sendEvents() {
+        guard let store, let settings, !stopped, !store.isPaused, store.lastError == nil, let report = store.report else { return }
         let now = store.clock()
         let update = tracker.update(report: report, agents: settings.agents, now: now, settings: settings.settings)
         for event in ShellProtocol.events(update, now: now) { write(event) }
     }
 
-    private func helloMessage(language _: AppLanguage) -> JSONValue {
+    private func helloMessage() -> JSONValue {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         return ShellProtocol.hello(engineVersion: version, demo: options.demo,
                                    language: L10n.resolved == .zhHans ? "zh" : "en", strings: ShellStrings.current)
@@ -188,7 +225,7 @@ public final class EngineServer {
 
     private func write(_ message: JSONValue) {
         guard let line = try? ShellProtocol.line(message) else { return }
-        send(line)
+        send(line, message["type"].stringValue == "state")
     }
 
     /// Lets every waiting approval go back to its client, stops collecting and ends with `status`.

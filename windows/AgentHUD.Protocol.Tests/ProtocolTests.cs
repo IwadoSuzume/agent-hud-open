@@ -104,6 +104,48 @@ public sealed class ProtocolTests
         var state = JsonNode.Parse(Line("engine-state.demo.json"))!.AsObject();
         state["panel"]!["glow"]![0]!["level"] = "orange";
         Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(state.ToJsonString()), "an unknown level");
+        // A number out of range or a key given twice is refused like the rest, not thrown as .NET's own error.
+        var hello = Line("engine-hello.json");
+        Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(hello.Replace("\"minor\":0", "\"minor\":99999999999")));
+        Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(hello.Replace("\"demo\":true", "\"demo\":true,\"demo\":false")));
+    }
+
+    /// <summary>The shared lines a reader must refuse whichever side it is on: those wrong in their envelope (the
+    /// rest are shell commands the engine refuses for their fields).</summary>
+    [TestMethod]
+    public void TheSharedEnvelopeFaultsAreRefusedHereToo()
+    {
+        var envelope = new[] { "not-json.json", "array.json", "version-2.json", "version-missing.json", "version-text.json",
+                               "type-missing.json", "type-unknown.json" };
+        foreach (var name in envelope)
+            Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(Line(Path.Combine("invalid", name))), name);
+    }
+
+    [TestMethod]
+    public void TheEventsAreRead()
+    {
+        var alert = (QuotaAlertEvent)EngineMessage.Parse(Line("engine-event-quota-alert.json"));
+        Assert.AreEqual("exhaustion", alert.Alert);
+        Assert.AreEqual(5_400, alert.TimeToExhaust);
+        Assert.IsNotNull(alert.TimeToExhaustText);
+        var credits = (ResetCreditsEvent)EngineMessage.Parse(Line("engine-event-reset-credits.json"));
+        Assert.AreEqual(2, credits.Added);
+        Assert.AreEqual("Codex", credits.Provider);
+        Assert.AreEqual("Personal", credits.AccountLabel);
+    }
+
+    [TestMethod]
+    public void QuestionsAndPlansAreRead()
+    {
+        var state = (State)EngineMessage.Parse(Line("engine-state.demo.json"));
+        var question = state.Approvals.Single(a => a.Id == "demo-question");
+        Assert.IsTrue(question.IsQuestion);
+        Assert.HasCount(2, question.Questions);
+        Assert.AreEqual("SQLite", question.Questions[0].Options[0].Label);
+        var plan = state.Approvals.Single(a => a.Id == "demo-plan");
+        Assert.IsTrue(plan.IsPlan);
+        Assert.IsNotNull(plan.Plan);
+        Assert.IsTrue(state.Panel.Sessions.Any(s => s.Phase == SessionPhase.WaitingForApproval && s.PhaseText == "Needs approval"));
     }
 
     [TestMethod]
