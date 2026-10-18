@@ -1,5 +1,6 @@
 #if os(Windows)
 import Foundation
+import WinSDK
 import XCTest
 @testable import AgentHUDCore
 
@@ -35,9 +36,31 @@ final class WindowsExecutablesTests: XCTestCase {
         XCTAssertEqual(ClaudeSessionOrigins.engineArguments(ancestors: ancestors, executablePaths: paths)?.dropFirst().first, "-p")
         XCTAssertTrue(ClaudeHeadlessRuns.headless(ancestors: ancestors, environment: ["CLAUDE_CODE_SESSION_ATTENDED": "0"],
                                                   executablePaths: paths), "a print-mode run asks no one")
+        // Spelled with 8.3 names on one side only (a home or temporary folder `C:\Users\RUNNER~1\…`), they still match.
+        let long = engine.path.replacingOccurrences(of: "/", with: "\\")
+        if let short = shortPath(long), short.lowercased() != long.lowercased() {
+            let shortAncestor = [HookProcessOrigins.Ancestor(executable: short, arguments: [short, "-p"])]
+            XCTAssertNotNil(ClaudeSessionOrigins.engineArguments(ancestors: shortAncestor, executablePaths: paths), short)
+            let shortHome = try XCTUnwrap(shortPath(home.path.replacingOccurrences(of: "/", with: "\\")))
+            let shortPaths = ClaudeEngineLocator.processPaths(home: URL(fileURLWithPath: shortHome), path: "")
+            XCTAssertNotNil(ClaudeSessionOrigins.engineArguments(ancestors: ancestors, executablePaths: shortPaths), shortHome)
+        }
         let other = try program("Tools/claude-helper.exe", in: home)
         XCTAssertNil(ClaudeSessionOrigins.engineArguments(ancestors: [.init(executable: other.path, arguments: [other.path, "-p"])],
                                                           executablePaths: paths), "another program is no engine")
+        if shortPath(long).map({ $0.lowercased() == long.lowercased() }) ?? true {
+            throw XCTSkip("the volume keeps no 8.3 names: the short-spelling cases did not run")
+        }
+    }
+
+    /// The 8.3 spelling of an existing `path`, or nil.
+    private func shortPath(_ path: String) -> String? {
+        let length = Win32.withWide(path) { GetShortPathNameW($0, nil, 0) }
+        guard length > 0 else { return nil }
+        var buffer = [WCHAR](repeating: 0, count: Int(length) + 1)
+        let written = Win32.withWide(path) { GetShortPathNameW($0, &buffer, DWORD(buffer.count)) }
+        guard written > 0, Int(written) < buffer.count else { return nil }
+        return String(decoding: buffer.prefix { $0 != 0 }, as: UTF16.self)
     }
 
     func testPathEntriesAreAbsoluteFoldersSeparatedBySemicolons() {

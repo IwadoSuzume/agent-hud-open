@@ -59,12 +59,24 @@ the same requests the macOS build makes, over WinHTTP: D-014), **Approvals** (pe
    session names there come from the editor's database alone.
 9. No source gives the shell Cursor runs a hook's command in on Windows (its docs name none); M5 gives it no hook there.
 10. Claude Code finds its host by the hook's ancestry; on Windows the native `claude.exe` is recognised, an npm install
-    (`claude.cmd` starting `node.exe`) is not, so a headless npm run's requests stay on the HUD until the client's own
-    limit.
+    (`claude.cmd` starting `node.exe`) is not. A headless (`-p`) run of an npm install is therefore not let go at once
+    as on macOS: its request waits on the HUD until the user answers or the HUD's hold time (10 minutes,
+    `PermissionRequests.holdTime`) hands it back to the client.
 11. Qoder CLI: user settings `~/.qoder/settings.json` (Core reads the default only, as on macOS, not `QODER_CONFIG_DIR`) — Qoder docs, *CLI settings
     reference* (https://docs.qoder.com/cli/settings-reference) and *CLI Hooks* (https://docs.qoder.com/en/cli/hooks),
     whose Windows notes give the exec form (`command` + `args`) run without a shell. Qoder CN's and QoderWork's docs
     say nothing of Windows: no hook (D-037), and their folders are not taken as an installed client.
+
+## Hook forms (D-037; retrieved 2026-10-18)
+
+| Client | Form written on Windows | Source |
+| --- | --- | --- |
+| Claude Code | `"command": "<engine>.exe"`, `"args": [...]`: exec form | *Hooks reference* (https://code.claude.com/docs/en/hooks): "`args` … When present, `command` is resolved as an executable and spawned directly with `args` as the argument vector, with no shell involved"; "On Windows, exec form requires `command` to resolve to a real executable such as a `.exe`". |
+| GitHub Copilot CLI | `"exec": "<engine>.exe"`, `"args": [...]`, no `bash`/`powershell`/`command` | *CLI hooks reference* (https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-hooks-reference): "`exec`: Executable name or path. Runs the executable directly without a shell"; "Do not combine `exec` with `bash`, `powershell`, or `command`"; user hooks in `%USERPROFILE%\.copilot\hooks\` or `$COPILOT_HOME/hooks/`. |
+| Qoder CLI | exec form, as Claude Code | footnote 11. |
+| Codex | one command line, `"<engine>.exe" <arguments>`, which Codex hands to `%ComSpec% /C` | openai/codex `codex-rs/hooks/src/engine/command_runner.rs` @ `ce0323f`. |
+| CodeBuddy Code | a Git Bash line, the engine double-quoted with forward slashes | *Hooks* (https://www.workbuddy.ai/docs/cli/hooks): "`command` … Shell command to run"; "Git Bash is enforced on Windows (cmd.exe and PowerShell are not supported)"; user settings `~/.codebuddy/settings.json`. The page does not spell out the invocation; the test runs the line as `bash -c <line>`, as a shell runs a command string, and the form uses only quoting that reads the same however Git Bash is given the line. |
+| Qwen Code | `"shell": "powershell"`, `& '<engine>.exe' <arguments>` | QwenLM/qwen-code `hookRunner.ts`, `utils/shell-utils.ts` @ `fa02030`. |
 
 ## Executables (D-019)
 

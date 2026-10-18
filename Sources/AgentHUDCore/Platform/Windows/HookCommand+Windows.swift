@@ -189,16 +189,22 @@ extension HookCommand {
     static func isTransientOnWindows(_ path: String) -> Bool {
         let native = path.replacingOccurrences(of: "/", with: "\\")
         if native.hasPrefix(#"\\"#) { return true }
-        let folded = PathCase.folded(native)
-        let temporary = [Win32.environment("TEMP"), Win32.environment("TMP"),
-                         FileManager.default.temporaryDirectory.path].compactMap { $0 }
-            .map { PathCase.folded($0.replacingOccurrences(of: "/", with: "\\")) }
-            .map { $0.hasSuffix("\\") ? $0 : $0 + "\\" }
+        // Each spelled as given and in its long form: a temporary folder named in its 8.3 form (`C:\Users\9B63~1\…`, for
+        // a long or non-ASCII user name) still holds an engine path spelled in full, and the other way round.
+        let spellings = Set([native, Win32.longPath(native)].map(PathCase.folded))
+        let temporary = Set([Win32.environment("TEMP"), Win32.environment("TMP"),
+                             FileManager.default.temporaryDirectory.path].compactMap { $0 }
+            .map { $0.replacingOccurrences(of: "/", with: "\\") }
+            .flatMap { [$0, Win32.longPath($0)] }
+            .map { PathCase.folded($0) }
+            .map { $0.hasSuffix("\\") ? $0 : $0 + "\\" })
+        for folded in spellings {
         for folder in temporary where folded.hasPrefix(folder) {
             let first = folded.dropFirst(folder.count).split(separator: "\\").first.map(String.init) ?? ""
             if first.hasPrefix("temp"), first.hasSuffix(".zip"), let underscore = first.firstIndex(of: "_"),
                first[first.index(first.startIndex, offsetBy: 4)..<underscore].allSatisfy(\.isNumber),
                underscore > first.index(first.startIndex, offsetBy: 4) { return true }
+        }
         }
         guard native.count >= 2, native.dropFirst().first == ":" else { return false }
         let type = Win32.withWide(String(native.prefix(2)) + "\\") { GetDriveTypeW($0) }

@@ -130,6 +130,16 @@ enum Win32 {
         return URL(fileURLWithPath: string(path), isDirectory: true)
     }
 
+    /// `path` in its long form, every 8.3 name spelled out (`GetLongPathNameW`), or as given when it does not exist or has none.
+    static func longPath(_ path: String) -> String {
+        let length = Win32.withWide(path) { GetLongPathNameW($0, nil, 0) }
+        guard length > 0 else { return path }
+        var buffer = [WCHAR](repeating: 0, count: Int(length) + 1)
+        let written = Win32.withWide(path) { GetLongPathNameW($0, &buffer, DWORD(buffer.count)) }
+        guard written > 0, Int(written) < buffer.count else { return path }
+        return String(decoding: buffer.prefix { $0 != 0 }, as: UTF16.self)
+    }
+
     /// The value of the environment variable `name` when it is set and not blank, its name matched without regard to
     /// case as Windows matches it (`ProcessInfo.environment` is keyed by the spelling the variable was set with, and a
     /// process may inherit `SYSTEMROOT` or `Path`).

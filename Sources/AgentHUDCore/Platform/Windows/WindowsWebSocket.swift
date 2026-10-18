@@ -60,6 +60,16 @@ final class WindowsWebSocket: @unchecked Sendable {
         }
     }
 
+    /// Runs `body` — calls on the handle `cancel` may close, that do not block — while `cancel` cannot close it; nil
+    /// when a cancel came first. A blocking call (the handshake's send and receive, a socket receive) is only begun after
+    /// `stillOpen()`: `cancel` closing its handle is what ends it, and the window between the check and the call is the
+    /// one race left (D-040).
+    private func whileOpen<Result>(_ body: () -> Result) -> Result? {
+        lock.withLock { cancelled ? nil : body() }
+    }
+
+    private func stillOpen() -> Bool { lock.withLock { !cancelled } }
+
     /// Takes `handle` back from `cancel`: true when the thread still owns it and must close it itself.
     private func reclaim() -> Bool {
         lock.withLock {
@@ -88,14 +98,18 @@ final class WindowsWebSocket: @unchecked Sendable {
         var disabled = DWORD(WINHTTP_DISABLE_COOKIES) | DWORD(WINHTTP_DISABLE_AUTHENTICATION)
         var status: DWORD = 0
         var size = DWORD(MemoryLayout<DWORD>.size)
-        let upgraded = WinHttpSetOption(request, DWORD(WINHTTP_OPTION_REDIRECT_POLICY), &never, DWORD(MemoryLayout<DWORD>.size))
-            && WinHttpSetOption(request, DWORD(WINHTTP_OPTION_DISABLE_FEATURE), &disabled, DWORD(MemoryLayout<DWORD>.size))
-            && WinHttpSetOption(request, DWORD(WINHTTP_OPTION_UPGRADE_TO_WEB_SOCKET), nil, 0)
-            && WinHttpSendRequest(request, nil, 0, nil, 0, 0, 0)
-            && WinHttpReceiveResponse(request, nil)
-            && WinHttpQueryHeaders(request, DWORD(WINHTTP_QUERY_STATUS_CODE) | DWORD(WINHTTP_QUERY_FLAG_NUMBER), nil, &status, &size, nil)
-            && status == 101
-        let socket = upgraded ? WinHttpWebSocketCompleteUpgrade(request, 0) : nil
+        let configured = whileOpen {
+            WinHttpSetOption(request, DWORD(WINHTTP_OPTION_REDIRECT_POLICY), &never, DWORD(MemoryLayout<DWORD>.size))
+                && WinHttpSetOption(request, DWORD(WINHTTP_OPTION_DISABLE_FEATURE), &disabled, DWORD(MemoryLayout<DWORD>.size))
+                && WinHttpSetOption(request, DWORD(WINHTTP_OPTION_UPGRADE_TO_WEB_SOCKET), nil, 0)
+        } == true
+        let answered = configured && stillOpen() && WinHttpSendRequest(request, nil, 0, nil, 0, 0, 0)
+            && stillOpen() && WinHttpReceiveResponse(request, nil)
+        let socket = answered ? whileOpen { () -> HINTERNET? in
+            let query = DWORD(WINHTTP_QUERY_STATUS_CODE) | DWORD(WINHTTP_QUERY_FLAG_NUMBER)
+            guard WinHttpQueryHeaders(request, query, nil, &status, &size, nil), status == 101 else { return nil }
+            return WinHttpWebSocketCompleteUpgrade(request, 0)
+        } ?? nil : nil
         if reclaim() { WinHttpCloseHandle(request) }
         guard let socket else { return }
         guard wait(on: socket) else { WinHttpCloseHandle(socket); return }
@@ -103,7 +117,7 @@ final class WindowsWebSocket: @unchecked Sendable {
 
         var buffer = [UInt8](repeating: 0, count: 64 * 1024)
         var message = Data()
-        while true {
+        while stillOpen() {
             var count: DWORD = 0
             var type = WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE
             let failure = buffer.withUnsafeMutableBytes {

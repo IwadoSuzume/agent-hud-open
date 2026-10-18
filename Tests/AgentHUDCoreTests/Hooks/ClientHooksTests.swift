@@ -96,6 +96,16 @@ final class ClientHooksTests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(CompletionHooks.isInstalled(.cursor, home: home))
     }
 
+    #if !os(Windows)
+    /// The POSIX shell line every macOS handler is, pinned as written: shared tests compare with `HookCommand.make` so
+    /// that they hold on Windows too.
+    func testTheCommandLineSingleQuotesThePathForTheShell() {
+        XCTAssertEqual(HookCommand.make(executable: URL(fileURLWithPath: "/Applications/O'Neil HUD.app/Contents/MacOS/Agent HUD"),
+                                        arguments: "--permission-hook claude"),
+                       #"'/Applications/O'\''Neil HUD.app/Contents/MacOS/Agent HUD' --permission-hook claude"#)
+    }
+    #endif
+
     func testRemovingNeverCreatesAFileTheClientDidNotHave() throws {
         let home = try directory(), executable = URL(fileURLWithPath: "/tmp/hud")
         for source in CompletionHooks.Source.allCases {

@@ -27,16 +27,28 @@ enum DeepSeekCredentialLocator {
 
     static func module(home: URL = UserHome.directory) -> URL? {
         #if os(Windows)
-        // npm's global packages and its npx cache on Windows (npm docs, *Folders* and *config: cache*), the install the
-        // DeepSeek Harness docs give; a POSIX folder would name the current drive's root, where any user may plant the
-        // module Node then loads (D-019), and Bun's global folder has no documented place on Windows.
-        var roots = [WindowsFolders.roamingAppData.appendingPathComponent("npm/node_modules")]
-        let cache = WindowsFolders.localAppData.appendingPathComponent("npm-cache/_npx")
+        module(home: home, appData: WindowsFolders.roamingAppData, localAppData: WindowsFolders.localAppData)
         #else
-        var roots = ["/opt/homebrew/lib/node_modules", "/usr/local/lib/node_modules"].map { URL(fileURLWithPath: $0) }
-        roots.append(home.appendingPathComponent(".bun/install/global/node_modules"))
-        let cache = home.appendingPathComponent(".npm/_npx")
+        module(roots: ["/opt/homebrew/lib/node_modules", "/usr/local/lib/node_modules"].map { URL(fileURLWithPath: $0) }
+                   + [home.appendingPathComponent(".bun/install/global/node_modules")],
+               cache: home.appendingPathComponent(".npm/_npx"))
         #endif
+    }
+
+    #if os(Windows)
+    /// npm's global packages and its npx cache on Windows (npm docs, *Folders* and *config: cache*), the install the
+    /// DeepSeek Harness docs give; a POSIX folder would name the current drive's root, where any user may plant the
+    /// module Node then loads (D-019), and Bun's global folder has no documented place on Windows. The two profile
+    /// folders are parameters so that tests give their own.
+    static func module(home: URL, appData: URL, localAppData: URL) -> URL? {
+        module(roots: [appData.appendingPathComponent("npm/node_modules")],
+               cache: localAppData.appendingPathComponent("npm-cache/_npx"))
+    }
+    #endif
+
+    /// The package under the first of `roots`, then of npx's installs in `cache`, newest first, that holds it.
+    private static func module(roots: [URL], cache: URL) -> URL? {
+        var roots = roots
         if let installs = try? FileManager.default.contentsOfDirectory(at: cache, includingPropertiesForKeys: [.contentModificationDateKey]) {
             roots += installs.sorted { a, b in
                 ((try? a.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast)

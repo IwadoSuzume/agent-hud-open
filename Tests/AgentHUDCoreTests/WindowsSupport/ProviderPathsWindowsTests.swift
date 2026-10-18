@@ -134,8 +134,17 @@ final class ProviderPathsWindowsTests: XCTestCase {
         let planted = home.appendingPathComponent(".bun/install/global/node_modules").appendingPathComponent(DeepSeekCredentialLocator.package)
         try FileManager.default.createDirectory(at: planted.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("module.exports = {}".utf8).write(to: planted)
-        // Not nil: npm's folders are the profile's (temporary under test.ps1, the user's in a bare `swift test`).
-        XCTAssertNotEqual(DeepSeekCredentialLocator.module(home: home)?.path, planted.path, "a module under Bun's folder is never loaded")
+        // npm's folders of a profile of the test's own: empty, so nothing else is found.
+        let profile = try directory()
+        XCTAssertNil(DeepSeekCredentialLocator.module(home: home, appData: profile.appendingPathComponent("Roaming"),
+                                                      localAppData: profile.appendingPathComponent("Local")),
+                     "a module under Bun's folder is never loaded")
+        let npm = profile.appendingPathComponent("Roaming/npm/node_modules").appendingPathComponent(DeepSeekCredentialLocator.package)
+        try FileManager.default.createDirectory(at: npm.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("module.exports = {}".utf8).write(to: npm)
+        XCTAssertEqual(DeepSeekCredentialLocator.module(home: home, appData: profile.appendingPathComponent("Roaming"),
+                                                        localAppData: profile.appendingPathComponent("Local"))?.path, npm.path,
+                       "npm's global folder is")
     }
 
     func testCursorIsReadFromItsRoamingFolder() {

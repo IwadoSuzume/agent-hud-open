@@ -110,9 +110,12 @@ public enum ClaudeSessionOrigins {
         guard let process = ancestors.first(where: { !shells.contains($0.executable) }) else { return nil }
         let executable = URL(fileURLWithPath: process.executable).resolvingSymlinksInPath().path
         #if os(Windows)
-        // Windows paths match without regard to case. An npm install (`claude.cmd` starting `node.exe` on its script) is
-        // not recognized: the shim is no link to follow.
-        let installed = executablePaths.contains { $0.caseInsensitiveCompare(executable) == .orderedSame }
+        // Windows paths match without regard to case and whichever 8.3 names they are spelled with. An npm install
+        // (`claude.cmd` starting `node.exe` on its script) is not recognized: the shim is no link to follow.
+        let running = Win32.longPath(executable.replacingOccurrences(of: "/", with: "\\"))
+        let installed = executablePaths.contains {
+            Win32.longPath($0.replacingOccurrences(of: "/", with: "\\")).caseInsensitiveCompare(running) == .orderedSame
+        }
         #else
         let installed = executablePaths.contains(executable)
         #endif

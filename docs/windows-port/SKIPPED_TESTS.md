@@ -1,7 +1,7 @@
 # Skipped and excluded tests
 
 Every test that does not run on Windows, with the reason and its Windows counterpart (TASK.md §6 G3). A skip that is
-not listed here counts as a failure. Three mechanisms, each listed below:
+not listed here counts as a failure. Three mechanisms, each listed below, and cases left out inside a test (§4):
 
 1. **Excluded files** — test files that do not build on Windows, in `windowsSkippedTests` in `Package.swift`.
 2. **Skip list** — tests that build but whose fixture or subject is macOS-specific, in
@@ -9,7 +9,7 @@ not listed here counts as a failure. Three mechanisms, each listed below:
 3. **Runtime skips** — tests that skip themselves (`XCTSkip`) on every platform when an opt-in variable or a tool is
    missing.
 
-State at M5 (2026-10-18, Windows 11 26200, Swift 6.4.1, `test.ps1`): 1421 pass, 4 runtime skips, 34 listed skips,
+State at M5 (2026-10-18, Windows 11 26200, Swift 6.4.1, `test.ps1`, round 2): 1426 pass, 4 runtime skips, 34 listed skips,
 7 excluded files, 0 failures.
 
 ## AgentHUDSupportTests
@@ -46,8 +46,7 @@ and the NIST and golden tests are its Windows counterpart.
 | `CompletionHooksTests/testTheRunningAppTakesOverAHandlerAnotherCopyWrote`, `AttentionHookTests/testTheRunningAppTakesOverEveryHandlerAndSwitchingOffTakesThemAllOut` | macOS's transient places (`/Volumes`, App Translocation) and POSIX command lines | `HookFormsWindowsTests.testTheRunningEngineTakesOverAHandlerAnotherCopyWrote`, `…/testAZipsCopyRemovableAndNetworkPlacesAreTransient` | permanent |
 | `CompletionHooksTests/testAntigravityKeepsTheEntryAsTheUserLeftItAndOnlyMovesTheCommand`, `PermissionHookTests/testZCodeNestsItsHookAndTurnsHooksOnOnlyWhenUnset` | install hooks for Antigravity and ZCode, which have no Windows hook (D-036, D-037) | `HookFormsWindowsTests.testClientsWithoutAWindowsHookShellAreGivenNoHandler`; `ProviderPathsWindowsTests.testClientsWithoutAWindowsSourceAreNeverRead` | permanent |
 | `ClientHooksTests/testASettingsFileKeptAsALinkIsWrittenWhereItLeadsAndKeepsItsPermissions` | POSIX permission bits | `HookFormsWindowsTests.testASettingsFileKeptAsALinkIsWrittenWhereItLeadsAndKeepsItsSecurity` (the DACL, D-023) | permanent |
-| `MCPToolsOffTests/testABundledHolderCountsByTheDataDirectoryItsBundleNames`, `…/testAnUnservedSocketIsOffWhileTheApplicationHoldsTheLockAndNotRunningOtherwise` | macOS bundle paths in the instance lock's holder | `MCPToolsOffWindowsTests` (2: the `<executable>
-<pid>` record, D-009) | permanent |
+| `MCPToolsOffTests/testABundledHolderCountsByTheDataDirectoryItsBundleNames`, `…/testAnUnservedSocketIsOffWhileTheApplicationHoldsTheLockAndNotRunningOtherwise` | macOS bundle paths in the instance lock's holder | `MCPToolsOffWindowsTests` (2: the record of executable path and process id, D-009) | permanent |
 
 ## 3. Runtime skips (all platforms)
 
@@ -60,5 +59,14 @@ and the NIST and golden tests are its Windows counterpart.
 | `DeepSeekProviderTests/testConcatenatedZstandardFramesAndTornFinalFrameMatchPlaintext`, `…/testAGrownCompressedLogIsDecodedFromItsLastCompleteFrame`, `…/testLargeCompressedLogDrainsPipeAndSkipsPackedConversationContent` | Node.js with Zstandard support is not installed (on Windows: no `node.exe` on `PATH`; they run where it is, as on this machine since M4) |
 | `ChildProcessWindowsTests/testNodeStartsInAnOtherwiseEmptyEnvironment` | on Windows only: no `node.exe` on `PATH` |
 | `SessionProjectWindowsTests` (every test that makes a repository) | on Windows only: no `git.exe` on `PATH` |
-| `SessionProjectWindowsTests/testAWorkingDirectoryRecordedInItsShortSpellingBelongsToTheMainRepository` | on Windows only: the volume keeps no 8.3 names (the fixture has no short spelling) |
+| `SessionProjectWindowsTests/testAWorkingDirectoryRecordedInItsShortSpellingBelongsToTheMainRepository`, `HookFormsWindowsTests/testAZipsCopyIsTransientWhicheverWayTheTemporaryFolderIsSpelled`, `WindowsExecutablesTests/testClaudesEngineIsRecognisedAmongAHooksAncestors` (its short-spelling cases, after the rest ran) | on Windows only: the volume keeps no 8.3 names (the fixture has no short spelling) |
 | `OpenCodeSessionObserverTests/testNativePluginRecordsOnlyFinishedTurnsOfTopLevelSessions`, `PiSessionObserverTests/testNativeExtensionLifecycleRetriesHeartbeatAndPrivacy` | on Windows only: no `node.exe` on `PATH` (`TestNode`, D-034) |
+| `HookFormsWindowsTests/testQwenCodesPowerShellRunsTheCommand` | on Windows only: no Windows PowerShell at `%SystemRoot%\System32\WindowsPowerShell\v1.0` (present on every supported Windows; it runs on this machine and in CI) |
+| `HookFormsWindowsTests/testCodeBuddysGitBashRunsTheCommand` | on Windows only: Git for Windows' `bash.exe` not found from `git.exe` on `PATH` (it runs on this machine and in CI) |
+
+## 4. Cases left out inside a test that runs
+
+| Test | Case left out on Windows | Why, and the Windows counterpart |
+| --- | --- | --- |
+| `ClientHooksTests/testTheCommandLineSingleQuotesThePathForTheShell` | the whole test (`#if !os(Windows)`): it pins macOS's POSIX quoting | `HookFormsWindowsTests.testTheCommandLineQuotesTheEngineForTheCommandProcessor` and each client's form |
+| `MCPAppChannelTests/testWithNoApplicationServingTheSocketACallSaysNotRunning` | a socket left bound with nobody accepting (`#if !os(Windows)`) | a pipe exists only while a process serves it, so a crashed application leaves nothing behind: the test's first case, no pipe at all, is that state on Windows |

@@ -3,6 +3,8 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+import CWinHTTP
+import WinSDK
 import XCTest
 @testable import AgentHUDCore
 
@@ -77,6 +79,23 @@ final class ProviderHTTPWindowsTests: XCTestCase, @unchecked Sendable {
             XCTAssertEqual(host.requests.count, 1, "\(status)")
         }
         XCTAssertEqual(elsewhere.connections, 0, "nothing went where the redirects pointed")
+    }
+
+    /// The options each request is sent with: these hold the cookie and authentication rules, which the loopback host
+    /// cannot show failing (every exchange has a session of its own, and no host here asks for a logon), and the
+    /// certificate rule, which needs a TLS host.
+    func testEveryRequestIsSentWithTheRulesAndCertificatesAreCheckedButForLoopback() {
+        for (host, secure) in [("api.github.com", true), ("127.0.0.1", true), ("127.0.0.1", false), ("localhost", true), ("::1", true)] {
+            let rules = WindowsHTTP.rules(host: host, secure: secure)
+            XCTAssertEqual(rules.redirectPolicy, DWORD(WINHTTP_OPTION_REDIRECT_POLICY_NEVER), host)
+            XCTAssertNotEqual(rules.disabledFeatures & DWORD(WINHTTP_DISABLE_COOKIES), 0, host)
+            XCTAssertNotEqual(rules.disabledFeatures & DWORD(WINHTTP_DISABLE_AUTHENTICATION), 0, host)
+        }
+        XCTAssertNotNil(WindowsHTTP.rules(host: "127.0.0.1", secure: true).ignoredCertificateErrors)
+        for (host, secure) in [("api.github.com", true), ("127.0.0.1", false), ("localhost", true), ("::1", true),
+                               ("127.0.0.1.example.com", true), ("127.0.0.2", true)] {
+            XCTAssertNil(WindowsHTTP.rules(host: host, secure: secure).ignoredCertificateErrors, "a certificate error is never ignored for \(host)")
+        }
     }
 
     func testNoCookieIsKeptOrSent() async throws {

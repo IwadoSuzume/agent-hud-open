@@ -158,12 +158,14 @@ final class HookFormsWindowsTests: XCTestCase {
             XCTAssertThrowsError(try CompletionHooks.configure(source, enabled: true, executable: engine, home: home), "\(source)")
             XCTAssertFalse(FileManager.default.fileExists(atPath: source.configuration(home: home).path), "\(source)")
             XCTAssertNoThrow(try CompletionHooks.configure(source, enabled: false, executable: engine, home: home), "\(source)")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: source.configuration(home: home).path), "\(source): removing creates nothing")
         }
         // Antigravity's approvals use no hook on any platform (`usesHook`), so it is not in this list.
         for source in [PermissionHooks.Source.qoderCN, .qoderWork, .zcode, .workbuddy] {
             XCTAssertThrowsError(try PermissionHooks.configure(source, enabled: true, executable: engine, home: home), "\(source)")
             XCTAssertFalse(FileManager.default.fileExists(atPath: source.configuration(home: home).path), "\(source)")
             XCTAssertNoThrow(try PermissionHooks.configure(source, enabled: false, executable: engine, home: home), "\(source)")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: source.configuration(home: home).path), "\(source): removing creates nothing")
         }
     }
 
@@ -187,6 +189,31 @@ final class HookFormsWindowsTests: XCTestCase {
         let programs = (Win32.environment("ProgramFiles") ?? #"C:\Program Files"#) + #"\Agent HUD\agenthud-engine.exe"#
         XCTAssertFalse(HookCommand.isTransient(programs))
         XCTAssertFalse(HookCommand.isTransient(WindowsFolders.localAppData.appendingPathComponent("Programs/Agent HUD/agenthud-engine.exe").path))
+    }
+
+    /// A temporary folder named in its 8.3 form still holds a zip's copy spelled in full (M5 review round 1).
+    func testAZipsCopyIsTransientWhicheverWayTheTemporaryFolderIsSpelled() throws {
+        // A temporary folder of its own whose name needs an 8.3 form, as `C:\Users\<long or CJK name>` does.
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("HUD temporary folder 临时 \(UUID().uuidString)")
+        let copy = folder.appendingPathComponent("Temp7_Agent HUD for Windows long name.zip/Agent HUD/agenthud-engine.exe")
+        try FileManager.default.createDirectory(at: copy.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data().write(to: copy)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let long = Win32.longPath(folder.path.replacingOccurrences(of: "/", with: "\\"))
+        let length = Win32.withWide(long) { GetShortPathNameW($0, nil, 0) }
+        var buffer = [WCHAR](repeating: 0, count: Int(length) + 1)
+        let written = Win32.withWide(long) { GetShortPathNameW($0, &buffer, DWORD(buffer.count)) }
+        let short = String(decoding: buffer.prefix { $0 != 0 }, as: UTF16.self)
+        try XCTSkipIf(written == 0 || short.lowercased() == long.lowercased(), "the volume keeps no 8.3 names for the temporary folder")
+        let saved = (Win32.environment("TEMP"), Win32.environment("TMP"))
+        defer {
+            _ = Win32.withWide("TEMP") { name in saved.0.map { Win32.withWide($0) { SetEnvironmentVariableW(name, $0) } } }
+            _ = Win32.withWide("TMP") { name in saved.1.map { Win32.withWide($0) { SetEnvironmentVariableW(name, $0) } } }
+        }
+        for name in ["TEMP", "TMP"] { _ = Win32.withWide(name) { name in Win32.withWide(short) { SetEnvironmentVariableW(name, $0) } } }
+        let spelledInFull = long + #"\Temp7_Agent HUD for Windows long name.zip\Agent HUD\agenthud-engine.exe"#
+        XCTAssertTrue(HookCommand.isTransient(spelledInFull), "TEMP \(short), engine \(spelledInFull)")
+        XCTAssertTrue(HookCommand.isTransient(Win32.longPath(spelledInFull)))
     }
 
     // MARK: Security descriptors (D-023)
@@ -235,6 +262,65 @@ final class HookFormsWindowsTests: XCTestCase {
         XCTAssertEqual(try json(settings)["model"].stringValue, "opus")
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: settings.deletingLastPathComponent().path).filter { $0.hasSuffix(".tmp") }
         XCTAssertEqual(leftovers, [], "the staged file is gone")
+    }
+
+    /// What is left beside a settings file: staged or backup copies of Agent HUD's.
+    private func leftovers(beside file: URL) throws -> [String] {
+        try FileManager.default.contentsOfDirectory(atPath: file.deletingLastPathComponent().path)
+            .filter { $0.contains(".agenthud-") }
+    }
+
+    /// A replace that fails, in each way `ReplaceFileW` can, never costs the user their file (M5 review round 1).
+    func testAFailedReplaceLeavesTheUsersFileWhereItWas() throws {
+        let file = home.appendingPathComponent(".claude/settings.json")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let original = Data(#"{"model":"opus"}"#.utf8), new = Data(#"{"model":"sonnet"}"#.utf8)
+        try original.write(to: file)
+        let move: @Sendable (String, String) -> Bool = { from, to in
+            Win32.withWide(from) { from in Win32.withWide(to) { to in MoveFileExW(from, to, 0) } }
+        }
+        let failures: [(String, HookSettings.Replace)] = [
+            // The old file renamed to the backup, the new one not moved in: only the backup holds the user's content.
+            ("ERROR_UNABLE_TO_MOVE_REPLACEMENT_2", { target, _, backup in XCTAssertTrue(move(target, backup)); return 1177 }),
+            // Neither moved.
+            ("ERROR_UNABLE_TO_MOVE_REPLACEMENT", { _, _, _ in 1176 }),
+            ("ERROR_UNABLE_TO_REMOVE_REPLACED", { _, _, _ in 1175 }),
+        ]
+        for (name, replace) in failures {
+            XCTAssertThrowsError(try HookSettings.replaceKeepingSecurity(new, at: file, replace: replace), name)
+            XCTAssertEqual(try Data(contentsOf: file), original, "\(name): the user's file is back in place")
+            XCTAssertEqual(try leftovers(beside: file), [], "\(name): nothing of Agent HUD's is left")
+        }
+        try HookSettings.replaceKeepingSecurity(new, at: file)
+        XCTAssertEqual(try Data(contentsOf: file), new)
+        XCTAssertEqual(try leftovers(beside: file), [], "the backup goes once the new file is in place")
+    }
+
+    /// A real failure: the client holds its settings file open without letting it be replaced.
+    func testASettingsFileTheClientHoldsIsLeftAsItWas() throws {
+        let file = home.appendingPathComponent(".claude/settings.json")
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let original = Data(#"{"model":"opus"}"#.utf8)
+        try original.write(to: file)
+        let held = Win32.withWide(file.path.replacingOccurrences(of: "/", with: "\\")) {
+            CreateFileW($0, DWORD(GENERIC_READ), DWORD(FILE_SHARE_READ) | DWORD(FILE_SHARE_WRITE), nil, DWORD(OPEN_EXISTING), 0, nil)
+        }
+        let handle = try XCTUnwrap(held == Win32.invalidHandle ? nil : held)
+        defer { CloseHandle(handle) }
+        XCTAssertThrowsError(try PermissionHooks.configure(.claude, enabled: true, executable: engine, home: home))
+        XCTAssertEqual(try Data(contentsOf: file), original)
+        XCTAssertEqual(try leftovers(beside: file), [])
+    }
+
+    func testASettingsFileDeeperThanMaxPathIsWritten() throws {
+        var folder = home!
+        while folder.path.count < 300 { folder.appendPathComponent("深层文件夹 deep folder \(folder.pathComponents.count)") }
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let file = folder.appendingPathComponent("settings.json")
+        try HookSettings.write(["model": .string("opus")], to: file)
+        try HookSettings.write(["model": .string("sonnet")], to: file)
+        XCTAssertEqual(try json(file)["model"].stringValue, "sonnet")
+        XCTAssertEqual(try leftovers(beside: file), [])
     }
 
     /// The Windows counterpart of `ClientHooksTests.testASettingsFileKeptAsALinkIsWrittenWhereItLeadsAndKeepsItsPermissions`:

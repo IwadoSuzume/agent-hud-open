@@ -25,6 +25,24 @@ extension ProviderHTTP {
 enum WindowsHTTP {
     static let bodyLimit = 16 * 1024 * 1024
 
+    /// The options every request is sent with (D-014): no redirect followed, no cookie and no WinHTTP authentication,
+    /// and, for HTTPS to 127.0.0.1 alone, a self-signed certificate accepted. One place, so that tests hold each rule.
+    struct Rules: Equatable {
+        let redirectPolicy: DWORD
+        let disabledFeatures: DWORD
+        /// The certificate errors to ignore; nil for every host but 127.0.0.1 over HTTPS.
+        let ignoredCertificateErrors: DWORD?
+    }
+
+    static func rules(host: String, secure: Bool) -> Rules {
+        Rules(redirectPolicy: DWORD(WINHTTP_OPTION_REDIRECT_POLICY_NEVER),
+              disabledFeatures: DWORD(WINHTTP_DISABLE_COOKIES) | DWORD(WINHTTP_DISABLE_AUTHENTICATION),
+              ignoredCertificateErrors: secure && host == "127.0.0.1"
+                  ? DWORD(SECURITY_FLAG_IGNORE_UNKNOWN_CA) | DWORD(SECURITY_FLAG_IGNORE_CERT_CN_INVALID)
+                      | DWORD(SECURITY_FLAG_IGNORE_CERT_DATE_INVALID) | DWORD(SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE)
+                  : nil)
+    }
+
     /// Whether `text` holds a line break, which no header name or value may.
     static func breaksLine(_ text: String) -> Bool {
         text.unicodeScalars.contains { $0 == "\r" || $0 == "\n" }
@@ -62,14 +80,13 @@ enum WindowsHTTP {
         defer { watchdog.finish() }
 
         // A request whose rules cannot all be set is not sent: a credential must never follow a redirect (D-014).
-        var never = DWORD(WINHTTP_OPTION_REDIRECT_POLICY_NEVER)
-        var disabled = DWORD(WINHTTP_DISABLE_COOKIES) | DWORD(WINHTTP_DISABLE_AUTHENTICATION)
+        let rules = WindowsHTTP.rules(host: host, secure: secure)
+        var never = rules.redirectPolicy
+        var disabled = rules.disabledFeatures
         guard WinHttpSetOption(handle, DWORD(WINHTTP_OPTION_REDIRECT_POLICY), &never, DWORD(MemoryLayout<DWORD>.size)),
               WinHttpSetOption(handle, DWORD(WINHTTP_OPTION_DISABLE_FEATURE), &disabled, DWORD(MemoryLayout<DWORD>.size))
         else { throw ProviderFailure.local }
-        if secure, host == "127.0.0.1" {
-            var ignore = DWORD(SECURITY_FLAG_IGNORE_UNKNOWN_CA) | DWORD(SECURITY_FLAG_IGNORE_CERT_CN_INVALID)
-                | DWORD(SECURITY_FLAG_IGNORE_CERT_DATE_INVALID) | DWORD(SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE)
+        if var ignore = rules.ignoredCertificateErrors {
             guard WinHttpSetOption(handle, DWORD(WINHTTP_OPTION_SECURITY_FLAGS), &ignore, DWORD(MemoryLayout<DWORD>.size)) else {
                 throw ProviderFailure.local
             }
