@@ -15,12 +15,14 @@ sealed class IslandViewModel : INotifyPropertyChanged
 {
     readonly ShellModel model;
     readonly RequestPlacement placement;
+    readonly Cards cards;
     bool isOpen, resting;
 
-    public IslandViewModel(ShellModel model, RequestPlacement placement, string display)
+    public IslandViewModel(ShellModel model, RequestPlacement placement, Cards cards, string display)
     {
         this.model = model;
         this.placement = placement;
+        this.cards = cards;
         Display = display;
     }
 
@@ -46,6 +48,8 @@ sealed class IslandViewModel : INotifyPropertyChanged
 
     Panel? Panel => model.State?.Panel;
     IReadOnlyList<Approval> Waiting => model.State?.Approvals ?? [];
+
+    public bool Waits(string requestId) => Waiting.Any(r => r.Id == requestId);
 
     /// <summary>A request of this display's waits: the island stays open for it.</summary>
     public bool HoldsRequest => Waiting.Any(r => placement.DisplayOf(r.Id) == Display);
@@ -77,11 +81,9 @@ sealed class IslandViewModel : INotifyPropertyChanged
         (Panel?.Sessions ?? []).Select(s => new SessionItem(s, s.Mark is { } mark ? Artwork.Mark(mark) : null,
                                                             Initial(s.Vendor ?? "?"))).ToList();
 
-    /// <summary>The request the answers act on, whole.</summary>
-    public IReadOnlyList<ApprovalItem> OpenRequest =>
-        placement.OpenRequest(Waiting.Select(r => r.Id).ToList()) is { } id
-            ? [Item(Waiting.First(r => r.Id == id))]
-            : [];
+    /// <summary>The request the answers act on, whole: its card, the same object for as long as it waits.</summary>
+    public CardModel? OpenCard =>
+        placement.OpenRequest(Waiting.Select(r => r.Id).ToList()) is { } id ? cards.Card(id) : null;
 
     /// <summary>Every other request waiting, on any display, a line each, oldest first.</summary>
     public IReadOnlyList<ApprovalItem> QueuedRequests
@@ -93,7 +95,7 @@ sealed class IslandViewModel : INotifyPropertyChanged
         }
     }
 
-    ApprovalItem Item(Approval request) => new(request, Artwork.Mark(request.Mark), Initial(request.Vendor), model);
+    ApprovalItem Item(Approval request) => new(request, Artwork.Mark(request.Mark), Initial(request.Vendor));
 
     public string? Error => model.State?.Error;
 
@@ -112,16 +114,5 @@ sealed record AgentItem(AgentRow Row, ImageSource? Image, string Initial)
     public string? ResetText => Row.ResetText;
 }
 
-sealed record ApprovalItem(Approval Request, ImageSource? Image, string Initial, ShellModel Model)
-{
-    public string Kind => Request.IsQuestion ? Model.Text("approval.question")
-                        : Request.IsPlan ? Model.Text("approval.plan")
-                        : Model.Text("approval.needsApproval");
-    public string Deny => Model.Text("approval.deny");
-    public string Allow => Model.Text("approval.allow");
-    public string Always => Model.Text("approval.always");
-    public bool IsPlainRequest => !Request.IsQuestion && !Request.IsPlan;
-    public bool OffersAlways => IsPlainRequest && Request.AlwaysAllowRule is not null;
-    /// <summary>The rule an Always allow adds, written out before it can be given (the request's own).</summary>
-    public string? AlwaysRule => OffersAlways ? $"{Model.Text("approval.alwaysAdds")} {Request.AlwaysAllowRule}" : null;
-}
+/// <summary>One line of the queue: enough to decide whether to open it.</summary>
+sealed record ApprovalItem(Approval Request, ImageSource? Image, string Initial);

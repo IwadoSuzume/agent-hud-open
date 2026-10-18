@@ -18,12 +18,15 @@ public partial class App : Application
 {
     readonly ShellModel model = new();
     readonly RequestPlacement placement = new();
+    readonly Cards cards;
     readonly List<IslandWindow> islands = [];
     EngineConnection? engine;
     Tray? tray;
     string? snapshotFolder;
     bool quitting;
     volatile string? lastComplaint;
+
+    public App() => cards = new Cards(model);
 
     public static string ShellVersion =>
         Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
@@ -107,6 +110,7 @@ public partial class App : Application
         }
         placement.Update((model.State?.Approvals ?? []).Select(r => r.Id), pointer.Device,
                          monitors.Select(m => m.Device).ToList());
+        cards.Sync(model.State?.Approvals ?? []);
     }
 
     void RefreshIslands()
@@ -138,7 +142,7 @@ public partial class App : Application
                 existing.Place(monitor);
                 continue;
             }
-            var made = new IslandWindow(model, placement, monitor, Send, RefreshIslands);
+            var made = new IslandWindow(model, placement, cards, monitor, Send, RefreshIslands);
             islands.Add(made);
             made.Show();
         }

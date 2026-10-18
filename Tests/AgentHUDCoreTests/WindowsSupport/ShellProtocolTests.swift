@@ -84,19 +84,11 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         let report = DemoUsageProvider.report(agents: agents, historyHours: 24, now: Self.now, stage: nil)
         let store = UsageStore(provider: DemoUsageProvider(), settings: settings, clock: { Self.now })
         store.replace(report: report)
-        PermissionRequests.shared.seedDemo(now: Self.now)
+        // The Windows demo's requests: the macOS demo's, then a question and a plan (`DemoData.windowsDemoRequests`).
+        PermissionRequests.shared.showDemo(DemoData.windowsDemoRequests(now: Self.now))
         defer { PermissionRequests.shared.showDemo([]) }
-        let question = PermissionRequest(
-            id: "demo-question", source: .claude, sessionID: "s1", toolName: "AskUserQuestion", summary: "Which database?",
-            detail: nil, cwd: "~/work/agent-hud",
-            questions: [PermissionQuestion(question: "Which database?", header: "Storage",
-                                           options: [.init(label: "SQLite", description: "One file"), .init(label: "Postgres")]),
-                        PermissionQuestion(question: "Anything else?", options: [], multiSelect: true)],
-            at: Self.now)
-        let plan = PermissionRequest(
-            id: "demo-plan", source: .claude, sessionID: "s1", toolName: "ExitPlanMode", summary: "Plan", detail: nil,
-            cwd: "~/work/agent-hud", answerInput: .object(["plan": .string("1. Read the ledger\n2. Split step 2")]), at: Self.now)
-        let approvals = PermissionRequests.shared.pending + [question, plan]
+        let approvals = PermissionRequests.shared.pending
+        let plan = try XCTUnwrap(approvals.first { $0.id == "demo-plan" })
         XCTAssertFalse(store.view.rows.isEmpty)
         XCTAssertTrue(store.view.sessions.contains { $0.phase.state == .waitingForApproval }, "a demo request makes a session wait")
         XCTAssertNotNil(plan.plan, "the plan request carries its plan")
@@ -233,7 +225,10 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         }
         XCTAssertFalse(sources.isEmpty)
         for (key, pair) in ShellStrings.pairs {
-            XCTAssertTrue(sources.contains("L10n.text(\"\(pair.zh)\", \"\(pair.en)\")"), "\(key): \(pair.zh) / \(pair.en)")
+            // A template's `{vendor}` is the Desktop's interpolation of the request's vendor.
+            let zh = pair.zh.replacingOccurrences(of: "{vendor}", with: #"\(request.vendor)"#)
+            let en = pair.en.replacingOccurrences(of: "{vendor}", with: #"\(request.vendor)"#)
+            XCTAssertTrue(sources.contains("L10n.text(\"\(zh)\", \"\(en)\")"), "\(key): \(pair.zh) / \(pair.en)")
         }
         L10n.setLanguage(.zhHans)
         XCTAssertEqual(ShellStrings.current["menu.quit"], "退出")

@@ -72,6 +72,15 @@ static class Native
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
 
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindow(IntPtr hwnd);
+
     /// <summary>One display: its device name, whole area and work area in physical pixels, and its DPI scale.</summary>
     public sealed record Monitor(string Device, RECT Bounds, RECT Work, double Scale, bool Primary);
 

@@ -44,10 +44,21 @@ static class Snapshot
         Directory.CreateDirectory(folder);
         var report = new StringBuilder();
         var status = 0;
-        foreach (var (name, resting, usage) in new[] { ("island-rest", true, false), ("island-open", false, false), ("island-usage", false, true) })
+        var pictures = new (string Name, bool Resting, bool Usage, string? Request)[]
+        {
+            ("island-rest", true, false, null), ("island-open", false, false, null), ("island-usage", false, true, null),
+            ("card-question", false, false, "demo-question"), ("card-plan", false, false, "demo-plan"),
+        };
+        foreach (var (name, resting, usage, request) in pictures)
         {
             island.View.Resting = resting;
             island.View.UsageOnly = usage;
+            if (request is not null)
+            {
+                // The card asked for, or no picture: a request the demo does not hold must not pass as another's card.
+                if (island.View.Waits(request) == false) { report.AppendLine($"{name} no request {request}"); status = 1; continue; }
+                island.OpenRequestForPicture(request);
+            }
             island.ForceOpen(!resting);
             island.UpdateLayout();
             // Let the bindings and a render pass catch up before the picture is taken.

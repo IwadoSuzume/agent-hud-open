@@ -22,6 +22,23 @@ public enum ShellStrings {
         "approval.question": ("在问你问题", "Asks a question"),
         "approval.plan": ("有计划待审", "Has a plan to review"),
         "alert.dismiss": ("知道了", "Dismiss"),
+        // A question card (PermissionQuestionViews.swift).
+        "question.chooseAny": ("可多选", "Choose any"),
+        "question.other": ("其他", "Other"),
+        "question.answer": ("回答", "Answer"),
+        "question.typeOwn": ("自己输入回答", "Type your own answer"),
+        "question.skip": ("跳过", "Skip"),
+        "question.next": ("继续", "Next"),
+        "question.submit": ("提交", "Submit"),
+        "card.back": ("返回", "Back"),
+        // A plan card (PermissionPlanViews.swift, PermissionAlertViews.swift).
+        "plan.keepPlanning": ("继续规划", "Keep planning"),
+        "plan.approveEdits": ("批准并自动接受编辑", "Approve, accept edits"),
+        "plan.approve": ("批准", "Approve"),
+        "plan.note": ("要改什么（可不填）", "What should change? (optional)"),
+        "plan.send": ("发送", "Send"),
+        // `{vendor}` stands where the Desktop interpolates `request.vendor`; the shell puts the request's vendor there.
+        "plan.elsewhere": ("请到 {vendor} 里审批这份计划", "Review this plan in {vendor}"),
     ]
 
     /// Every string, in the resolved language (`L10n`).

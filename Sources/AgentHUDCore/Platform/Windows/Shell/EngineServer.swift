@@ -111,7 +111,8 @@ public final class EngineServer {
 
         PermissionRequests.shared.holdTime = TimeInterval(settings.settings.approvalWaitMinutes * 60)
         if options.demo {
-            PermissionRequests.shared.seedDemo()
+            // The macOS demo's requests, then a question and a plan, so the shell's every card can be seen.
+            PermissionRequests.shared.showDemo(DemoData.windowsDemoRequests(now: Date()))
         } else {
             if let executable = options.executable { SessionObservers.configure(executable: executable, enabled: settings.settings.clientHooks) }
             observedClients = SessionObservers.observedClients()

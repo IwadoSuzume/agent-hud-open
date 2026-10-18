@@ -16,6 +16,10 @@
     <SolidColorBrush x:Key="Card" Color="#FF1F1F22" />
     <SolidColorBrush x:Key="Secondary" Color="#FF9A9AA0" />
     <SolidColorBrush x:Key="Track" Color="#33FFFFFF" />
+    <SolidColorBrush x:Key="Inset" Color="#14FFFFFF" />
+    <SolidColorBrush x:Key="Highlight" Color="#2EFFFFFF" />
+    <SolidColorBrush x:Key="Border" Color="#33FFFFFF" />
+    <SolidColorBrush x:Key="Tertiary" Color="#FF6E6E73" />
 
     <DataTemplate x:Key="MarkTemplate">
       <Grid Width="20" Height="20">
@@ -37,10 +41,16 @@
           <ControlTemplate TargetType="Button">
             <Border x:Name="Face" CornerRadius="6" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="1" Padding="{TemplateBinding Padding}">
-              <ContentPresenter HorizontalAlignment="Center" />
+              <ContentPresenter x:Name="Label" HorizontalAlignment="Center" />
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Opacity" Value="0.85" /></Trigger>
+              <!-- Not ready (a question without an answer yet): the plain highlight and tertiary text, as on macOS. -->
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Face" Property="Background" Value="#2EFFFFFF" />
+                <Setter TargetName="Face" Property="BorderBrush" Value="Transparent" />
+                <Setter TargetName="Label" Property="TextElement.Foreground" Value="#FF6E6E73" />
+              </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -77,36 +87,156 @@
                      Visibility="{Binding Error, Converter={StaticResource Shown}}" />
 
           <StackPanel Visibility="{Binding ShowsEvents, Converter={StaticResource Shown}}">
-          <ItemsControl ItemsSource="{Binding OpenRequest}">
-            <ItemsControl.ItemTemplate>
+          <!-- The open request's card: the same CardModel while the request waits, so its fields keep what is typed. -->
+          <ContentControl Content="{Binding OpenCard}" Focusable="False">
+            <ContentControl.ContentTemplate>
               <DataTemplate>
                 <Border Background="{StaticResource Card}" CornerRadius="10" Margin="10,0,10,8" Padding="12,10">
                   <StackPanel>
                     <StackPanel Orientation="Horizontal">
                       <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MarkTemplate}" Width="16" Height="16" />
-                      <TextBlock Text="{Binding Kind}" Margin="8,0,0,0" Foreground="{StaticResource Secondary}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding KindText}" Margin="8,0,0,0" Foreground="{StaticResource Secondary}" VerticalAlignment="Center" />
                     </StackPanel>
                     <TextBlock Text="{Binding Request.Summary}" FontWeight="SemiBold" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding Request.Detail}" Foreground="{StaticResource Secondary}" Margin="0,4,0,0" TextWrapping="Wrap"
-                               MaxHeight="64" TextTrimming="CharacterEllipsis"
-                               Visibility="{Binding Request.Detail, Converter={StaticResource Shown}}" />
-                    <TextBlock Text="{Binding AlwaysRule}" Foreground="{StaticResource Secondary}" FontSize="11" Margin="0,6,0,0"
-                               TextWrapping="Wrap" Visibility="{Binding AlwaysRule, Converter={StaticResource Shown}}" />
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0"
-                                Visibility="{Binding IsPlainRequest, Converter={StaticResource Shown}}">
-                      <Button Style="{StaticResource CardButton}" Content="{Binding Deny}" Tag="{Binding}" Click="OnDeny"
-                              Background="#33FF453A" BorderBrush="#99FF453A" />
-                      <Button Style="{StaticResource CardButton}" Content="{Binding Always}" Tag="{Binding}" Click="OnAlways"
-                              Background="Transparent" BorderBrush="#9930D158"
-                              Visibility="{Binding OffersAlways, Converter={StaticResource Shown}}" />
-                      <Button Style="{StaticResource CardButton}" Content="{Binding Allow}" Tag="{Binding}" Click="OnAllow"
-                              Background="#FF30D158" BorderBrush="#FF30D158" Foreground="Black" />
+
+                    <!-- A plain request: what an allow lets run, the rule Always allow adds, and the answers. -->
+                    <StackPanel Visibility="{Binding IsPlain, Converter={StaticResource Shown}}">
+                      <Border Background="{StaticResource Inset}" CornerRadius="7" Margin="0,6,0,0" Padding="8,6"
+                              Visibility="{Binding Subject, Converter={StaticResource Shown}}">
+                        <TextBlock Text="{Binding Subject}" Foreground="{StaticResource Secondary}" TextWrapping="Wrap" MaxHeight="96"
+                                   TextTrimming="CharacterEllipsis" FontFamily="Cascadia Mono, Consolas" FontSize="11" />
+                      </Border>
+                      <TextBlock Text="{Binding AlwaysRule}" Foreground="{StaticResource Secondary}" FontSize="11" Margin="0,6,0,0"
+                                 TextWrapping="Wrap" Visibility="{Binding AlwaysRule, Converter={StaticResource Shown}}" />
+                      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                        <Button Style="{StaticResource CardButton}" Content="{Binding Deny}" Tag="{Binding}" Click="OnDeny"
+                                Background="#33FF453A" BorderBrush="#99FF453A" />
+                        <Button Style="{StaticResource CardButton}" Content="{Binding Always}" Tag="{Binding}" Click="OnAlways"
+                                Background="Transparent" BorderBrush="#9930D158"
+                                Visibility="{Binding OffersAlways, Converter={StaticResource Shown}}" />
+                        <Button Style="{StaticResource CardButton}" Content="{Binding Allow}" Tag="{Binding}" Click="OnAllow"
+                                Background="#FF30D158" BorderBrush="#FF30D158" Foreground="Black" />
+                      </StackPanel>
+                    </StackPanel>
+
+                    <!-- A question, one at a time: its offered answers, the user's own words, Skip, Back, Next or Submit. -->
+                    <StackPanel Visibility="{Binding IsQuestion, Converter={StaticResource Shown}}" Margin="0,8,0,0">
+                      <StackPanel Orientation="Horizontal">
+                        <Border Background="#24FF9F0A" CornerRadius="4" Padding="5,1" Margin="0,0,7,0" VerticalAlignment="Top"
+                                Visibility="{Binding PageText, Converter={StaticResource Shown}}">
+                          <TextBlock Text="{Binding PageText}" FontSize="10" FontWeight="SemiBold" Foreground="{x:Static local:LevelBrush.Warning}" />
+                        </Border>
+                        <TextBlock Text="{Binding QuestionText}" FontWeight="SemiBold" TextWrapping="Wrap" MaxWidth="340" />
+                      </StackPanel>
+                      <TextBlock Text="{Binding ChooseAny}" FontSize="10" Foreground="{StaticResource Tertiary}" Margin="0,4,0,0"
+                                 Visibility="{Binding MultiSelect, Converter={StaticResource Shown}}" />
+                      <ItemsControl ItemsSource="{Binding Options}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Button Tag="{Binding}" Click="OnPickOption" Focusable="False" Cursor="Hand" Margin="0,0,0,3">
+                              <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                  <Border x:Name="Row" Background="{StaticResource Inset}" CornerRadius="7" Padding="9,7">
+                                    <ContentPresenter />
+                                  </Border>
+                                  <ControlTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding Picked}" Value="True">
+                                      <Setter TargetName="Row" Property="Background" Value="{StaticResource Highlight}" />
+                                    </DataTrigger>
+                                  </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                              </Button.Template>
+                              <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="18" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding Marker}" Foreground="White" FontSize="11" />
+                                <StackPanel Grid.Column="1">
+                                  <TextBlock Text="{Binding Option.Label}" Foreground="White" FontWeight="Medium" TextWrapping="Wrap" />
+                                  <TextBlock Text="{Binding Option.Description}" Foreground="{StaticResource Secondary}" FontSize="11"
+                                             TextWrapping="Wrap" Visibility="{Binding Option.Description, Converter={StaticResource Shown}}" />
+                                </StackPanel>
+                              </Grid>
+                            </Button>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <Border CornerRadius="7" Padding="9,7" Background="{StaticResource Inset}" Tag="{Binding}"
+                              MouseLeftButtonDown="OnChooseOwn">
+                        <StackPanel>
+                          <TextBlock Text="{Binding OwnLabel}" FontWeight="Medium" />
+                          <Grid Margin="0,3,0,0">
+                            <TextBox x:Name="OwnField" Text="{Binding OwnText, UpdateSourceTrigger=PropertyChanged}" Tag="{Binding}"
+                                     Background="Transparent" Foreground="White" CaretBrush="White" BorderThickness="0" Padding="0"
+                                     PreviewMouseLeftButtonDown="OnFieldClicked" PreviewKeyDown="OnOwnKey" />
+                            <TextBlock Text="{Binding OwnPlaceholder}" Foreground="{StaticResource Tertiary}" IsHitTestVisible="False"
+                                       Visibility="{Binding Text, ElementName=OwnField, Converter={StaticResource Shown}, ConverterParameter=invert}" />
+                          </Grid>
+                        </StackPanel>
+                      </Border>
+                      <Grid Margin="0,10,0,0">
+                        <Button Style="{StaticResource CardButton}" Content="{Binding Skip}" Tag="{Binding}" Click="OnSkip" Margin="0"
+                                Background="Transparent" BorderBrush="{StaticResource Border}" Foreground="{StaticResource Secondary}"
+                                HorizontalAlignment="Left" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                          <Button Style="{StaticResource CardButton}" Content="{Binding Back}" Tag="{Binding}" Click="OnBack"
+                                  Background="Transparent" BorderBrush="{StaticResource Border}" Foreground="{StaticResource Secondary}"
+                                  Visibility="{Binding CanGoBack, Converter={StaticResource Shown}}" />
+                          <Button Style="{StaticResource CardButton}" Content="{Binding NextText}" Tag="{Binding}" Click="OnNext"
+                                  IsEnabled="{Binding Ready}" Background="#FF30D158" BorderBrush="#FF30D158" Foreground="Black" />
+                        </StackPanel>
+                      </Grid>
+                    </StackPanel>
+
+                    <!-- A plan to read, then Approve, Approve and accept edits, or Keep planning with a note. -->
+                    <StackPanel Visibility="{Binding IsPlan, Converter={StaticResource Shown}}" Margin="0,8,0,0">
+                      <Border Background="{StaticResource Inset}" CornerRadius="7">
+                        <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto" Focusable="False">
+                          <TextBox Text="{Binding PlanText, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" Background="Transparent"
+                                   Foreground="White" BorderThickness="0" Padding="9" FontSize="11" Focusable="False" />
+                        </ScrollViewer>
+                      </Border>
+                      <Grid Margin="0,8,0,0" Visibility="{Binding NotNoting, Converter={StaticResource Shown}}">
+                        <Button Style="{StaticResource CardButton}" Content="{Binding KeepPlanning}" Tag="{Binding}" Click="OnKeepPlanning"
+                                Margin="0" Background="Transparent" BorderBrush="{StaticResource Border}" Foreground="{StaticResource Secondary}"
+                                HorizontalAlignment="Left" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                          <Button Style="{StaticResource CardButton}" Content="{Binding ApproveEdits}" Tag="{Binding}" Click="OnApproveEdits"
+                                  Background="Transparent" BorderBrush="#6630D158" Foreground="{x:Static local:LevelBrush.Ok}" />
+                          <Button Style="{StaticResource CardButton}" Content="{Binding Approve}" Tag="{Binding}" Click="OnApprove"
+                                  Background="#FF30D158" BorderBrush="#FF30D158" Foreground="Black" />
+                        </StackPanel>
+                      </Grid>
+                      <StackPanel Margin="0,8,0,0" Visibility="{Binding Noting, Converter={StaticResource Shown}}">
+                        <Border Background="{StaticResource Inset}" CornerRadius="7" Padding="9,7">
+                          <Grid>
+                            <TextBox x:Name="NoteField" Text="{Binding NoteText, UpdateSourceTrigger=PropertyChanged}" Tag="{Binding}"
+                                     Background="Transparent" Foreground="White" CaretBrush="White" BorderThickness="0" Padding="0"
+                                     PreviewMouseLeftButtonDown="OnFieldClicked" PreviewKeyDown="OnNoteKey" />
+                            <TextBlock Text="{Binding NotePlaceholder}" Foreground="{StaticResource Tertiary}" IsHitTestVisible="False"
+                                       Visibility="{Binding Text, ElementName=NoteField, Converter={StaticResource Shown}, ConverterParameter=invert}" />
+                          </Grid>
+                        </Border>
+                        <Grid Margin="0,8,0,0">
+                          <Button Style="{StaticResource CardButton}" Content="{Binding Back}" Tag="{Binding}" Click="OnStopNote" Margin="0"
+                                  Background="Transparent" BorderBrush="{StaticResource Border}" Foreground="{StaticResource Secondary}"
+                                  HorizontalAlignment="Left" />
+                          <Button Style="{StaticResource CardButton}" Content="{Binding Send}" Tag="{Binding}" Click="OnSendNote"
+                                  Background="{StaticResource Highlight}" BorderBrush="{StaticResource Border}" HorizontalAlignment="Right" />
+                        </Grid>
+                      </StackPanel>
+                    </StackPanel>
+
+                    <!-- A plan its client answers itself: where to review it, and Dismiss, which answers nothing. -->
+                    <StackPanel Visibility="{Binding IsPlanElsewhere, Converter={StaticResource Shown}}" Margin="0,8,0,0">
+                      <TextBlock Text="{Binding Elsewhere}" Foreground="{StaticResource Secondary}" TextWrapping="Wrap" />
+                      <Button Style="{StaticResource CardButton}" Content="{Binding Dismiss}" Tag="{Binding}" Click="OnLeave"
+                              HorizontalAlignment="Right" Margin="0,8,0,0" Background="{StaticResource Highlight}"
+                              BorderBrush="{StaticResource Border}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
               </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
 
           <ItemsControl ItemsSource="{Binding QueuedRequests}" Margin="10,0,10,0">
             <ItemsControl.ItemTemplate>

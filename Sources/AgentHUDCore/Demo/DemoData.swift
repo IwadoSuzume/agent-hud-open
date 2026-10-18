@@ -501,7 +501,11 @@ public enum DemoData {
                 summary: "tsconfig.base.json", detail: "~/Projects/acme-shared/tsconfig.base.json", cwd: "~/Projects/acme-web",
                 path: "~/Projects/acme-shared/tsconfig.base.json", at: at)
         default:
+            #if os(Windows)
+            return windowsPermissionRequest(id, at: at)
+            #else
             return nil
+            #endif
         }
     }
 }

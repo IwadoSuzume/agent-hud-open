@@ -63,7 +63,7 @@ PowerShell's `*>` holds everything until the process exits too.
 | G2 Windows build | `swift build -c release --scratch-path $build` (warnings compared with the baseline below); `dotnet build windows\AgentHUD.sln -c Release` from M7; the `Windows port` workflow (`windows.yml`) | M1 (CI), M2+ |
 | G3 Windows tests | `scripts\windows\test.ps1 -ScratchPath $build -Log $env:TEMP\g3.log` (temporary profile, registered skips, batches, preference cleanup); every exclusion, listed skip and runtime skip in SKIPPED_TESTS.md | M2 (Support), M3+ (Core) |
 | G4 determinism | `RecordCodingGoldenTests` (Support), on Windows and in the macOS CI | M2+ |
-| G5 UI | `scripts\windows\test-dotnet.ps1` (`dotnet test windows\AgentHUD.sln -c Release`, warnings as errors, telemetry off, D-042; then `python scripts\windows\check-protocol.py`): the protocol's C# contract tests from M6, the shell's own (`AgentHUD.Shell.Tests`) from M7; and from M7 `scripts\windows\smoke-shell.ps1 -Engine <release agenthud-engine.exe>` (the shell's `--snapshot` with the demo in a temporary profile: three pictures of plausible size, status 0 within 30 s; CI keeps the pictures as the `shell-snapshot` artifact) | M6 (protocol), M7+ (UI) |
+| G5 UI | `scripts\windows\test-dotnet.ps1` (`dotnet test windows\AgentHUD.sln -c Release`, warnings as errors, telemetry off, D-042; then `python scripts\windows\check-protocol.py`): the protocol's C# contract tests from M6, the shell's own (`AgentHUD.Shell.Tests`) from M7; and from M7 `scripts\windows\smoke-shell.ps1 -Engine <release agenthud-engine.exe>` (the shell's `--snapshot` with the demo in a temporary profile: five pictures — at rest, open, the usage panel, a question's and a plan's cards — of plausible size, status 0 within 30 s; CI keeps the pictures as the `shell-snapshot` artifact); opt-in, on a desktop nobody is using, `scripts\windows\ui-check.ps1 -Engine <exe>` (real clicks and typing, D-046) | M6 (protocol), M7+ (UI) |
 | G6 boundaries | `python scripts\check-source-boundaries.py` | every milestone |
 
 Warning baseline (Swift 6.4.1 toolchain and SDK, not the port's): `WinSDK.swiftmodule … reference to type 'wchar_t'
@@ -87,8 +87,11 @@ deprecated` in `Providers/Antigravity/AntigravityCLI.swift`; `result of call to 
    display, click-through, never activating; the engine connection, hover, request queue on its display, tray; protocol
    1.1 (`panel.marks`, rows' `modelText`/`shortModelText`/`mark`, sessions' `vendor`/`mark`, approvals' `mark`); the
    snapshot and `smoke-shell.ps1` (G5, CI step).
-3. M7 next, in this order: questions and plans on the card (the field takes the keyboard only when clicked, docs/hud.md);
-   events (quota alerts, reset credits, completions: their words need more `ShellStrings`, D-043) on the pointer's
+3. M7 step 3 (D-046): question and plan cards (drafts kept per request, one question at a time, a plan's three
+   answers and its note, a plan answered elsewhere), typing that takes the keyboard only once clicked, the Windows demo's
+   question and plan, `scripts\windows\ui-check.ps1` (opt-in; 14 checks passed locally). A person should still type an
+   answer through a Chinese input method once (the check bypasses input methods).
+4. M7 next, in this order: events (quota alerts, reset credits, completions: their words need more `ShellStrings`, D-043) on the pointer's
    display; the settings window (patches through `update-settings`; Core validates); the statistics window (needs a
    protocol addition for the statistics data); light/dark and Mica for the normal windows; launch at login (`Run` key);
    docks on other edges and dragging; full-screen apps; then the review. The engine still lacks: the session title and

@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
   Gate G5's smoke test (docs/windows-port/PROGRESS.md): the Windows shell started with the engine's demo data draws the
-  island at rest, open with its requests, and as the usage panel into PNG files (`AgentHUD --snapshot`), and ends with
+  island at rest, open with its requests, as the usage panel, and a question's and a plan's cards into PNG files (`AgentHUD --snapshot`), and ends with
   status 0 within 30 seconds.
 
 .DESCRIPTION
@@ -49,7 +49,8 @@ try {
 }
 
 # Each picture: present, drawn, at least as large as the island's least extent at 2x, at most a display's.
-$expected = @{ 'island-rest' = @(120, 40); 'island-open' = @(600, 200); 'island-usage' = @(600, 400) }
+$expected = @{ 'island-rest' = @(120, 40); 'island-open' = @(600, 200); 'island-usage' = @(600, 400);
+               'card-question' = @(600, 300); 'card-plan' = @(600, 300) }
 $report = Get-Content -LiteralPath (Join-Path $Out 'snapshot.txt')
 $failures = @()
 foreach ($name in $expected.Keys) {
