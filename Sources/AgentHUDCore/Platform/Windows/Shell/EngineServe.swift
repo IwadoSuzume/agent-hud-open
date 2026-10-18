@@ -126,14 +126,13 @@ public enum EngineServe {
 
     /// Writes whole lines to the protocol handle on a thread of its own, so that the engine never waits for the shell
     /// (PROTOCOL.md): a slow, hung or gone reader holds this thread, never the main actor that takes the hooks' requests
-    /// and lets unanswered ones go after the hold time (G7). A `state` or a `hello` waiting to be written is replaced by
-    /// a newer one of its kind (the shell keeps the last of each); other lines wait in order, at most `limit` in all,
-    /// an `error` dropped first when there are too many, then the oldest line that is neither.
+    /// and lets unanswered ones go after the hold time (G7). Lines are queued by `enqueue`.
     final class ProtocolWriter: @unchecked Sendable {
         static let limit = 256
+        typealias Queued = (line: Data, kind: String)
         private let handle: Win32.SendableHandle
         private let condition = NSCondition()
-        private var queue: [(line: Data, kind: String)] = []
+        private var queue: [Queued] = []
         private var writing = false
         private var broken = false
 
@@ -151,14 +150,27 @@ public enum EngineServe {
             condition.lock()
             defer { condition.unlock() }
             guard !broken else { return }
-            if Self.replaceable.contains(kind), let index = queue.firstIndex(where: { $0.kind == kind }) { queue.remove(at: index) }
+            Self.enqueue(line, kind: kind, into: &queue)
+            condition.signal()
+        }
+
+        /// The queue's rules (PROTOCOL.md). A `hello` not yet written is replaced where it stands, so that the shell
+        /// still reads a `hello` before any `state`; a `state` not yet written gives way to the newer one at the end,
+        /// after the lines queued before it (a new language's `hello` included). The shell keeps the last of each. Other
+        /// lines wait in order, at most `limit` in all: when a stalled shell lets more pile up, an `error` is dropped
+        /// first, then the oldest other line (an `event`), never the `hello` or the `state`.
+        static func enqueue(_ line: Data, kind: String, into queue: inout [Queued]) {
+            if kind == "hello", let index = queue.firstIndex(where: { $0.kind == "hello" }) {
+                queue[index] = (line, kind)
+                return
+            }
+            if kind == "state", let index = queue.firstIndex(where: { $0.kind == "state" }) { queue.remove(at: index) }
             queue.append((line, kind))
-            if queue.count > Self.limit,
+            if queue.count > limit,
                let index = queue.firstIndex(where: { $0.kind == "error" })
-                ?? queue.firstIndex(where: { !Self.replaceable.contains($0.kind) }) {
+                ?? queue.firstIndex(where: { !replaceable.contains($0.kind) }) {
                 queue.remove(at: index)
             }
-            condition.signal()
         }
 
         /// Waits until every queued line is written, the reader is gone, or `seconds` pass.

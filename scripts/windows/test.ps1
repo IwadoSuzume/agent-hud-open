@@ -56,14 +56,25 @@ try {
     $ErrorActionPreference = 'Continue'
     if ($Log) { Set-Content -LiteralPath $Log -Value '' -Encoding utf8 }
     # Runs swift with the arguments, writing its output to the console and the log; its exit status is left in
-    # $script:code (a function's return value would collect the output too).
+    # $script:code (a function's return value would collect the output too). A batch that runs no test fails: swift
+    # ends it with status 0, so a filter that matched nothing (several filters passed as one string through
+    # `powershell -File`, a misspelt class) would otherwise pass.
     function Invoke-Swift([string[]] $arguments) {
+        $script:ranNone = $false
         & swift @arguments 2>&1 | ForEach-Object {
             $line = "$_"
             Write-Host $line
             if ($Log) { Add-Content -LiteralPath $Log -Value $line -Encoding utf8 }
+            if ($line -match 'No matching test cases were run') { $script:ranNone = $true }
         }
         $script:code = $LASTEXITCODE
+        if ($script:code -eq 0 -and $script:ranNone) {
+            $filters = for ($i = 0; $i -lt $arguments.Count - 1; $i++) { if ($arguments[$i] -eq '--filter') { $arguments[$i + 1] } }
+            $message = "test.ps1: no test matched the filter $($filters -join ', ')"
+            Write-Host $message
+            if ($Log) { Add-Content -LiteralPath $Log -Value $message -Encoding utf8 }
+            $script:code = 1
+        }
     }
     # The tests are built once, before any batch runs, by build.ps1, which tries again only when Swift Build reports a
     # file in use (DECISIONS.md D-032); no test runs without a build.

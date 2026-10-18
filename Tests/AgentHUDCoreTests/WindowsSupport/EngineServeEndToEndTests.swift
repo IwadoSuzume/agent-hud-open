@@ -6,7 +6,8 @@ import XCTest
 @testable import AgentHUDCore
 
 /// `agenthud-engine --serve` as the shell runs it (PROTOCOL.md): a child with pipes for its standard input and output,
-/// in the temporary profile gate G3 runs in (D-021). Every line on its output must be a protocol message.
+/// each in a home of its own (`isolatedEnvironment`), never the profile the tests run in. Every line on its output must be a
+/// protocol message.
 final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
     private func engine() throws -> URL {
         var buffer = [WCHAR](repeating: 0, count: 32_768)
@@ -78,35 +79,50 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
 
     private func type(_ name: String) -> (JSONValue) -> Bool { { $0["type"].stringValue == name } }
 
-    /// An environment for a real (not demo) engine and its hooks that can reach nothing of the machine's user: only the
-    /// system's own variables are taken over, and the user's folders — home, roaming and local profile — are folders of
-    /// `home`. Every client's home variable (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `XDG_CONFIG_HOME`, …) is left out, so a
-    /// machine that sets one keeps its real client untouched (TASK.md §8, G7).
+    private static let systemVariables = ["SystemRoot", "windir", "SystemDrive", "ComSpec", "PATHEXT", "TEMP", "TMP", "OS",
+                                          "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "USERNAME", "USERDOMAIN",
+                                          "ProgramFiles", "ProgramFiles(x86)", "ProgramData"]
+    private static let profileVariables = ["USERPROFILE", "HOME", "APPDATA", "LOCALAPPDATA"]
+
+    /// A home of the test's own, removed afterwards.
+    private func temporaryHome() throws -> URL {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("HUD 引擎 home \(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: home) }
+        return home
+    }
+
+    /// An environment for an engine and its hooks that can reach nothing of the machine's user: only the system's own
+    /// variables are taken over, and the user's folders — home, roaming and local profile — are folders of `home`. Every
+    /// client's home variable (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `XDG_CONFIG_HOME`, …) is left out, so a machine that
+    /// sets one keeps its real client untouched (TASK.md §8, G7). `Path` is the system's folders and those holding the
+    /// Swift runtime, so no installed client (`claude`, `codex`) can be found and started: only the opt-in probe may
+    /// start one (architecture.md).
     private func isolatedEnvironment(home: URL) throws -> [String: String] {
-        let system = ["SystemRoot", "windir", "SystemDrive", "ComSpec", "PATH", "PATHEXT", "TEMP", "TMP", "OS",
-                      "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "USERNAME", "USERDOMAIN", "ProgramFiles",
-                      "ProgramFiles(x86)", "ProgramData"]
+        let inherited = ProcessInfo.processInfo.environment
         var environment: [String: String] = [:]
-        for (name, value) in ProcessInfo.processInfo.environment
-        where system.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+        for (name, value) in inherited where Self.systemVariables.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
             environment[name] = value
         }
+        let systemRoot = environment.first { $0.key.caseInsensitiveCompare("SystemRoot") == .orderedSame }?.value ?? #"C:\Windows"#
+        let path = inherited.first { $0.key.caseInsensitiveCompare("Path") == .orderedSame }?.value ?? ""
+        let runtime = path.split(separator: ";").map(String.init)
+            .filter { FileManager.default.fileExists(atPath: ($0 as NSString).appendingPathComponent("swiftCore.dll")) }
+        XCTAssertFalse(runtime.isEmpty, "the Swift runtime is on the tests' own Path")
+        environment["Path"] = ([systemRoot + #"\System32"#, systemRoot] + runtime).joined(separator: ";")
         let native = home.path.replacingOccurrences(of: "/", with: "\\")
-        for (name, folder) in [("USERPROFILE", ""), ("HOME", ""), ("APPDATA", #"\Profile\Roaming"#), ("LOCALAPPDATA", #"\Profile\Local"#)] {
+        for (name, folder) in zip(Self.profileVariables, ["", "", #"\Profile\Roaming"#, #"\Profile\Local"#]) {
             environment[name] = native + folder
             try FileManager.default.createDirectory(atPath: native + folder, withIntermediateDirectories: true)
         }
-        // Nothing the child is given names a folder of the user's but these, all inside `home`.
-        let profile = ProcessInfo.processInfo.environment["USERPROFILE"].map { $0.lowercased() } ?? "\u{0}"
-        for (name, value) in environment where !["PATH", "TEMP", "TMP"].contains(name.uppercased()) {
-            XCTAssertFalse(value.lowercased().hasPrefix(profile) && !value.lowercased().hasPrefix(native.lowercased()),
-                           "\(name) would reach the real profile")
-        }
+        // Nothing but the allowed names reaches the child.
+        let allowed = Set((Self.systemVariables + Self.profileVariables + ["Path"]).map { $0.uppercased() })
+        XCTAssertTrue(Set(environment.keys.map { $0.uppercased() }).isSubset(of: allowed), "\(environment.keys.sorted())")
         return environment
     }
 
     func testTheDemoServesStateTakesAnswersAndSettingsAndQuits() throws {
-        let served = try Served(try engine(), ["--demo", "--language", "en"])
+        let served = try Served(try engine(), ["--demo", "--language", "en"], environment: try isolatedEnvironment(home: try temporaryHome()))
         defer { if served.process.isRunning { served.process.terminate() } }
         served.send(#"{"v":1,"type":"hello","minor":0,"shell":{"version":"test"}}"#)
         let hello = try XCTUnwrap(served.next(type("hello")), "the engine answers hello")
@@ -148,9 +164,8 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
     /// hook prints that answer and ends with status 0 (TASK.md G7: only the user's answer resolves it).
     func testARealRequestGoesThroughTheProtocolAndHooksChangeOnlyWithTheirSwitch() throws {
         let engine = try engine()
-        let home = FileManager.default.temporaryDirectory.appendingPathComponent("HUD 引擎 home \(UUID().uuidString)", isDirectory: true)
+        let home = try temporaryHome()
         try FileManager.default.createDirectory(at: home.appendingPathComponent(".claude/projects"), withIntermediateDirectories: true)
-        addTeardownBlock { try? FileManager.default.removeItem(at: home) }
         let settingsFile = home.appendingPathComponent(".claude/settings.json")
         let environment = try isolatedEnvironment(home: home)
 
@@ -215,6 +230,7 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
         let process = Process(), input = Pipe(), output = Pipe()
         process.executableURL = try engine()
         process.arguments = ["--serve", "--demo"]
+        process.environment = try isolatedEnvironment(home: try temporaryHome())
         process.standardInput = input
         process.standardOutput = output // never read
         process.standardError = FileHandle.nullDevice
@@ -233,11 +249,16 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
     }
 
     func testAnEngineThatFindsAnotherCopyRunningSaysWhichAndExits() throws {
-        // The lock the engine looks for, in the temporary profile both processes share.
-        let claim = InstanceLock.claim(at: InstanceLock.sharedURL, executable: URL(fileURLWithPath: #"C:\Program Files\Agent HUD\agenthud-engine.exe"#))
+        // The lock the engine looks for: the shared lock's place under the child's own local profile.
+        let home = try temporaryHome(), environment = try isolatedEnvironment(home: home)
+        let local = URL(fileURLWithPath: try XCTUnwrap(environment["LOCALAPPDATA"]), isDirectory: true)
+        XCTAssertTrue(InstanceLock.sharedURL.path.hasSuffix("/app.agenthud/instance.lock"))
+        let lock = local.appendingPathComponent("app.agenthud/instance.lock")
+        try FileManager.default.createDirectory(at: lock.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let claim = InstanceLock.claim(at: lock, executable: URL(fileURLWithPath: #"C:\Program Files\Agent HUD\agenthud-engine.exe"#))
         guard case .acquired = claim else { return XCTFail("the test holds the lock") }
         try withExtendedLifetime(claim) {
-            let served = try Served(try engine(), [])
+            let served = try Served(try engine(), [], environment: environment)
             defer { if served.process.isRunning { served.process.terminate() } }
             served.send(#"{"v":1,"type":"hello","minor":0,"shell":{"version":"test"}}"#)
             let held = try XCTUnwrap(served.next(type("lock-held")))
@@ -247,7 +268,7 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
     }
 
     func testTheEngineEndsWhenItsInputEnds() throws {
-        let served = try Served(try engine(), ["--demo"])
+        let served = try Served(try engine(), ["--demo"], environment: try isolatedEnvironment(home: try temporaryHome()))
         defer { if served.process.isRunning { served.process.terminate() } }
         served.send(#"{"v":1,"type":"hello","minor":0,"shell":{"version":"test"}}"#)
         XCTAssertNotNil(served.next(type("state")))

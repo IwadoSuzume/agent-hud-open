@@ -36,10 +36,11 @@ announces in `hello`. A reader ignores fields it does not know. Times are intege
    each thing the HUD presents once (a quota alert, reset credits, a finished turn).
 3. The shell sends `refresh`, `answer`, `update-settings` and `quit` as the user acts. The engine never waits for the
    shell: its lines are written by a thread of their own, so a slow, hung or gone reader holds that thread only, never
-   the engine's work (taking hooks' requests, letting unanswered ones go after the hold time). A `state` or a `hello`
-   not yet written gives way to a newer one of its kind (the newer goes to the end of the queue, after the lines before
-   it); other lines wait in order, at most 256 in all — when a stalled shell lets more pile up, an `error` is dropped
-   first, then the oldest `event`, never the latest `hello` or `state`. On exit the engine waits at most 2 s for its
+   the engine's work (taking hooks' requests, letting unanswered ones go after the hold time). A `hello` not yet
+   written is replaced by a newer one where it stands, so a `hello` still comes before any `state`; a `state` not yet
+   written gives way to a newer one at the end of the queue, after the lines before it. Other lines wait in order, at
+   most 256 in all — when a stalled shell lets more pile up, an `error` is dropped first, then the oldest other line
+   (an `event`), never the `hello` or the `state`. On exit the engine waits at most 2 s for its
    last lines (`lock-held` before status 3).
 4. The engine reads each line as it ends with `\n`; a line over the limit is dropped up to its end and answered with
    `error`. The fixtures are LF-only (`.gitattributes`), and both test sides refuse a CR in them.

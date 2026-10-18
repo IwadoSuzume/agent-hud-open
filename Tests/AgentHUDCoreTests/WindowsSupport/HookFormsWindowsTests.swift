@@ -240,7 +240,8 @@ final class HookFormsWindowsTests: XCTestCase {
         let baseLength = Win32.withWide(base) { GetLongPathNameW($0, nil, 0) }
         var baseBuffer = [WCHAR](repeating: 0, count: Int(baseLength) + 1)
         let baseWritten = Win32.withWide(base) { GetLongPathNameW($0, &baseBuffer, DWORD(baseBuffer.count)) }
-        XCTAssertNotEqual(baseWritten, 0)
+        // An empty base would be the working directory: stop rather than build the tree there.
+        guard baseWritten > 0 else { return XCTFail("the fixture's base has no long form") }
         var folder = URL(fileURLWithPath: String(decoding: baseBuffer.prefix { $0 != 0 }, as: UTF16.self), isDirectory: true)
         while folder.path.utf16.count < 300 { folder.appendPathComponent("深层 long folder name \(folder.pathComponents.count)") }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

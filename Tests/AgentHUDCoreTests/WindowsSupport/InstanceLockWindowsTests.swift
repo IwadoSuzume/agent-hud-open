@@ -7,11 +7,50 @@ import XCTest
 /// One Agent HUD at a time on Windows (Platform/Windows/InstanceLock+Windows.swift), with the rules InstanceLockTests
 /// holds the macOS lock to.
 final class InstanceLockWindowsTests: XCTestCase, @unchecked Sendable {
+    /// A junction a test made and could not remove: its folder is then left in place, never removed through the link.
+    private var junctionLeft = false
+
     private func directory() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("agenthud 锁 \(UUID().uuidString)")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        addTeardownBlock { try? FileManager.default.removeItem(at: url) }
+        addTeardownBlock { [unowned self] in if !self.junctionLeft { try? FileManager.default.removeItem(at: url) } }
         return url
+    }
+
+    private struct JunctionFailed: Error { let step: String, code: DWORD }
+
+    /// A junction at `link` to the folder `target`, as `mklink /J` makes one but without a shell: an empty folder whose
+    /// mount-point reparse data names the target (`\??\` form) and prints it as given. Both paths are native.
+    private func makeJunction(_ link: String, to target: String) throws {
+        guard Win32.withWide(link, { CreateDirectoryW($0, nil) }) else { throw JunctionFailed(step: "folder", code: GetLastError()) }
+        let handle = Win32.withWide(link) {
+            CreateFileW($0, DWORD(GENERIC_WRITE), 0, nil, DWORD(OPEN_EXISTING),
+                        DWORD(FILE_FLAG_BACKUP_SEMANTICS) | DWORD(FILE_FLAG_OPEN_REPARSE_POINT), nil)
+        }
+        guard let handle, handle != Win32.invalidHandle else {
+            let code = GetLastError()
+            _ = Win32.withWide(link) { RemoveDirectoryW($0) }
+            throw JunctionFailed(step: "open", code: code)
+        }
+        let substitute = Array(#"\??\"#.utf16) + Array(target.utf16), printed = Array(target.utf16)
+        let names = substitute + [0] + printed + [0]
+        var data: [UInt8] = []
+        func put(_ value: UInt16) { data.append(UInt8(value & 0xFF)); data.append(UInt8(value >> 8)) }
+        put(0x0003); put(0xA000)                                       // IO_REPARSE_TAG_MOUNT_POINT
+        put(UInt16(8 + names.count * 2)); put(0)                       // ReparseDataLength, Reserved
+        put(0); put(UInt16(substitute.count * 2))                      // SubstituteName offset, length
+        put(UInt16((substitute.count + 1) * 2)); put(UInt16(printed.count * 2)) // PrintName offset, length
+        names.forEach(put)
+        var returned: DWORD = 0
+        let set: Bool = data.withUnsafeMutableBytes {
+            DeviceIoControl(handle, 0x0009_00A4 /* FSCTL_SET_REPARSE_POINT */, $0.baseAddress, DWORD($0.count), nil, 0, &returned, nil)
+        }
+        let code = set ? 0 : GetLastError()
+        CloseHandle(handle)                                            // before the folder can be removed
+        guard set else {
+            _ = Win32.withWide(link) { RemoveDirectoryW($0) }
+            throw JunctionFailed(step: "reparse point", code: code)
+        }
     }
 
     private let running = URL(fileURLWithPath: #"C:\Program Files\Agent HUD Open\agenthud-engine.exe"#)
@@ -72,19 +111,15 @@ final class InstanceLockWindowsTests: XCTestCase, @unchecked Sendable {
         let url = folder.appendingPathComponent("instance.lock")
         let me = try XCTUnwrap(Bundle.main.executableURL)
         let link = folder.appendingPathComponent("通过 junction")
-        let mklink = Process()
-        mklink.executableURL = URL(fileURLWithPath: Win32.environment("ComSpec") ?? #"C:\Windows\System32\cmd.exe"#)
-        mklink.arguments = ["/d", "/c", "mklink", "/J", link.path.replacingOccurrences(of: "/", with: "\\"),
-                            me.deletingLastPathComponent().path.replacingOccurrences(of: "/", with: "\\")]
-        mklink.standardOutput = FileHandle.nullDevice
-        try mklink.run()
-        mklink.waitUntilExit()
-        XCTAssertEqual(mklink.terminationStatus, 0, "mklink /J needs no elevation")
-        // The link goes before its folder is removed (teardown blocks run last-in first-out), so that removal never
-        // walks into the build's own folder.
-        let unlink = { _ = Win32.withWide(link.path.replacingOccurrences(of: "/", with: "\\")) { RemoveDirectoryW($0) } }
-        addTeardownBlock(unlink)
-        defer { unlink() }
+        let native = link.path.replacingOccurrences(of: "/", with: "\\")
+        try makeJunction(native, to: me.deletingLastPathComponent().path.replacingOccurrences(of: "/", with: "\\"))
+        // The link goes before its folder is removed; a link that would not go keeps the folder, so that no removal
+        // ever walks into the build's own folder.
+        defer {
+            let removed = Win32.withWide(native) { RemoveDirectoryW($0) }
+            XCTAssertTrue(removed, "the junction goes")
+            if !removed { junctionLeft = true }
+        }
         let throughLink = link.appendingPathComponent(me.lastPathComponent)
         XCTAssertNotEqual(throughLink.path.lowercased(), WindowsProcesses.imagePath(GetCurrentProcessId())?.lowercased())
         guard case .acquired(let lock) = InstanceLock.claim(at: url, executable: throughLink) else { return XCTFail("claims") }

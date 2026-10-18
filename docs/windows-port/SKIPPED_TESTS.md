@@ -9,7 +9,7 @@ not listed here counts as a failure. Three mechanisms, each listed below, and ca
 3. **Runtime skips** — tests that skip themselves (`XCTSkip`) on every platform when an opt-in variable or a tool is
    missing.
 
-State at M6 (2026-10-18, Windows 11 26200, Swift 6.4.1, `test.ps1`, round 3): 1447 pass, 4 runtime skips, 34 listed skips,
+State at M7 step 1 (2026-10-18, Windows 11 26200, Swift 6.4.1, `test.ps1`): 1452 pass, 4 runtime skips, 34 listed skips,
 7 excluded files, 0 failures. The C# contract tests (`scripts\windows\test-dotnet.ps1`): 11 pass, none skipped.
 
 ## AgentHUDSupportTests
