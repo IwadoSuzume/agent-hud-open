@@ -36,9 +36,11 @@ announces in `hello`. A reader ignores fields it does not know. Times are intege
    each thing the HUD presents once (a quota alert, reset credits, a finished turn).
 3. The shell sends `refresh`, `answer`, `update-settings` and `quit` as the user acts. The engine never waits for the
    shell: its lines are written by a thread of their own, so a slow, hung or gone reader holds that thread only, never
-   the engine's work (taking hooks' requests, letting unanswered ones go after the hold time). A `state` not yet
-   written gives way to a newer one; other lines wait in order, at most 256, the oldest dropped first. On exit the
-   engine waits at most 2 s for its last lines (`lock-held` before status 3).
+   the engine's work (taking hooks' requests, letting unanswered ones go after the hold time). A `state` or a `hello`
+   not yet written gives way to a newer one of its kind (the newer goes to the end of the queue, after the lines before
+   it); other lines wait in order, at most 256 in all — when a stalled shell lets more pile up, an `error` is dropped
+   first, then the oldest `event`, never the latest `hello` or `state`. On exit the engine waits at most 2 s for its
+   last lines (`lock-held` before status 3).
 4. The engine reads each line as it ends with `\n`; a line over the limit is dropped up to its end and answered with
    `error`. The fixtures are LF-only (`.gitattributes`), and both test sides refuse a CR in them.
 
@@ -79,7 +81,10 @@ The whole of what the HUD shows, every time (a reader keeps the last one only):
 resolved language, by the rules the macOS panel uses: `resetText` is `AgentRow.resetLabel` ("Pending update" once a
 reset's time has passed, "—" for an account that is not current), `phaseText` is `UsageStore.sessionStatusLabel`
 ("Needs approval", "Status out of date", "Live status off", or the running or idle time), `project` is
-`SessionProject`'s title (a repository's worktrees share it).
+`SessionProject`'s title (a repository's worktrees share it), `tokensText` is `TokenFormat.inOut` (the in/out pair,
+not the panel row's shorter total, which comes with the row's title in M7, D-043). A reset more than a day off is
+labelled by weekday and time in the engine's time zone, which on Windows is GMT until the engine sets it from the
+Windows zone (D-043).
 
 Version 1.0 does not carry the balances (`billing`), the grouping of rows into accounts, the account and source
 notices, or the token columns of the last 24 hours. The shell shows none of them until a minor version adds them, and

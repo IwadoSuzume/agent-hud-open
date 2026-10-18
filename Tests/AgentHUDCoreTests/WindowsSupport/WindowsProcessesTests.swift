@@ -12,7 +12,10 @@ final class WindowsProcessesTests: XCTestCase {
         let line = try XCTUnwrap(WindowsProcesses.listing().split(separator: "\n").first { $0.hasPrefix("\(me) ") })
         XCTAssertFalse(line.contains("\\"), "backslashes are written as forward slashes")
         let image = try XCTUnwrap(WindowsProcesses.imagePath(me))
-        XCTAssertEqual(image.lowercased(), Bundle.main.executableURL?.path.lowercased())
+        // The system follows junctions and links in the image's name; the build folder may be reached through one.
+        let mine = try XCTUnwrap(Bundle.main.executableURL)
+        let final = try XCTUnwrap(WindowsPaths.finalPath(image), "the image exists")
+        XCTAssertEqual(final.lowercased(), WindowsPaths.finalPath(mine.path)?.lowercased())
         XCTAssertTrue(WindowsProcesses.isCurrentUser(me))
         XCTAssertNotNil(WindowsProcesses.commandLine(me))
     }

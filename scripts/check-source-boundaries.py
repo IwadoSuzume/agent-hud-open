@@ -103,6 +103,8 @@ for name in sorted(set(filter(None, paths))):
     lowered = Path(name).name.lower()
     if lowered == "packages.config":
         failures.append(f"{name}: packages come through PackageReference only")
+    if lowered.endswith(".rsp"):
+        failures.append(f"{name}: MSBuild response files could add feeds or properties; none is used")
     if lowered == "nuget.config":
         if name != "windows/nuget.config" or path.read_text(encoding="utf-8").replace("\r\n", "\n") != nuget_config:
             failures.append(f"{name}: only windows/nuget.config, clearing every feed for nuget.org alone, is allowed")
@@ -123,6 +125,9 @@ for name in sorted(set(filter(None, paths))):
             failures.append(f"{name}: SDK {element.get('Sdk') or element.get('Name')} is not allowed")
         if tag in {"PackageVersion", "GlobalPackageReference", "PackageDownload"}:
             failures.append(f"{name}: {tag} is not used; each test project names its packages")
+        if tag in {"RestoreSources", "RestoreAdditionalProjectSources", "RestoreConfigFile", "RestoreFallbackFolders",
+                   "RestorePackagesPath", "RestoreAdditionalProjectFallbackFolders"}:
+            failures.append(f"{name}: {tag} would restore from elsewhere than windows/nuget.config's nuget.org")
         if tag != "PackageReference":
             continue
         package = element.get("Include") or element.get("Update")

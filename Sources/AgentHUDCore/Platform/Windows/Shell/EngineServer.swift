@@ -22,17 +22,8 @@ public final class EngineServer {
         public init() {}
     }
 
-    /// What the engine does to the clients' hooks: `SessionObservers`' own calls; a test counts them.
-    public struct Hooks: Sendable {
-        public var configure: @MainActor @Sendable (URL, Bool) -> Void = { SessionObservers.configure(executable: $0, enabled: $1) }
-        public var observedClients: @MainActor @Sendable () -> Set<String> = { SessionObservers.observedClients() }
-        public var installObservers: @MainActor @Sendable () -> Void = { SessionObservers.installObservers() }
-        public init() {}
-    }
-
     private let options: Options
-    private let hooks: Hooks
-    private let send: @Sendable (Data, Bool) -> Void
+    private let send: @Sendable (Data, String) -> Void
     private let finish: @MainActor (Int32) -> Void
     private var instanceLock: InstanceLock?
     private(set) var settings: SettingsStore?
@@ -44,12 +35,11 @@ public final class EngineServer {
     private var stopped = false
     private let deepseekQuestions = DeepSeekQuestionObserver()
 
-    /// `send` writes one line to the shell, `true` for a line a newer one of its kind may replace before it is
-    /// written (`state`); `finish` ends the process with a status, after everything has stopped.
-    public init(options: Options, hooks: Hooks = Hooks(), send: @escaping @Sendable (Data, Bool) -> Void,
+    /// `send` writes one line to the shell, with its message's type (a newer `state` or `hello` may replace one not
+    /// yet written); `finish` ends the process with a status, after everything has stopped.
+    public init(options: Options, send: @escaping @Sendable (Data, String) -> Void,
                 finish: @escaping @MainActor (Int32) -> Void) {
         self.options = options
-        self.hooks = hooks
         self.send = send
         self.finish = finish
     }
@@ -95,6 +85,8 @@ public final class EngineServer {
 
     private func start() {
         started = true
+        // A `lock-held` is said in the language asked for, as everything after it would be.
+        if let language = options.language { L10n.setLanguage(language) }
         if !options.demo {
             switch InstanceLock.claim(at: options.lock, executable: options.executable) {
             case .acquired(let lock): instanceLock = lock
@@ -121,8 +113,8 @@ public final class EngineServer {
         if options.demo {
             PermissionRequests.shared.seedDemo()
         } else {
-            if let executable = options.executable { hooks.configure(executable, settings.settings.clientHooks) }
-            observedClients = hooks.observedClients()
+            if let executable = options.executable { SessionObservers.configure(executable: executable, enabled: settings.settings.clientHooks) }
+            observedClients = SessionObservers.observedClients()
             PermissionRequests.shared.start()
             deepseekQuestions.setEnabled(settings.settings.clientHooks)
         }
@@ -147,7 +139,7 @@ public final class EngineServer {
         }
         track({ settings.settings.clientHooks }) { [weak self] in
             guard let self, !self.options.demo else { return }
-            if let executable = self.options.executable { self.hooks.configure(executable, settings.settings.clientHooks) }
+            if let executable = self.options.executable { SessionObservers.configure(executable: executable, enabled: settings.settings.clientHooks) }
             self.deepseekQuestions.setEnabled(settings.settings.clientHooks)
         }
         // A client run for the first time creates its directory, and its observer goes in with the next report.
@@ -160,8 +152,8 @@ public final class EngineServer {
 
     private func installObserversForNewClients() {
         guard !options.demo, let settings else { return }
-        let present = hooks.observedClients()
-        if settings.settings.clientHooks, !present.subtracting(observedClients).isEmpty { hooks.installObservers() }
+        let present = SessionObservers.observedClients()
+        if settings.settings.clientHooks, !present.subtracting(observedClients).isEmpty { SessionObservers.installObservers() }
         observedClients = present
     }
 
@@ -225,7 +217,7 @@ public final class EngineServer {
 
     private func write(_ message: JSONValue) {
         guard let line = try? ShellProtocol.line(message) else { return }
-        send(line, message["type"].stringValue == "state")
+        send(line, message["type"].stringValue ?? "")
     }
 
     /// Lets every waiting approval go back to its client, stops collecting and ends with `status`.

@@ -78,6 +78,33 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
 
     private func type(_ name: String) -> (JSONValue) -> Bool { { $0["type"].stringValue == name } }
 
+    /// An environment for a real (not demo) engine and its hooks that can reach nothing of the machine's user: only the
+    /// system's own variables are taken over, and the user's folders — home, roaming and local profile — are folders of
+    /// `home`. Every client's home variable (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `XDG_CONFIG_HOME`, …) is left out, so a
+    /// machine that sets one keeps its real client untouched (TASK.md §8, G7).
+    private func isolatedEnvironment(home: URL) throws -> [String: String] {
+        let system = ["SystemRoot", "windir", "SystemDrive", "ComSpec", "PATH", "PATHEXT", "TEMP", "TMP", "OS",
+                      "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "USERNAME", "USERDOMAIN", "ProgramFiles",
+                      "ProgramFiles(x86)", "ProgramData"]
+        var environment: [String: String] = [:]
+        for (name, value) in ProcessInfo.processInfo.environment
+        where system.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+            environment[name] = value
+        }
+        let native = home.path.replacingOccurrences(of: "/", with: "\\")
+        for (name, folder) in [("USERPROFILE", ""), ("HOME", ""), ("APPDATA", #"\Profile\Roaming"#), ("LOCALAPPDATA", #"\Profile\Local"#)] {
+            environment[name] = native + folder
+            try FileManager.default.createDirectory(atPath: native + folder, withIntermediateDirectories: true)
+        }
+        // Nothing the child is given names a folder of the user's but these, all inside `home`.
+        let profile = ProcessInfo.processInfo.environment["USERPROFILE"].map { $0.lowercased() } ?? "\u{0}"
+        for (name, value) in environment where !["PATH", "TEMP", "TMP"].contains(name.uppercased()) {
+            XCTAssertFalse(value.lowercased().hasPrefix(profile) && !value.lowercased().hasPrefix(native.lowercased()),
+                           "\(name) would reach the real profile")
+        }
+        return environment
+    }
+
     func testTheDemoServesStateTakesAnswersAndSettingsAndQuits() throws {
         let served = try Served(try engine(), ["--demo", "--language", "en"])
         defer { if served.process.isRunning { served.process.terminate() } }
@@ -125,9 +152,7 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
         try FileManager.default.createDirectory(at: home.appendingPathComponent(".claude/projects"), withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: home) }
         let settingsFile = home.appendingPathComponent(".claude/settings.json")
-        var environment = ProcessInfo.processInfo.environment
-        environment["USERPROFILE"] = home.path.replacingOccurrences(of: "/", with: "\\")
-        environment.removeValue(forKey: "CLAUDE_CODE_SESSION_ATTENDED")
+        let environment = try isolatedEnvironment(home: home)
 
         let served = try Served(engine, [], environment: environment)
         defer { if served.process.isRunning { served.process.terminate() } }
@@ -172,8 +197,11 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
         let request = try XCTUnwrap(asked["approvals"].arrayValue?.first { $0["sessionID"].stringValue == "through-the-shell" })
         XCTAssertTrue(hook.isRunning, "the hook waits for the user")
         served.send(#"{"v":1,"type":"answer","id":"\#(try XCTUnwrap(request["id"].stringValue))","decision":"allow"}"#)
+        // Bounded: a hook that never got its answer would otherwise wait the engine's 10-minute hold.
+        let hookDeadline = Date().addingTimeInterval(20)
+        while hook.isRunning, Date() < hookDeadline { Thread.sleep(forTimeInterval: 0.05) }
+        if hook.isRunning { hook.terminate(); return XCTFail("the hook did not get its answer") }
         let answer = output.fileHandleForReading.readDataToEndOfFile()
-        hook.waitUntilExit()
         XCTAssertEqual(hook.terminationStatus, 0)
         XCTAssertEqual(try ProviderJSON.read(answer)["hookSpecificOutput"]["decision"]["behavior"].stringValue, "allow")
 

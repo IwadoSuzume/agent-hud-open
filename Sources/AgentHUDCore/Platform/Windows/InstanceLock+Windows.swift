@@ -67,12 +67,19 @@ public final class InstanceLock: @unchecked Sendable {
     /// The application that holds the lock at `url` now; nil when no copy holds it or the holder has not written its
     /// name yet. It only asks: the file is opened sharing reading and writing, so the lock is never taken, not even for
     /// a moment, and a copy that starts meanwhile is not turned away. A process that must not start the application,
-    /// such as `--mcp`, learns from it whether one runs.
+    /// such as `--mcp`, learns from it whether one runs. The system names a process's executable with junctions and
+    /// links followed, so a holder that wrote its name through one is compared by the file both names reach.
     static func runningApplication(at url: URL = sharedURL) -> URL? {
         guard let record = record(at: url), let pid = record.pid, let path = record.path,
-              let running = WindowsProcesses.imagePath(pid),
-              running.lowercased() == path.replacingOccurrences(of: "\\", with: "/").lowercased() else { return nil }
+              let running = WindowsProcesses.imagePath(pid) else { return nil }
+        let written = path.replacingOccurrences(of: "\\", with: "/")
+        guard running.lowercased() == written.lowercased() || sameFile(running, written) else { return nil }
         return URL(fileURLWithPath: path)
+    }
+
+    private static func sameFile(_ first: String, _ second: String) -> Bool {
+        guard let first = WindowsPaths.finalPath(first), let second = WindowsPaths.finalPath(second) else { return false }
+        return first.lowercased() == second.lowercased()
     }
 
     /// The application whose executable the holder wrote. Nil while the holder has not written it yet.

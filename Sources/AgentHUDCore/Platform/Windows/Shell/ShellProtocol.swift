@@ -77,7 +77,10 @@ public enum ShellProtocol {
             "maxUsedPct": view.maxUsedPct.map(JSONValue.number) ?? .null,
             "glow": .array(view.glowSegments.map { .object(["vendor": .string($0.vendor), "level": .string($0.level.rawValue)]) }),
             "agents": .array(view.rows.map { row in agent(row, view: view) }),
-            "sessions": .array(view.sessions.map { session($0, statusText: store.sessionStatusLabel($0.session)) }),
+            "sessions": .array(view.sessions.map {
+                session($0, statusText: store.sessionStatusLabel($0.session),
+                        project: projectTitle($0.session, report: store.report?.generatedAt))
+            }),
         ])
     }
 
@@ -100,14 +103,28 @@ public enum ShellProtocol {
         ])
     }
 
-    /// `statusText` is `UsageStore.sessionStatusLabel`: "Needs approval", "Status out of date", "Live status off" or
-    /// the running or idle time.
-    static func session(_ session: ReportView.Session, statusText: String) -> JSONValue {
-        let live = session.session
+    /// The titles `SessionProject` gave the working directories of the report `report` was made at: it walks folders
+    /// and reads Git's pointers, which is not done again for every state of the same report.
+    @MainActor private static var projectTitles: (report: Date?, titles: [String: String?]) = (nil, [:])
+
+    @MainActor
+    static func projectTitle(_ live: LiveSession, report: Date?) -> String? {
+        if projectTitles.report != report { projectTitles = (report, [:]) }
+        let key = live.workingDirectory ?? ""
+        if let known = projectTitles.titles[key] { return known }
         let project = SessionProject(live)
+        let title = project.path == nil ? nil : project.title
+        projectTitles.titles[key] = title
+        return title
+    }
+
+    /// `statusText` is `UsageStore.sessionStatusLabel`: "Needs approval", "Status out of date", "Live status off" or
+    /// the running or idle time; `project` is `SessionProject`'s title.
+    static func session(_ session: ReportView.Session, statusText: String, project: String?) -> JSONValue {
+        let live = session.session
         return .object([
             "id": .string(live.id), "agentId": .string(live.agentId), "task": .string(live.task),
-            "project": text(project.path == nil ? nil : project.title),
+            "project": text(project),
             "phase": .string(session.phase.state.rawValue),
             "phaseText": .string(statusText),
             "startedAt": time(live.startedAt), "lastEventAt": time(session.lastEventAt),

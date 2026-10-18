@@ -107,6 +107,24 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         try assertMatches(state, "engine-state.demo.json")
     }
 
+    /// The same report eight days on, with Claude's live status off: the labels a quick look at the demo never shows —
+    /// "Pending update" for a reset whose time has passed (no confirmed reset), "Live status off" for its sessions.
+    @MainActor
+    func testTheLaterStateIsTheSharedFixture() throws {
+        let agents = DemoData.everyAgent
+        let settings = SettingsStore(defaults: try XCTUnwrap(SettingsFile(url: nil)), defaultAgents: agents)
+        settings.update { $0.setLiveStatus(for: "Claude", enabled: false) }
+        let report = DemoUsageProvider.report(agents: agents, historyHours: 24, now: Self.now, stage: nil)
+        let later = Self.now.addingTimeInterval(8 * 86_400)
+        let store = UsageStore(provider: DemoUsageProvider(), settings: settings, clock: { later })
+        store.replace(report: report)
+        let state = try ShellProtocol.state(store: store, approvals: [])
+        let agentsShown = state["panel"]["agents"].arrayValue ?? [], sessions = state["panel"]["sessions"].arrayValue ?? []
+        XCTAssertTrue(agentsShown.contains { $0["resetText"].stringValue == "Pending update" }, "a passed reset is not a confirmed one")
+        XCTAssertTrue(sessions.contains { $0["phaseText"].stringValue == "Live status off" })
+        try assertMatches(state, "engine-state.later.json")
+    }
+
     @MainActor
     func testEventsAreTheSharedFixtures() throws {
         let report = DemoUsageProvider.report(agents: DemoData.everyAgent, historyHours: 24, now: Self.now, stage: nil)

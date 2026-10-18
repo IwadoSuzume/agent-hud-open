@@ -148,6 +148,15 @@ public sealed class ProtocolTests
         Assert.IsTrue(state.Panel.Sessions.Any(s => s.Phase == SessionPhase.WaitingForApproval && s.PhaseText == "Needs approval"));
     }
 
+    /// <summary>The same report eight days on, Claude's live status off: Core's labels for a passed reset and those sessions.</summary>
+    [TestMethod]
+    public void TheLaterStateCarriesCoresLabels()
+    {
+        var state = (State)EngineMessage.Parse(Line("engine-state.later.json"));
+        Assert.IsTrue(state.Panel.Agents.Any(a => a.ResetText == "Pending update"));
+        Assert.IsTrue(state.Panel.Sessions.Any(s => s.PhaseText == "Live status off"));
+    }
+
     [TestMethod]
     public void TheShellsMessagesAreItsFixturesByteForByte()
     {

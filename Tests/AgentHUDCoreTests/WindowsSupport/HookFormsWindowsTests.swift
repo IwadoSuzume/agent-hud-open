@@ -235,7 +235,13 @@ final class HookFormsWindowsTests: XCTestCase {
 
     /// `Win32.longPath` beyond MAX_PATH: asked in its `\\?\` form, given back without it.
     func testTheLongFormOfAPathBeyondMaxPath() throws {
-        var folder = home!
+        // The fixture's own base spelled in full first: a runner's TEMP is itself an 8.3 name (`RUNNER~1`).
+        let base = home!.path.replacingOccurrences(of: "/", with: "\\")
+        let baseLength = Win32.withWide(base) { GetLongPathNameW($0, nil, 0) }
+        var baseBuffer = [WCHAR](repeating: 0, count: Int(baseLength) + 1)
+        let baseWritten = Win32.withWide(base) { GetLongPathNameW($0, &baseBuffer, DWORD(baseBuffer.count)) }
+        XCTAssertNotEqual(baseWritten, 0)
+        var folder = URL(fileURLWithPath: String(decoding: baseBuffer.prefix { $0 != 0 }, as: UTF16.self), isDirectory: true)
         while folder.path.utf16.count < 300 { folder.appendPathComponent("深层 long folder name \(folder.pathComponents.count)") }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let long = folder.path.replacingOccurrences(of: "/", with: "\\")

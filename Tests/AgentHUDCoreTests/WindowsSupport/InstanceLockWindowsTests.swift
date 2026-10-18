@@ -65,6 +65,34 @@ final class InstanceLockWindowsTests: XCTestCase, @unchecked Sendable {
         XCTAssertNil(InstanceLock.runningApplication(at: url), "no process has that id")
     }
 
+    /// A copy started through a junction writes that spelling, while the system names its image with the junction
+    /// followed: it still counts as the copy that runs.
+    func testAHolderNamedThroughAJunctionCountsAsRunning() throws {
+        let folder = try directory()
+        let url = folder.appendingPathComponent("instance.lock")
+        let me = try XCTUnwrap(Bundle.main.executableURL)
+        let link = folder.appendingPathComponent("通过 junction")
+        let mklink = Process()
+        mklink.executableURL = URL(fileURLWithPath: Win32.environment("ComSpec") ?? #"C:\Windows\System32\cmd.exe"#)
+        mklink.arguments = ["/d", "/c", "mklink", "/J", link.path.replacingOccurrences(of: "/", with: "\\"),
+                            me.deletingLastPathComponent().path.replacingOccurrences(of: "/", with: "\\")]
+        mklink.standardOutput = FileHandle.nullDevice
+        try mklink.run()
+        mklink.waitUntilExit()
+        XCTAssertEqual(mklink.terminationStatus, 0, "mklink /J needs no elevation")
+        // The link goes before its folder is removed (teardown blocks run last-in first-out), so that removal never
+        // walks into the build's own folder.
+        let unlink = { _ = Win32.withWide(link.path.replacingOccurrences(of: "/", with: "\\")) { RemoveDirectoryW($0) } }
+        addTeardownBlock(unlink)
+        defer { unlink() }
+        let throughLink = link.appendingPathComponent(me.lastPathComponent)
+        XCTAssertNotEqual(throughLink.path.lowercased(), WindowsProcesses.imagePath(GetCurrentProcessId())?.lowercased())
+        guard case .acquired(let lock) = InstanceLock.claim(at: url, executable: throughLink) else { return XCTFail("claims") }
+        withExtendedLifetime(lock) {
+            XCTAssertEqual(InstanceLock.runningApplication(at: url)?.path, throughLink.path, "the same file, another name")
+        }
+    }
+
     func testAReadingProcessNeverTurnsAStartingCopyAway() throws {
         let url = try directory().appendingPathComponent("instance.lock")
         try "\(running.path)\n1".write(to: url, atomically: true, encoding: .utf8)
