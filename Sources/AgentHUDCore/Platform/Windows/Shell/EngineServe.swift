@@ -63,6 +63,8 @@ public enum EngineServe {
             complain("--serve takes --demo and --language zh|en only")
             exit(2)
         }
+        // Foundation's default zone is Windows' own (it reports GMT otherwise): Core's labels read as the wall clock.
+        WindowsTimeZone.adopt()
         guard let output = takeProtocolOutput() else {
             complain("no standard output to serve on")
             exit(2)

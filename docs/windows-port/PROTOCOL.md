@@ -89,8 +89,7 @@ reset's time has passed, "—" for an account that is not current), `phaseText` 
 ("Needs approval", "Status out of date", "Live status off", or the running or idle time), `project` is
 `SessionProject`'s title (a repository's worktrees share it), `tokensText` is `TokenFormat.inOut` (the in/out pair,
 not the panel row's shorter total, which comes with the row's title in M7, D-043). A reset more than a day off is
-labelled by weekday and time in the engine's time zone, which on Windows is GMT until the engine sets it from the
-Windows zone (D-043).
+labelled by weekday and time in the engine's time zone, Windows' own (`WindowsTimeZone`, D-050).
 
 Version 1.0 does not carry the balances (`billing`), the grouping of rows into accounts, the account and source
 notices, or the token columns of the last 24 hours. The shell shows none of them until a minor version adds them, and

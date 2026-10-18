@@ -119,10 +119,10 @@ deprecated` in `Providers/Antigravity/AntigravityCLI.swift`; `result of call to 
   is timing-dependent on the runner (failed on 39102050317 and attempt 1 of 39104084904 with 187 vs 480, 3.4–3.8 s;
   passes in about 1.7 s). The port changes no Desktop code: for G1, one `rerun-failed-jobs` of the failed job is the
   agreed response, and a second failure is a finding.
-- swift-corelibs-foundation on Windows reports the local time zone as GMT (`TimeZone.current`, `Calendar.current`, a
-  default `DateFormatter`; measured by the M6 round-1 tester on a UTC−4 machine, with or without `TZ`): a reset more
-  than a day off is labelled in GMT ("Sun 13:00"). The engine should set `NSTimeZone.default` from the Windows zone at
-  start (M7, with a test); the protocol fixtures are made in UTC on purpose and are not affected.
+- Resolved in M7 step 7 (D-050): swift-corelibs-foundation on Windows reports the local time zone as GMT; `--serve` now
+  adopts Windows' zone as Foundation's default (`WindowsTimeZone`, the system ICU's Windows-to-IANA mapping, else the
+  current offset). `TimeZone.current` itself still says GMT, and Core does not read it. Hooks and `--mcp` format no
+  times. The protocol fixtures are made in UTC on purpose and are not affected.
 - The MCP server's `instructions` (Core text) say the HUD shows "at the Mac's notch"; the Windows build serves the same
   words. Platform-aware product text belongs to M6/M7 (the UI's strings come from Core).
 - The real `%TEMP%` grows by about 50 folders per G3 run (M4's `ProviderEnginesWindowsTests`, upstream fixtures,
