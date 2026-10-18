@@ -2,7 +2,7 @@
 
 Items a milestone could not finish within four review rounds (TASK.md §5.5): symptom, what was tried, suggestion.
 
-## B-001 — M4 not approved after four rounds: two Windows implementations without tests (2026-10-18)
+## B-001 — CLOSED — M4 not approved after four rounds: two Windows implementations without tests (2026-10-18)
 
 - **Symptom.** M4 review round 4 (`reports/M4-review-4.md`, on `4cdf931`) returned CHANGES_REQUESTED with two BLOCKING
   items, both new in that round. (1) `WindowsHTTP.send` (`Platform/Windows/ProviderHTTP+Windows.swift`), the WinHTTP
@@ -20,3 +20,6 @@ Items a milestone could not finish within four review rounds (TASK.md §5.5): sy
   and deleted by the test; `gh:` targets never read). Until M5 is approved, SUPPORT_MATRIX's ✅ in the Quota column
   rests on the provider fixtures, not on a tested Windows transport.
 - **Suggestion.** Close this entry when M5 is approved with those tests in its range.
+- **Closed 2026-10-18** with M5's approval (`port-M5-approved`, `bb1ce7d`): `ProviderHTTPWindowsTests`,
+  `WindowsCredentialsTests` and `WindowsHTTP.rules`' test run in Windows CI and locally (`reports/M5-tests-2.md`), and
+  the M5 reviews judged B-001 resolved (`reports/M5-review-1.md`, `M5-review-2.md`).

@@ -4,13 +4,13 @@ Read this first when resuming (TASK.md, top). Update after every step.
 
 ## Status
 
-- **Current milestone:** M5 — Hooks & MCP (review round 2). M4 closed after four rounds **without approval**: its last
-  review found two untested Windows implementations (BLOCKERS.md B-001); their tests land at the start of M5's range.
+- **Current milestone:** M6 — Engine & UI protocol (to start). M5 approved 2026-10-18 (`port-M5-approved`, `bb1ce7d`);
+  M4 closed after four rounds without approval, its blocker B-001 closed by M5.
 - **Branch:** `windows-port`, pushed to the fork `IwadoSuzume/agent-hud-open` (created 2026-10-16 for CI; upstream
   `jazzenchen/agent-hud-open` is never pushed to, no PR is opened).
 - **Spike branch:** `spike-m0` (commit `809e047`, local only): the full spike, Core + tests building and running on
   Windows. Milestones M1–M5 re-apply it in reviewed steps; do not merge it.
-- **Last approved tag:** `port-M3-approved` (`da470d9`); earlier `port-M2-approved` (`887c949`), `port-M1-approved` (`ffc8dba`), `port-M0-approved` (`990426e`)
+- **Last approved tag:** `port-M5-approved` (`bb1ce7d`); earlier `port-M3-approved` (`da470d9`), `port-M2-approved` (`887c949`), `port-M1-approved` (`ffc8dba`), `port-M0-approved` (`990426e`)
 
 ## Milestones
 
@@ -21,7 +21,7 @@ Read this first when resuming (TASK.md, top). Update after every step.
 | M2 Support cross-platform | approved 2026-10-17 | `ffc8dba` | `port-M2-approved` (`887c949`) | round 1: tests ALL_PASS (Windows run 39000065894, macOS run 39000074546: 2086 XCTest + 10 swift-testing incl. `portableDigestsEqualCryptoKit`), review APPROVE |
 | M3 Core platform layer | approved 2026-10-17 | `08bbc4a` | `port-M3-approved` (`da470d9`) | round 3 (`da470d9`): tests ALL_PASS (Windows run 39006576859: Core 1310 executed, 1301 passed, 9 skipped, 0 failed; macOS run 39006577913: 2086 XCTest + 10 swift-testing; local G2 warnings equal the baseline; D-006 holds), review APPROVE (3 non-blocking: an 8.3 short-path SessionProject case, D-032 wording, test.ps1 header — done on the M4 branch; the tester's 3 G8 doc notes fixed with the approval). Round 2 (`dd38fc8`): tests FAILURES (Windows run 39005191736: the D-032 retry built on attempt 2, then 4 tests failed on the runner only — the built-in Administrator's SID written as SDDL's `LA`, the runner's 8.3 `RUNNER~1` temporary path), macOS run 39005199779 success, review CHANGES_REQUESTED (that failure only) → test helpers compare the SDDL alias and resolve the fixture's final path; test.ps1's `-Filter` batch fixed and its retry limited to a file in use; WindowsFoldersTests' warnings fixed; D-021/D-033 notes. Round 1 (`c8dca6e`): tests FAILURES (Windows run 39003222984 failed in Swift Build's bundle Touch before any test ran; D-006 broken by one line of `InstanceLock.swift`; 9 warnings over the baseline), macOS run 39003224306 success, review CHANGES_REQUESTED (the same 2 blocking) → fixed: D-032 build-first, D-006 restored and exempted, port warnings fixed and upstream-line warnings baselined (D-033), plus the review's non-blocking items (pipe acceptor logs and reports a stop, header CR/LF refused, pipe key owner checked, PlatformGapsTests) |
 | M4 Providers | **not approved** (4 rounds, B-001) 2026-10-18 | `469bc44` | — (closed at `4cdf931`) | round 4 (`4cdf931`): tests ALL_PASS (`reports/M4-tests-4.md`: Windows run 39047601254 and local both 1343 executed, 1339 passed, 4 skipped, 0 failed; macOS run 39047601576: 2086 XCTest + 10 swift-testing, all 31 Windows-skipped tests pass on macOS; warnings equal the baseline), review CHANGES_REQUESTED (`reports/M4-review-4.md`: rounds 1–3 all fixed; 2 new BLOCKING — no Windows test of the WinHTTP transport or of Credential Manager → B-001, fixed in M5's range). Round 3 (`76ec0e2`, review only — its tester was cut off by a rate limit; covered by round 4's tests; CI on `cda1fca` green): review CHANGES_REQUESTED (the Grok Bot quota check could not fail) → `4cdf931`. Round 2 (`0bdab94`): tests FAILURES (`reports/M4-tests-2.md`: the driveless-path test on CI's `D:`; 8 unnamed skip-list entries), review CHANGES_REQUESTED (counterparts that test the gates) → `76ec0e2`. Round 1 (`c1d64a0`): tests ALL_PASS (Windows run 39028601296, macOS run 39028601964), review CHANGES_REQUESTED (4 blocking: PlatformSupport gated only `isInstalled`; macOS-only home folders read on Windows; the D-019 test could not fail; four Windows places without a source) → `848ca5b`, `8509b17` (D-036 revised, SUPPORT_MATRIX, registered skips). Before review: run 39028057775 on `696284b` failed in a cold release build (Swift Build Touch race) → `scripts/windows/build.ps1` (D-032) |
-| M5 Hooks & MCP | review (round 2) | `505492b` (M4's close) | — | round 1 (`c369f8d`): tests FAILURES (`reports/M5-tests-1.md`: Windows run 39102050084 1425 run, 1420 passed, 4 skipped, 1 failed — Claude's ancestry test under the runner's 8.3 `RUNNER~1` temporary folder; macOS run 39102050317 1 failure in the upstream Desktop test `StatsWindowLifecycleTests.testNativeRestoreFitsContentUpdatedWhileMiniaturized`, no Desktop change in the port; local test.ps1 1421/0), review CHANGES_REQUESTED (`reports/M5-review-1.md`: BLOCKING — a failed `ReplaceFileW` could delete the only copy of a settings file) → round 2: backup and restore, long paths, both spellings in ancestry, WebSocket calls under the cancel lock, `WindowsHTTP.rules`, hook-form sources with URLs, skip register, 8.3 temporary folders, DeepSeek npm roots injectable, macOS quoting pinned |
+| M5 Hooks & MCP | approved 2026-10-18 | `505492b` (M4's close) | `port-M5-approved` (`bb1ce7d`) | round 2 (`bb1ce7d`): tests ALL_PASS (`reports/M5-tests-2.md`: Windows run 39104084529 and local both 1430 executed, 1426 passed, 4 skipped, 0 failed, also under an 8.3 `TEMP`; macOS run 39104084904 green on attempt 2 after one `rerun-failed-jobs` — the upstream flaky test below; 2087 XCTest), review APPROVE (`reports/M5-review-2.md`, 9 non-blocking → M6 step 1). Round 1 (`c369f8d`): tests FAILURES (`reports/M5-tests-1.md`: Claude's ancestry under the runner's 8.3 `RUNNER~1`; the same upstream macOS flake), review CHANGES_REQUESTED (`reports/M5-review-1.md`: a failed `ReplaceFileW` could delete the only copy of a settings file) → round 2: backup and restore, long paths, long forms in ancestry, WebSocket calls under the cancel lock, `WindowsHTTP.rules`, hook-form sources with URLs, skip register, 8.3 `TEMP`, DeepSeek npm roots injectable, macOS quoting pinned |
 | M6 Engine & UI protocol | todo | | | |
 | M7 Windows UI shell | todo | | | |
 | M8 Packaging | todo | | | |
@@ -74,12 +74,17 @@ deprecated` in `Providers/Antigravity/AntigravityCLI.swift`; `result of call to 
 
 ## Next steps (resume here)
 
-1. M5 review round 2 on `505492b...HEAD` (M5's start is M4's close commit): push `windows-port`, CI (Windows push run +
-   `Source checks` dispatch), port-tester (`reports/M5-tests-2.md`), port-reviewer (`reports/M5-review-2.md`); then tag
-   `port-M5-approved` and close B-001. M5 was developed on `m5-work` in `%LOCALAPPDATA%\agenthud-dev\wt5` (scratch
-   `wt5build`; runner `wt5.cmd <log> <swift args>` in the session scratchpad sets the toolchain and a temporary profile)
-   and merged into `windows-port`.
-2. M6 (engine & UI protocol) after M5's approval.
+1. M6 (engine & UI protocol), on a branch `m6-work` in a worktree `%LOCALAPPDATA%\agenthud-dev\wt6` (scratch `wt6build`),
+   M6's start being M5's approval commit. First, M5 round 2's non-blocking review items (`reports/M5-review-2.md`):
+   log failed removals in `HookSettings+Windows.swift` and test the restore-failed branch; `path.utf16.count` for the
+   `\?\` threshold; revise D-023 (backup, restore after 1177, logged leftovers, `\?\`); `Win32.longPath` over
+   MAX_PATH; `isTransientOnWindows` treating a local `\?\C:\…` path as a share; the reverse 8.3 case in
+   `HookFormsWindowsTests`; the exact certificate flags in `ProviderHTTPWindowsTests`; CodeBuddy Code's source domain.
+2. Then M6 proper (TASK.md §4): `agenthud-engine` gains the shell protocol over inherited anonymous pipes (ADR-001,
+   D-022), `docs/windows-port/PROTOCOL.md` + JSON Schema in `windows/protocol/` with shared fixtures, contract tests
+   on both ends. Core already holds the presentation logic the shell needs (`Logic/` ReportView, AgentRow, Alerts,
+   SessionPhase, Quota; `Formatting/`; `PanelLayout/`), so the engine sends computed view models and localized
+   strings (`L10n`), and the C# side recomputes nothing.
 
 ## Known issues / TODO
 
@@ -89,6 +94,10 @@ deprecated` in `Providers/Antigravity/AntigravityCLI.swift`; `result of call to 
 
 - Spike test failures to fix are listed in PORTING_PLAN.md §8.
 - An empty folder `E:\src` is left from the first junction (the tools may not remove a drive's top-level folder).
+- The upstream macOS test `AgentHUDDesktopTests.StatsWindowLifecycleTests.testNativeRestoreFitsContentUpdatedWhileMiniaturized`
+  is timing-dependent on the runner (failed on 39102050317 and attempt 1 of 39104084904 with 187 vs 480, 3.4–3.8 s;
+  passes in about 1.7 s). The port changes no Desktop code: for G1, one `rerun-failed-jobs` of the failed job is the
+  agreed response, and a second failure is a finding.
 - The MCP server's `instructions` (Core text) say the HUD shows "at the Mac's notch"; the Windows build serves the same
   words. Platform-aware product text belongs to M6/M7 (the UI's strings come from Core).
 - The real `%TEMP%` grows by about 50 folders per G3 run (M4's `ProviderEnginesWindowsTests`, upstream fixtures,
