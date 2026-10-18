@@ -1,0 +1,61 @@
+// What the shell last heard from the engine (PROTOCOL.md): the last hello (its words), the last state (a reader keeps
+// the last one only) and the events not yet presented. It keeps no model of its own and decides nothing; every value
+// shown is the engine's. Used on one thread, the UI's.
+using AgentHUD.Protocol;
+
+namespace AgentHUD.Shell;
+
+public sealed class ShellModel
+{
+    readonly Queue<HudEvent> events = new();
+
+    public EngineHello? Hello { get; private set; }
+    public State? State { get; private set; }
+    /// <summary>The copy that holds the instance lock, when the engine found one running (it then exits with 3).</summary>
+    public LockHeld? LockHeld { get; private set; }
+    /// <summary>The last error the engine reported about a line of the shell's.</summary>
+    public string? LastError { get; private set; }
+
+    /// <summary>Raised after a hello, a state or a lock-held changed what is shown.</summary>
+    public event Action? Changed;
+    /// <summary>Raised when an event arrives (a quota alert, reset credits, a finished turn).</summary>
+    public event Action<HudEvent>? EventArrived;
+
+    public void Apply(object message)
+    {
+        switch (message)
+        {
+            case EngineHello hello: Hello = hello; Changed?.Invoke(); break;
+            case State state: State = state; Changed?.Invoke(); break;
+            case LockHeld held: LockHeld = held; Changed?.Invoke(); break;
+            case EngineError error: LastError = error.Message; break;
+            case HudEvent hudEvent:
+                events.Enqueue(hudEvent);
+                EventArrived?.Invoke(hudEvent);
+                break;
+        }
+    }
+
+    /// <summary>The engine's word for <paramref name="key"/> (ShellStrings, in the resolved language); the key itself
+    /// before the first hello or for a key a newer shell knows and this engine does not.</summary>
+    public string Text(string key) => Hello?.Strings.TryGetValue(key, out var text) == true ? text : key;
+
+    /// <summary>The events in the order they came, each taken once.</summary>
+    public bool TryTakeEvent(out HudEvent? next)
+    {
+        next = events.Count > 0 ? events.Dequeue() : null;
+        return next is not null;
+    }
+
+    /// <summary>The setting <paramref name="name"/> as Core encodes it, or <paramref name="fallback"/>.</summary>
+    public int IntSetting(string name, int fallback) =>
+        State?.Settings[name] is System.Text.Json.Nodes.JsonValue value && value.TryGetValue(out int number) ? number : fallback;
+
+    public bool BoolSetting(string name, bool fallback) =>
+        State?.Settings[name] is System.Text.Json.Nodes.JsonValue value && value.TryGetValue(out bool flag) ? flag : fallback;
+
+    /// <summary>The hover delays the user set (Core's `hoverDelayMs`, `collapseDelayMs`; Core's defaults before the
+    /// first state).</summary>
+    public HoverConfig Hover => new(TimeSpan.FromMilliseconds(IntSetting("hoverDelayMs", 400)),
+                                    TimeSpan.FromMilliseconds(IntSetting("collapseDelayMs", 200)));
+}

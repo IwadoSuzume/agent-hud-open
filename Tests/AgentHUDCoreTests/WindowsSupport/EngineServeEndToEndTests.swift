@@ -126,7 +126,7 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
         defer { if served.process.isRunning { served.process.terminate() } }
         served.send(#"{"v":1,"type":"hello","minor":0,"shell":{"version":"test"}}"#)
         let hello = try XCTUnwrap(served.next(type("hello")), "the engine answers hello")
-        XCTAssertEqual(hello["minor"], .integer(0))
+        XCTAssertEqual(hello["minor"], .integer(ShellProtocol.minor), "the engine says its own minor version, whatever the shell's")
         XCTAssertEqual(hello["demo"], .bool(true))
         XCTAssertEqual(hello["language"].stringValue, "en")
         XCTAssertEqual(hello["strings"]["menu.quit"].stringValue, "Quit")

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The shell's windowless parts: the hover machine (the macOS HoverMachineTests, case for case), where requests are
+       shown, what the shell keeps of the engine's lines, and the engine connection over in-memory pipes. Test packages
+       only, never shipped (DECISIONS.md D-042, THIRD_PARTY_NOTICES.txt). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="MSTest.TestAdapter" Version="4.0.2" />
+    <PackageReference Include="MSTest.TestFramework" Version="4.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgentHUD.Protocol\AgentHUD.Protocol.csproj" />
+    <ProjectReference Include="..\AgentHUD.Shell\AgentHUD.Shell.csproj" />
+  </ItemGroup>
+
+</Project>

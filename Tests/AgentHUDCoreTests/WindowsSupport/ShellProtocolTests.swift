@@ -159,7 +159,7 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
 
     func testShellMessagesAreTheCommandsTheyStandFor() throws {
         let expected: [String: ShellProtocol.Command] = [
-            "shell-hello.json": .hello(minor: 0, shellVersion: "0.1.0"),
+            "shell-hello.json": .hello(minor: 1, shellVersion: "0.1.0"),
             "shell-refresh.json": .refresh,
             "shell-quit.json": .quit,
             "shell-answer-allow.json": .answer(id: "demo-tests", .allow),

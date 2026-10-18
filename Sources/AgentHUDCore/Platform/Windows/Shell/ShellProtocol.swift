@@ -7,7 +7,7 @@ import Foundation
 /// own rules and formatting; the shell recomputes nothing.
 public enum ShellProtocol {
     public static let major: Int64 = 1
-    public static let minor: Int64 = 0
+    public static let minor: Int64 = 1
     /// The longest line either side takes.
     public static let lineLimit = 16 * 1024 * 1024
 
@@ -76,6 +76,11 @@ public enum ShellProtocol {
             "now": time(view.now),
             "maxUsedPct": view.maxUsedPct.map(JSONValue.number) ?? .null,
             "glow": .array(view.glowSegments.map { .object(["vendor": .string($0.vendor), "level": .string($0.level.rawValue)]) }),
+            // 1.1: the resting HUD's marks, Core's logo queue (`queueMarks`): vendors that share artwork share a mark.
+            "marks": .array(view.queueMarks.map { mark in
+                .object(["key": .string(mark.key), "vendor": .string(mark.vendor), "isWorking": .bool(mark.isWorking),
+                         "waiting": .bool(mark.waitedLongest != nil)])
+            }),
             "agents": .array(view.rows.map { row in agent(row, view: view) }),
             "sessions": .array(view.sessions.map {
                 session($0, statusText: store.sessionStatusLabel($0.session),
@@ -88,6 +93,11 @@ public enum ShellProtocol {
         .object([
             "id": .string(row.id), "vendor": .string(row.agent.vendor), "model": .string(row.agent.model),
             "shortModel": text(row.agent.shortModel),
+            // 1.1: the row's label as the panel writes it ("Current session", "Weekly limit · Fable"), its short form,
+            // and the mark it is drawn with.
+            "modelText": .string(L10n.modelLabel(row.agent.model)),
+            "shortModelText": .string(L10n.shortModelLabel(row.agent.model)),
+            "mark": .string(VendorMark.key(row.agent.vendor)),
             "level": row.level.map { .string($0.rawValue) } ?? .null,
             "usedPct": row.usedPct.map(JSONValue.number) ?? .null,
             "remainingPct": row.remainingPct.map(JSONValue.number) ?? .null,
@@ -125,6 +135,9 @@ public enum ShellProtocol {
         return .object([
             "id": .string(live.id), "agentId": .string(live.agentId), "task": .string(live.task),
             "project": text(project),
+            // 1.1: the agent the session ran in, and its mark.
+            "vendor": text(session.source.agentVendor),
+            "mark": text(session.source.agentVendor.map(VendorMark.key)),
             "phase": .string(session.phase.state.rawValue),
             "phaseText": .string(statusText),
             "startedAt": time(live.startedAt), "lastEventAt": time(session.lastEventAt),
@@ -138,6 +151,7 @@ public enum ShellProtocol {
     static func approval(_ request: PermissionRequest) -> JSONValue {
         .object([
             "id": .string(request.id), "source": .string(request.source.rawValue), "vendor": .string(request.vendor),
+            "mark": .string(VendorMark.key(request.vendor)),
             "sessionID": .string(request.sessionID), "toolName": text(request.toolName), "summary": .string(request.summary),
             "detail": text(request.detail), "project": text(request.project), "path": text(request.path),
             "removed": text(request.removed), "added": text(request.added), "at": time(request.at),

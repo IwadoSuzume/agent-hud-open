@@ -40,7 +40,7 @@ public sealed class ProtocolTests
     public void TheEnginesHelloIsRead()
     {
         var hello = (EngineHello)EngineMessage.Parse(Line("engine-hello.json"));
-        Assert.AreEqual(0, hello.Minor);
+        Assert.AreEqual(1, hello.Minor, "the engine speaks 1.1");
         Assert.IsTrue(hello.Demo);
         Assert.AreEqual("en", hello.Language);
         Assert.AreEqual("Quit", hello.Strings["menu.quit"]);
@@ -92,6 +92,27 @@ public sealed class ProtocolTests
         Assert.AreEqual(3, ((EngineHello)EngineMessage.Parse(hello.ToJsonString())).Minor);
     }
 
+    /// <summary>1.1 added the resting marks, the rows' labels and the marks of rows, sessions and requests; a 1.0
+    /// engine's state, without them, is still read, its rows labelled by their model as given.</summary>
+    [TestMethod]
+    public void AStateWithoutTheFieldsOf11IsRead()
+    {
+        var state = JsonNode.Parse(Line("engine-state.demo.json"))!.AsObject();
+        var panel = state["panel"]!.AsObject();
+        panel.Remove("marks");
+        foreach (var row in panel["agents"]!.AsArray()) { row!.AsObject().Remove("modelText"); row.AsObject().Remove("shortModelText"); row.AsObject().Remove("mark"); }
+        foreach (var session in panel["sessions"]!.AsArray()) { session!.AsObject().Remove("vendor"); session.AsObject().Remove("mark"); }
+        foreach (var request in state["approvals"]!.AsArray()) request!.AsObject().Remove("mark");
+        var read = (State)EngineMessage.Parse(state.ToJsonString());
+        Assert.IsEmpty(read.Panel.Marks);
+        Assert.IsTrue(read.Panel.Agents.All(a => a.ModelText == a.Model && a.Mark == a.Vendor));
+        Assert.IsTrue(read.Panel.Sessions.All(s => s.Vendor is null && s.Mark is null));
+        Assert.IsTrue(read.Approvals.All(r => r.Mark == r.Vendor));
+        var current = (State)EngineMessage.Parse(Line("engine-state.demo.json"));
+        Assert.AreEqual("Current session", current.Panel.Agents[0].ModelText);
+        Assert.IsTrue(current.Panel.Marks.Any(m => m.Vendor == "Codex" && m.Key == "ChatGPT"), "Codex is drawn with ChatGPT's mark");
+    }
+
     [TestMethod]
     public void LinesTheShellMustRefuseAreRefused()
     {
@@ -106,7 +127,8 @@ public sealed class ProtocolTests
         Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(state.ToJsonString()), "an unknown level");
         // A number out of range or a key given twice is refused like the rest, not thrown as .NET's own error.
         var hello = Line("engine-hello.json");
-        Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(hello.Replace("\"minor\":0", "\"minor\":99999999999")));
+        StringAssert.Contains(hello, "\"minor\":1");
+        Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(hello.Replace("\"minor\":1", "\"minor\":99999999999")));
         Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(hello.Replace("\"demo\":true", "\"demo\":true,\"demo\":false")));
     }
 

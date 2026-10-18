@@ -1,4 +1,4 @@
-# Engine ↔ shell protocol, version 1.0
+# Engine ↔ shell protocol, version 1.1
 
 How `AgentHUD.exe` (the WPF shell, M7) and `agenthud-engine.exe` (Swift, Support + Core) talk on Windows (ADR-001,
 D-022, D-041). The engine computes; the shell shows what it is sent and sends back what the user did. No rule of Core
@@ -50,7 +50,7 @@ announces in `hello`. A reader ignores fields it does not know. Times are intege
 ### `hello`
 
 ```json
-{"v":1,"type":"hello","minor":0,"engine":{"version":"0"},"demo":false,"language":"en","strings":{"…":"…"}}
+{"v":1,"type":"hello","minor":1,"engine":{"version":"0"},"demo":false,"language":"en","strings":{"…":"…"}}
 ```
 
 `language` is the language Core resolved (`zh` or `en`). `strings` holds the words of the shell's own chrome
@@ -73,12 +73,17 @@ The whole of what the HUD shows, every time (a reader keeps the last one only):
 | `panel` | the panel's projection of `ReportView` (below) |
 | `approvals` | the requests waiting for the user (`PermissionRequests.pending`), oldest first |
 
-`panel`: `now`; `maxUsedPct`; `glow` (`[{vendor, level}]`, `level` one of `ok`, `warning`, `critical`); `agents`
-(one per `ReportView.rows` entry: `id`, `vendor`, `model`, `shortModel`, `level`, `usedPct`, `remainingPct`,
+`panel`: `now`; `maxUsedPct`; `glow` (`[{vendor, level}]`, `level` one of `ok`, `warning`, `critical`); `marks` (1.1:
+the resting HUD's logo queue, `ReportView.queueMarks` in its order: `[{key, vendor, isWorking, waiting}]`, `key` the
+mark vendors that share artwork share, `VendorMark.key`, and `waiting` whether a request of its sessions waits);
+`agents` (one per `ReportView.rows` entry: `id`, `vendor`, `model`, `shortModel`, `level`, `usedPct`, `remainingPct`,
 `weeklyRemainingPct`, `resetAt`, `resetText`, `missingQuotaLabel`, `paletteIndex`, `isCurrentAccount`,
-`forecastHint`); `sessions` (one per `ReportView.sessions` entry: `id`, `agentId`, `task`, `project`, `phase`
-(`running`, `waitingForApproval`, `idle`, `unverified`), `phaseText`, `startedAt`, `lastEventAt`, `message`,
-`liveStatus`, `tokensIn`, `tokensOut`, `cacheReadTokens`, `tokensText`). Every `…Text` is Core's formatting in the
+`forecastHint`, and from 1.1 `modelText` and `shortModelText`, the row's label and its short form as the panel writes
+them, `L10n.modelLabel` and `shortModelLabel` — "Current session", "Weekly limit · Fable", "5h" — and `mark`);
+`sessions` (one per `ReportView.sessions` entry: `id`, `agentId`, `task`, `project`, `phase` (`running`,
+`waitingForApproval`, `idle`, `unverified`), `phaseText`, `startedAt`, `lastEventAt`, `message`, `liveStatus`,
+`tokensIn`, `tokensOut`, `cacheReadTokens`, `tokensText`, and from 1.1 `vendor`, the agent it ran in,
+`SessionSource.agentVendor`, and its `mark`, both null when Core knows none). Every `…Text` is Core's formatting in the
 resolved language, by the rules the macOS panel uses: `resetText` is `AgentRow.resetLabel` ("Pending update" once a
 reset's time has passed, "—" for an account that is not current), `phaseText` is `UsageStore.sessionStatusLabel`
 ("Needs approval", "Status out of date", "Live status off", or the running or idle time), `project` is
@@ -94,7 +99,14 @@ never works them out from the fields above (grouping rows by `vendor`, summing s
 An approval: `id`, `source`, `vendor`, `sessionID`, `toolName`, `summary`, `detail`, `project`, `path`, `removed`,
 `added`, `at`, `isQuestion`, `questions` (`[{key, question, header, multiSelect, options: [{label, description}]}]`),
 `isPlan`, `plan`, `answersPlan`, `alwaysAllowRule` (the rule an "Always allow" would add, or null when the client
-offers none — then the shell shows no such button).
+offers none — then the shell shows no such button), and from 1.1 `mark`.
+
+### Version 1.1
+
+1.1 adds `panel.marks`, the agent rows' `modelText`, `shortModelText` and `mark`, the sessions' `vendor` and `mark`,
+and the approvals' `mark` (M7: the shell's resting HUD and labels, which it may not work out itself). The schema
+lists them as the engine of this version sends them; a shell reads a 1.0 engine's state without them, an empty queue
+and each row labelled by its `model` as given (`AStateWithoutTheFieldsOf11IsRead`).
 
 ### `event`
 

@@ -58,13 +58,17 @@
       }
     },
     "panel": {
-      "type": "object", "additionalProperties": false, "required": ["now", "maxUsedPct", "glow", "agents", "sessions"],
+      "type": "object", "additionalProperties": false, "required": ["now", "maxUsedPct", "glow", "marks", "agents", "sessions"],
       "properties": {
         "now": { "$ref": "#/$defs/time" },
         "maxUsedPct": { "$ref": "#/$defs/pctOrNull" },
         "glow": { "type": "array", "items": {
           "type": "object", "additionalProperties": false, "required": ["vendor", "level"],
           "properties": { "vendor": { "type": "string" }, "level": { "$ref": "#/$defs/level" } } } },
+        "marks": { "type": "array", "items": {
+          "type": "object", "additionalProperties": false, "required": ["key", "vendor", "isWorking", "waiting"],
+          "properties": { "key": { "type": "string" }, "vendor": { "type": "string" }, "isWorking": { "type": "boolean" },
+                          "waiting": { "type": "boolean" } } } },
         "agents": { "type": "array", "items": { "$ref": "#/$defs/agent" } },
         "sessions": { "type": "array", "items": { "$ref": "#/$defs/session" } }
       }
@@ -72,7 +76,8 @@
     "agent": {
       "type": "object", "additionalProperties": false,
       "required": ["id", "vendor", "model", "shortModel", "level", "usedPct", "remainingPct", "weeklyRemainingPct",
-                   "resetAt", "resetText", "missingQuotaLabel", "paletteIndex", "isCurrentAccount", "forecastHint"],
+                   "resetAt", "resetText", "missingQuotaLabel", "paletteIndex", "isCurrentAccount", "forecastHint",
+                   "modelText", "shortModelText", "mark"],
       "properties": {
         "id": { "type": "string" }, "vendor": { "type": "string" }, "model": { "type": "string" },
         "shortModel": { "$ref": "#/$defs/textOrNull" }, "level": { "$ref": "#/$defs/levelOrNull" },
@@ -80,13 +85,14 @@
         "weeklyRemainingPct": { "$ref": "#/$defs/pctOrNull" },
         "resetAt": { "$ref": "#/$defs/timeOrNull" }, "resetText": { "$ref": "#/$defs/textOrNull" },
         "missingQuotaLabel": { "type": "string" }, "paletteIndex": { "type": "integer", "minimum": 0 },
-        "isCurrentAccount": { "type": "boolean" }, "forecastHint": { "$ref": "#/$defs/textOrNull" }
+        "isCurrentAccount": { "type": "boolean" }, "forecastHint": { "$ref": "#/$defs/textOrNull" },
+        "modelText": { "type": "string" }, "shortModelText": { "type": "string" }, "mark": { "type": "string" }
       }
     },
     "session": {
       "type": "object", "additionalProperties": false,
       "required": ["id", "agentId", "task", "project", "phase", "phaseText", "startedAt", "lastEventAt", "message",
-                   "liveStatus", "tokensIn", "tokensOut", "cacheReadTokens", "tokensText"],
+                   "liveStatus", "tokensIn", "tokensOut", "cacheReadTokens", "tokensText", "vendor", "mark"],
       "properties": {
         "id": { "type": "string" }, "agentId": { "type": "string" }, "task": { "type": "string" },
         "project": { "$ref": "#/$defs/textOrNull" },
@@ -95,15 +101,17 @@
         "startedAt": { "$ref": "#/$defs/time" }, "lastEventAt": { "$ref": "#/$defs/time" },
         "message": { "$ref": "#/$defs/textOrNull" }, "liveStatus": { "type": "boolean" },
         "tokensIn": { "type": "integer", "minimum": 0 }, "tokensOut": { "type": "integer", "minimum": 0 },
-        "cacheReadTokens": { "type": "integer", "minimum": 0 }, "tokensText": { "type": "string" }
+        "cacheReadTokens": { "type": "integer", "minimum": 0 }, "tokensText": { "type": "string" },
+        "vendor": { "$ref": "#/$defs/textOrNull" }, "mark": { "$ref": "#/$defs/textOrNull" }
       }
     },
     "approval": {
       "type": "object", "additionalProperties": false,
       "required": ["id", "source", "vendor", "sessionID", "toolName", "summary", "detail", "project", "path", "removed",
-                   "added", "at", "isQuestion", "questions", "isPlan", "plan", "answersPlan", "alwaysAllowRule"],
+                   "added", "at", "isQuestion", "questions", "isPlan", "plan", "answersPlan", "alwaysAllowRule", "mark"],
       "properties": {
         "id": { "type": "string" }, "source": { "type": "string" }, "vendor": { "type": "string" },
+        "mark": { "type": "string" },
         "sessionID": { "type": "string" }, "toolName": { "$ref": "#/$defs/textOrNull" }, "summary": { "type": "string" },
         "detail": { "$ref": "#/$defs/textOrNull" }, "project": { "$ref": "#/$defs/textOrNull" },
         "path": { "$ref": "#/$defs/textOrNull" }, "removed": { "$ref": "#/$defs/textOrNull" },

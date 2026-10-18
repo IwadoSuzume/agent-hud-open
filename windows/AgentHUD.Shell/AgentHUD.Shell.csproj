@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The shell's parts that need no window: the engine's child process and its lines, what the shell last heard, and
+       the hover timing. No package beyond the SDK's; every business rule stays in Core (TASK.md M7). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgentHUD.Protocol\AgentHUD.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

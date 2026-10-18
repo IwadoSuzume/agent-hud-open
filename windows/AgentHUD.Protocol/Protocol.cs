@@ -14,7 +14,7 @@ public sealed class ProtocolRejectedException(string message) : Exception(messag
 public static class ProtocolVersion
 {
     public const int Major = 1;
-    public const int Minor = 0;
+    public const int Minor = 1;
     /// <summary>The longest line either side takes.</summary>
     public const int LineLimit = 16 * 1024 * 1024;
 }
@@ -32,14 +32,18 @@ public sealed record EngineError(string Message);
 
 public sealed record GlowSegment(string Vendor, StatusLevel Level);
 
+/// <summary>One mark of the resting HUD (1.1, Core's logo queue): vendors that share artwork share its key.</summary>
+public sealed record QueueMark(string Key, string Vendor, bool IsWorking, bool Waiting);
+
 public sealed record AgentRow(string Id, string Vendor, string Model, string? ShortModel, StatusLevel? Level,
                               double? UsedPct, double? RemainingPct, double? WeeklyRemainingPct, DateTimeOffset? ResetAt,
                               string? ResetText, string MissingQuotaLabel, int PaletteIndex, bool IsCurrentAccount,
-                              string? ForecastHint);
+                              string? ForecastHint, string ModelText, string ShortModelText, string Mark);
 
 public sealed record Session(string Id, string AgentId, string Task, string? Project, SessionPhase Phase, string PhaseText,
                              DateTimeOffset StartedAt, DateTimeOffset LastEventAt, string? Message, bool LiveStatus,
-                             long TokensIn, long TokensOut, long CacheReadTokens, string TokensText);
+                             long TokensIn, long TokensOut, long CacheReadTokens, string TokensText, string? Vendor,
+                             string? Mark);
 
 public sealed record QuestionOption(string Label, string? Description);
 
@@ -48,10 +52,10 @@ public sealed record Question(string Key, string Text, string? Header, bool Mult
 public sealed record Approval(string Id, string Source, string Vendor, string SessionId, string? ToolName, string Summary,
                               string? Detail, string? Project, string? Path, string? Removed, string? Added,
                               DateTimeOffset At, bool IsQuestion, IReadOnlyList<Question> Questions, bool IsPlan,
-                              string? Plan, bool AnswersPlan, string? AlwaysAllowRule);
+                              string? Plan, bool AnswersPlan, string? AlwaysAllowRule, string Mark);
 
 public sealed record Panel(DateTimeOffset Now, double? MaxUsedPct, IReadOnlyList<GlowSegment> Glow,
-                           IReadOnlyList<AgentRow> Agents, IReadOnlyList<Session> Sessions);
+                           IReadOnlyList<AgentRow> Agents, IReadOnlyList<Session> Sessions, IReadOnlyList<QueueMark> Marks);
 
 /// <summary>The whole of what the HUD shows. <see cref="Settings"/> is Core's own encoding, kept as JSON: the shell
 /// edits it by sending patches, and Core validates them.</summary>
@@ -114,7 +118,11 @@ public static class EngineMessage
             new Panel(Time(panel, "now"), OptNumber(panel, "maxUsedPct"),
                       Arr(panel, "glow").Select(g => new GlowSegment(Text(g, "vendor"), Level(Text(g, "level")))).ToList(),
                       Arr(panel, "agents").Select(ParseAgent).ToList(),
-                      Arr(panel, "sessions").Select(ParseSession).ToList()),
+                      Arr(panel, "sessions").Select(ParseSession).ToList(),
+                      Has(panel, "marks")
+                          ? Arr(panel, "marks").Select(m => new QueueMark(Text(m, "key"), Text(m, "vendor"), Bool(m, "isWorking"),
+                                                                          Bool(m, "waiting"))).ToList()
+                          : []),
             Arr(message, "approvals").Select(ParseApproval).ToList());
     }
 
@@ -123,7 +131,11 @@ public static class EngineMessage
         OptText(a, "level") is { } level ? Level(level) : null,
         OptNumber(a, "usedPct"), OptNumber(a, "remainingPct"), OptNumber(a, "weeklyRemainingPct"), OptTime(a, "resetAt"),
         OptText(a, "resetText"), Text(a, "missingQuotaLabel"), Int(a, "paletteIndex"), Bool(a, "isCurrentAccount"),
-        OptText(a, "forecastHint"));
+        OptText(a, "forecastHint"),
+        // 1.1; a 1.0 engine's row is labelled by its model as given, drawn with its vendor's mark.
+        Has(a, "modelText") ? Text(a, "modelText") : Text(a, "model"),
+        Has(a, "shortModelText") ? Text(a, "shortModelText") : OptText(a, "shortModel") ?? Text(a, "model"),
+        Has(a, "mark") ? Text(a, "mark") : Text(a, "vendor"));
 
     static Session ParseSession(JsonObject s) => new(
         Text(s, "id"), Text(s, "agentId"), Text(s, "task"), OptText(s, "project"),
@@ -134,7 +146,8 @@ public static class EngineMessage
             var other => throw Rejected($"unknown phase {other}"),
         },
         Text(s, "phaseText"), Time(s, "startedAt"), Time(s, "lastEventAt"), OptText(s, "message"), Bool(s, "liveStatus"),
-        Long(s, "tokensIn"), Long(s, "tokensOut"), Long(s, "cacheReadTokens"), Text(s, "tokensText"));
+        Long(s, "tokensIn"), Long(s, "tokensOut"), Long(s, "cacheReadTokens"), Text(s, "tokensText"),
+        Has(s, "vendor") ? OptText(s, "vendor") : null, Has(s, "mark") ? OptText(s, "mark") : null);
 
     static Approval ParseApproval(JsonObject r) => new(
         Text(r, "id"), Text(r, "source"), Text(r, "vendor"), Text(r, "sessionID"), OptText(r, "toolName"), Text(r, "summary"),
@@ -143,7 +156,8 @@ public static class EngineMessage
         Arr(r, "questions").Select(q => new Question(Text(q, "key"), Text(q, "question"), OptText(q, "header"),
             Bool(q, "multiSelect"),
             Arr(q, "options").Select(o => new QuestionOption(Text(o, "label"), OptText(o, "description"))).ToList())).ToList(),
-        Bool(r, "isPlan"), OptText(r, "plan"), Bool(r, "answersPlan"), OptText(r, "alwaysAllowRule"));
+        Bool(r, "isPlan"), OptText(r, "plan"), Bool(r, "answersPlan"), OptText(r, "alwaysAllowRule"),
+        Has(r, "mark") ? Text(r, "mark") : Text(r, "vendor"));
 
     static HudEvent ParseEvent(JsonObject e) => Text(e, "kind") switch
     {
@@ -164,6 +178,9 @@ public static class EngineMessage
     };
 
     // Field readers: a missing field or one of another kind rejects the line.
+    /// <summary>A field a later minor version added is there (an older engine leaves it out).</summary>
+    static bool Has(JsonNode? node, string name) => node is JsonObject o && o.ContainsKey(name);
+
     static ProtocolRejectedException Rejected(string why) => new(why);
 
     static JsonNode? Field(JsonNode? node, string name) =>

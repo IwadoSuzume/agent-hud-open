@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Windows shell (ADR-002): WPF on .NET 10, the tray icon through Windows Forms' NotifyIcon, no package. It shows
+       what the engine sends and sends the user's choices back; every business rule stays in Core (TASK.md M7). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WFO0003 asks a Windows Forms app to set its DPI mode in code; this is a WPF app, which takes Per-Monitor-V2 from
+         the manifest, and uses Windows Forms for the tray icon alone. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+    <AssemblyName>AgentHUD</AssemblyName>
+    <RootNamespace>AgentHUD</RootNamespace>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgentHUD.Protocol\AgentHUD.Protocol.csproj" />
+    <ProjectReference Include="..\AgentHUD.Shell\AgentHUD.Shell.csproj" />
+  </ItemGroup>
+
+  <!-- The macOS app's own artwork (LobeIcons, THIRD_PARTY_NOTICES.txt), read from where it lives, never copied. -->
+  <ItemGroup>
+    <Resource Include="..\..\Sources\AgentHUDDesktop\Resources\*.png" Exclude="..\..\Sources\AgentHUDDesktop\Resources\settings-wallpaper.png"
+              Link="Artwork\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

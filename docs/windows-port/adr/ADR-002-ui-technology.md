@@ -1,6 +1,7 @@
 # ADR-002: Windows UI technology — WPF on .NET 10
 
-- Status: accepted (M0, 2026-10-16)
+- Status: accepted (M0, 2026-10-16); confirmed by M7's first step (2026-10-18, D-045): the topmost, non-activating,
+  per-pixel transparent island per display passes clicks through its transparent pixels and never takes the focus
 - Deciders: port owner (unattended run; decision principles of TASK.md §7)
 
 ## Context

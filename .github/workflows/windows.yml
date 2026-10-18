@@ -111,6 +111,21 @@ jobs:
         # In a temporary profile, with the registered skips (scripts/windows/skipped-tests.txt, SKIPPED_TESTS.md).
         run: scripts/windows/test.ps1
 
+      - name: Shell smoke test (G5)
+        # The WPF shell against the release engine's demo data: three pictures and status 0 within 30 s.
+        run: |
+          $engine = Get-ChildItem .build -Recurse -Filter agenthud-engine.exe | Where-Object FullName -match 'release' | Select-Object -First 1
+          if (-not $engine) { throw 'no release agenthud-engine.exe under .build' }
+          scripts/windows/smoke-shell.ps1 -Engine $engine.FullName -Out "$env:RUNNER_TEMP\snapshot"
+
+      - name: Keep the shell's pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shell-snapshot
+          path: ${{ runner.temp }}/snapshot
+          if-no-files-found: ignore
+
       - name: Compile a smoke package
         # Proves the toolchain, the Windows SDK and the linker work on the runner before the port's own targets do.
         run: |

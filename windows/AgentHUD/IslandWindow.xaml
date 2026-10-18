@@ -1,0 +1,192 @@
+<Window x:Class="AgentHUD.IslandWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:AgentHUD"
+        Title="Agent HUD" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" Topmost="True" ShowActivated="False" ResizeMode="NoResize"
+        Width="420" Height="720" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12" Foreground="White">
+  <!-- One display's island (TASK.md §3: the notch's stand-in at the top centre). The window is as large as the open
+       panel and transparent around the island, so the pixels outside it take no clicks; it never takes the focus. -->
+  <Window.Resources>
+    <local:LevelBrush x:Key="Level" />
+    <local:FractionWidth x:Key="Fraction" />
+    <local:Shown x:Key="Shown" />
+    <SolidColorBrush x:Key="Ground" Color="#F2121214" />
+    <SolidColorBrush x:Key="Card" Color="#FF1F1F22" />
+    <SolidColorBrush x:Key="Secondary" Color="#FF9A9AA0" />
+    <SolidColorBrush x:Key="Track" Color="#33FFFFFF" />
+
+    <DataTemplate x:Key="MarkTemplate">
+      <Grid Width="20" Height="20">
+        <Image Source="{Binding Image}" Visibility="{Binding Image, Converter={StaticResource Shown}}" />
+        <Border CornerRadius="5" Background="#33FFFFFF" Visibility="{Binding Image, Converter={StaticResource Shown}, ConverterParameter=invert}">
+          <TextBlock Text="{Binding Initial}" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+      </Grid>
+    </DataTemplate>
+
+    <Style x:Key="CardButton" TargetType="Button">
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Padding" Value="12,4" />
+      <Setter Property="Margin" Value="6,0,0,0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Face" CornerRadius="6" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="1" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Face" Property="Opacity" Value="0.85" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+
+  <Grid>
+    <Border x:Name="Island" HorizontalAlignment="Center" VerticalAlignment="Top" Background="{StaticResource Ground}"
+            CornerRadius="0,0,14,14" SnapsToDevicePixels="True">
+      <StackPanel>
+        <!-- At rest: Core's logo queue, a mark each; a mark whose agent waits on the user wears a sign. -->
+        <ItemsControl ItemsSource="{Binding Marks}" Margin="14,6,14,7"
+                      Visibility="{Binding ShowsPanel, Converter={StaticResource Shown}, ConverterParameter=invert}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Grid Margin="4,0">
+                <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MarkTemplate}" />
+                <Ellipse Width="7" Height="7" Fill="{x:Static local:LevelBrush.Warning}" Stroke="#FF121214" StrokeThickness="1.5"
+                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-3,0"
+                         Visibility="{Binding Mark.Waiting, Converter={StaticResource Shown}}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Open: the event panel while requests wait (the open one whole, the rest a line each), else the usage panel.
+             It follows its content up to the display's height less 80 pt (PanelMaxHeight) and scrolls beyond. -->
+        <ScrollViewer x:Name="PanelScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False"
+                      Visibility="{Binding ShowsPanel, Converter={StaticResource Shown}}">
+        <StackPanel x:Name="PanelContent" Width="400" Margin="0,8,0,10">
+          <TextBlock Text="{Binding Error}" Foreground="{x:Static local:LevelBrush.Warning}" Margin="16,0,16,6" TextWrapping="Wrap"
+                     Visibility="{Binding Error, Converter={StaticResource Shown}}" />
+
+          <StackPanel Visibility="{Binding ShowsEvents, Converter={StaticResource Shown}}">
+          <ItemsControl ItemsSource="{Binding OpenRequest}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{StaticResource Card}" CornerRadius="10" Margin="10,0,10,8" Padding="12,10">
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                      <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MarkTemplate}" Width="16" Height="16" />
+                      <TextBlock Text="{Binding Kind}" Margin="8,0,0,0" Foreground="{StaticResource Secondary}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding Request.Summary}" FontWeight="SemiBold" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Request.Detail}" Foreground="{StaticResource Secondary}" Margin="0,4,0,0" TextWrapping="Wrap"
+                               MaxHeight="64" TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding Request.Detail, Converter={StaticResource Shown}}" />
+                    <TextBlock Text="{Binding AlwaysRule}" Foreground="{StaticResource Secondary}" FontSize="11" Margin="0,6,0,0"
+                               TextWrapping="Wrap" Visibility="{Binding AlwaysRule, Converter={StaticResource Shown}}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0"
+                                Visibility="{Binding IsPlainRequest, Converter={StaticResource Shown}}">
+                      <Button Style="{StaticResource CardButton}" Content="{Binding Deny}" Tag="{Binding}" Click="OnDeny"
+                              Background="#33FF453A" BorderBrush="#99FF453A" />
+                      <Button Style="{StaticResource CardButton}" Content="{Binding Always}" Tag="{Binding}" Click="OnAlways"
+                              Background="Transparent" BorderBrush="#9930D158"
+                              Visibility="{Binding OffersAlways, Converter={StaticResource Shown}}" />
+                      <Button Style="{StaticResource CardButton}" Content="{Binding Allow}" Tag="{Binding}" Click="OnAllow"
+                              Background="#FF30D158" BorderBrush="#FF30D158" Foreground="Black" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <ItemsControl ItemsSource="{Binding QueuedRequests}" Margin="10,0,10,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Button Tag="{Binding}" Click="OnOpenRequest" Focusable="False" Cursor="Hand" Margin="0,0,0,4">
+                  <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                      <Border x:Name="Line" Background="#14FFFFFF" CornerRadius="8" Padding="12,7">
+                        <ContentPresenter />
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Line" Property="Background" Value="#26FFFFFF" /></Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Button.Template>
+                  <StackPanel Orientation="Horizontal">
+                    <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MarkTemplate}" Width="14" Height="14" />
+                    <TextBlock Text="{Binding Request.Summary}" Foreground="White" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"
+                               MaxWidth="330" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          </StackPanel>
+
+          <StackPanel Visibility="{Binding ShowsUsage, Converter={StaticResource Shown}}">
+          <ItemsControl ItemsSource="{Binding Agents}" Margin="16,2,16,4">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="0,4">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="24" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="122" />
+                    <ColumnDefinition Width="64" />
+                  </Grid.ColumnDefinitions>
+                  <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MarkTemplate}" Width="16" Height="16" HorizontalAlignment="Left" />
+                  <TextBlock Grid.Column="1" Text="{Binding Row.ModelText}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <Grid Grid.Column="2" Width="110" Height="6" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Border CornerRadius="3" Background="{StaticResource Track}" />
+                    <Border CornerRadius="3" HorizontalAlignment="Left" Background="{Binding Row.Level, Converter={StaticResource Level}}"
+                            Width="{Binding UsedFraction, Converter={StaticResource Fraction}, ConverterParameter=110}" />
+                  </Grid>
+                  <TextBlock Grid.Column="3" Text="{Binding ResetText}" Foreground="{StaticResource Secondary}" HorizontalAlignment="Right"
+                             VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Border Height="1" Background="#22FFFFFF" Margin="16,6" />
+
+          <ItemsControl ItemsSource="{Binding Sessions}" Margin="16,0,16,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="0,4">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="24" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MarkTemplate}" Width="16" Height="16"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,1,0,0" />
+                  <StackPanel Grid.Column="1">
+                    <TextBlock Text="{Binding Session.Task}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Foreground="{StaticResource Secondary}" FontSize="11" TextTrimming="CharacterEllipsis">
+                      <Run Text="{Binding Session.Project, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Session.PhaseText, Mode=OneWay}" />
+                    </TextBlock>
+                  </StackPanel>
+                  <TextBlock Grid.Column="2" Text="{Binding Session.TokensText}" Foreground="{StaticResource Secondary}" Margin="10,0,0,0"
+                             VerticalAlignment="Top" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          </StackPanel>
+        </StackPanel>
+        </ScrollViewer>
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>
