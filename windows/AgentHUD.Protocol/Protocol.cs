@@ -14,7 +14,7 @@ public sealed class ProtocolRejectedException(string message) : Exception(messag
 public static class ProtocolVersion
 {
     public const int Major = 1;
-    public const int Minor = 2;
+    public const int Minor = 3;
     /// <summary>The longest line either side takes.</summary>
     public const int LineLimit = 16 * 1024 * 1024;
 }
@@ -81,6 +81,19 @@ public sealed record CompletionEvent(string Id, string SessionId, string Vendor,
                                      DateTimeOffset? StartedAt, DateTimeOffset CompletedAt, EventCopy? Copy,
                                      string? Mark) : HudEvent(Id, Copy, Mark);
 
+/// <summary>One model's part of a period (1.3): its name, mark, tokens as Core writes them, share of the period's whole
+/// (for the bar) and Core's palette index.</summary>
+public sealed record StatisticsModel(string Id, string Name, string DisplayName, string Vendor, string Mark, string Tokens,
+                                     double Share, int PaletteIndex);
+
+/// <summary>Today, the last seven or the last thirty days (1.3): the total, cost and cache share as Core writes them,
+/// every model that spent tokens, how many of them the card names, and the rest counted together.</summary>
+public sealed record StatisticsPeriod(string Period, string Label, string Total, string? Cost, string? CacheHits,
+                                      IReadOnlyList<StatisticsModel> Models, int Listed, string? RestText, string? RestTokens);
+
+/// <summary>The statistics window's Recent usage card (1.3), the engine's answer to a `statistics` request.</summary>
+public sealed record Statistics(DateTimeOffset? GeneratedAt, string Title, string Dimensions, IReadOnlyList<StatisticsPeriod> Periods);
+
 /// <summary>Reads one line from the engine.</summary>
 public static class EngineMessage
 {
@@ -117,6 +130,7 @@ public static class EngineMessage
             "error" => new EngineError(Text(message, "message")),
             "state" => ParseState(message),
             "event" => ParseEvent(Obj(message, "event")),
+            "statistics" => ParseStatistics(message),
             var type => throw Rejected($"unknown type {type}"),
         };
     }
@@ -136,6 +150,16 @@ public static class EngineMessage
                           : []),
             Arr(message, "approvals").Select(ParseApproval).ToList());
     }
+
+    static Statistics ParseStatistics(JsonObject message) => new(
+        OptTime(message, "generatedAt"), Text(message, "title"), Text(message, "dimensions"),
+        Arr(message, "periods").Select(p => new StatisticsPeriod(
+            Text(p, "period"), Text(p, "label"), Text(p, "total"), OptText(p, "cost"), OptText(p, "cacheHits"),
+            Arr(p, "models").Select(m => new StatisticsModel(Text(m, "id"), Text(m, "name"), Text(m, "displayName"),
+                Text(m, "vendor"), Text(m, "mark"), Text(m, "tokens"), OptNumber(m, "share") ?? 0, Int(m, "paletteIndex"))).ToList(),
+            Int(p, "listed"),
+            Field(p, "rest") is JsonObject rest ? Text(rest, "text") : null,
+            Field(p, "rest") is JsonObject restTokens ? Text(restTokens, "tokens") : null)).ToList());
 
     static AgentRow ParseAgent(JsonObject a) => new(
         Text(a, "id"), Text(a, "vendor"), Text(a, "model"), OptText(a, "shortModel"),
@@ -262,6 +286,9 @@ public static class ShellMessage
         Line(new() { ["minor"] = ProtocolVersion.Minor, ["shell"] = new JsonObject { ["version"] = shellVersion }, ["type"] = "hello" });
 
     public static string Refresh() => Line(new() { ["type"] = "refresh" });
+
+    /// <summary>1.3: the statistics window asks for its figures; the engine answers with `statistics`.</summary>
+    public static string Statistics() => Line(new() { ["type"] = "statistics" });
 
     public static string Quit() => Line(new() { ["type"] = "quit" });
 

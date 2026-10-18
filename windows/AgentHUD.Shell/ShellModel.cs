@@ -13,6 +13,12 @@ public sealed class ShellModel
     public State? State { get; private set; }
     /// <summary>The copy that holds the instance lock, when the engine found one running (it then exits with 3).</summary>
     public LockHeld? LockHeld { get; private set; }
+    /// <summary>The engine's last answer to a `statistics` request (1.3).</summary>
+    public Statistics? Statistics { get; private set; }
+
+    /// <summary>Raised when the statistics come.</summary>
+    public event Action? StatisticsChanged;
+
     /// <summary>The last error the engine reported about a line of the shell's.</summary>
     public string? LastError { get; private set; }
 
@@ -29,6 +35,7 @@ public sealed class ShellModel
             case State state: State = state; Changed?.Invoke(); break;
             case LockHeld held: LockHeld = held; Changed?.Invoke(); break;
             case EngineError error: LastError = error.Message; break;
+            case Statistics statistics: Statistics = statistics; StatisticsChanged?.Invoke(); break;
             case HudEvent hudEvent:
                 events.Enqueue(hudEvent);
                 EventArrived?.Invoke(hudEvent);

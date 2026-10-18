@@ -117,6 +117,29 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         try assertMatches(state, "engine-state.later.json")
     }
 
+    /// 1.3: the statistics window's Recent usage card, as the Desktop's UsagePeriodsCard makes it from the demo's report:
+    /// three periods, each with its total, cost and cache share and the models that spent the most.
+    @MainActor
+    func testTheStatisticsAreTheSharedFixture() throws {
+        let agents = DemoData.everyAgent
+        let settings = SettingsStore(defaults: try XCTUnwrap(SettingsFile(url: nil)), defaultAgents: agents)
+        let report = DemoUsageProvider.report(agents: agents, historyHours: 24 * 30, now: Self.now, stage: nil)
+        let store = UsageStore(provider: DemoUsageProvider(), settings: settings, clock: { Self.now })
+        store.replace(report: report)
+        let statistics = ShellStatistics.message(store: store)
+        let periods = statistics["periods"].arrayValue ?? []
+        XCTAssertEqual(periods.map { $0["period"].stringValue }, ["today", "days7", "days30"])
+        XCTAssertFalse(periods.allSatisfy { ($0["models"].arrayValue ?? []).isEmpty }, "the demo spent tokens")
+        for period in periods {
+            let shares = (period["models"].arrayValue ?? []).compactMap { model -> Double? in
+                if case .number(let share) = model["share"] { return share }
+                return nil
+            }
+            if !shares.isEmpty { XCTAssertEqual(shares.reduce(0, +), 1, accuracy: 1e-9, "the shares make the whole bar") }
+        }
+        try assertMatches(statistics, "engine-statistics.json")
+    }
+
     @MainActor
     func testEventsAreTheSharedFixtures() throws {
         let report = DemoUsageProvider.report(agents: DemoData.everyAgent, historyHours: 24, now: Self.now, stage: nil)
@@ -165,6 +188,7 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
             "shell-answer-plan.json": .answer(id: "demo-plan", .approvePlan(acceptEdits: true)),
             "shell-answer-keep-planning.json": .answer(id: "demo-plan", .keepPlanning(note: "Split step 2")),
             "shell-update-settings.json": .updateSettings(["language": .string("zh-Hans"), "approvalWaitMinutes": .integer(5)]),
+            "shell-statistics.json": .statistics,
         ]
         let present = Set(try FileManager.default.contentsOfDirectory(atPath: Self.fixtures.path).filter { $0.hasPrefix("shell-") })
         XCTAssertEqual(present, Set(expected.keys), "every shell fixture is checked here")
@@ -259,7 +283,7 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         // (the approval wait's choices) are held to the Desktop's the same way.
         let call = try NSRegularExpression(pattern: #"L10n\.text\("(?:[^()]|\([^()]*\))*\)"#)
         var calls: [String] = []
-        for file in ["ShellEventCopy.swift", "ShellStrings.swift"] {
+        for file in ["ShellEventCopy.swift", "ShellStrings.swift", "ShellStatistics.swift"] {
             let text = try String(contentsOf: Self.root.appendingPathComponent("Sources/AgentHUDCore/Platform/Windows/Shell/\(file)"),
                                   encoding: .utf8)
             calls += call.matches(in: text, range: NSRange(text.startIndex..., in: text)).compactMap { Range($0.range, in: text).map { String(text[$0]) } }

@@ -13,7 +13,7 @@ namespace AgentHUD;
 
 /// <summary>The shell: starts the engine (`agenthud-engine --serve`), keeps one island per display, a tray icon, and
 /// sends the user's choices back. Options: `--demo` (the engine's example data), `--language en|zh-Hans`,
-/// `--engine &lt;path&gt;`, `--show-settings`, `--snapshot &lt;folder&gt;` (the G5 smoke test: draws the HUD into PNG files and
+/// `--engine &lt;path&gt;`, `--show-settings`, `--show-stats`, `--snapshot &lt;folder&gt;` (the G5 smoke test: draws the HUD into PNG files and
 /// quits; `--feed &lt;folder&gt;` gives it the protocol's event fixtures to draw).</summary>
 public partial class App : Application
 {
@@ -27,7 +27,7 @@ public partial class App : Application
     EngineConnection? engine;
     Tray? tray;
     string? snapshotFolder;
-    bool quitting, demo, showSettings;
+    bool quitting, demo, showSettings, showStats;
     volatile string? lastComplaint;
 
     public App() => cards = new Cards(model);
@@ -53,6 +53,7 @@ public partial class App : Application
                 case "--engine" when i + 1 < e.Args.Length: enginePath = e.Args[++i]; break;
                 case "--feed" when i + 1 < e.Args.Length: feedFolder = Path.GetFullPath(e.Args[++i]); break;
                 case "--show-settings": showSettings = true; break;
+                case "--show-stats": showStats = true; break;
                 case "--snapshot" when i + 1 < e.Args.Length:
                     snapshotFolder = Path.GetFullPath(e.Args[++i]);
                     if (!arguments.Contains("--demo")) arguments.Add("--demo");
@@ -90,9 +91,9 @@ public partial class App : Application
         SystemEvents.DisplaySettingsChanged += OnDisplaysChanged;
         if (snapshotFolder is null) tray = new Tray(model, OpenSettings, OpenStatistics, Quit);
         engine.Start(ShellVersion);
-        if (snapshotFolder is not null) Snapshot.Begin(this, model, islands, snapshotFolder, feedFolder);
+        if (snapshotFolder is not null) Snapshot.Begin(this, model, islands, snapshotFolder, feedFolder, Send);
         // As the macOS app's `--show-settings`: the window once the engine has said hello (its words are the engine's).
-        else if (showSettings) model.Changed += OpenSettingsOnce;
+        else if (showSettings || showStats) model.Changed += OpenSettingsOnce;
     }
 
     void OnModelChanged()
@@ -212,7 +213,8 @@ public partial class App : Application
     {
         if (model.Hello is null || model.State is null) return;
         model.Changed -= OpenSettingsOnce;
-        Dispatcher.BeginInvoke(OpenSettings);
+        if (showSettings) Dispatcher.BeginInvoke(OpenSettings);
+        if (showStats) Dispatcher.BeginInvoke(OpenStatistics);
     }
 
     SettingsWindow? settingsWindow;
@@ -240,7 +242,17 @@ public partial class App : Application
         launchAtLogin = wanted;
     }
 
-    internal void OpenStatistics() => Log("Statistics window: a later M7 step");
+    StatisticsWindow? statisticsWindow;
+
+    /// <summary>Usage statistics: the one window, brought forward when it is open.</summary>
+    internal void OpenStatistics()
+    {
+        if (statisticsWindow is { IsLoaded: true }) { statisticsWindow.Activate(); return; }
+        statisticsWindow = new StatisticsWindow(model, Send);
+        statisticsWindow.Closed += (_, _) => statisticsWindow = null;
+        statisticsWindow.Show();
+        statisticsWindow.Activate();
+    }
 
     internal void Quit() => Quit(0);
 

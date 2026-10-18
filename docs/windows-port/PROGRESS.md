@@ -99,7 +99,9 @@ deprecated` in `Providers/Antigravity/AntigravityCLI.swift`; `result of call to 
    their confirmation, the approval wait), launch at login through the `Run` key, WPF's Fluent theme with Mica for the
    normal windows, `--show-settings`; the snapshot draws the window and `ui-check.ps1` changes a setting through the
    engine (19 checks passed locally).
-6. M7 next, in this order: the statistics window (needs a protocol addition for the statistics data); the other
+6. M7 step 6 (D-049): the statistics window's Recent usage card (protocol 1.3), `--show-stats`, its snapshot. G1 for
+   step 4 (`da4f908`): macOS run 39172797224 green on attempt 2 after the agreed single rerun of the upstream flake.
+7. M7 next, in this order: the other
    settings panes the shell can honour (agents and their live status need the agent list in the protocol); docks on
    other edges and dragging; full-screen apps; the timezone (below); then the review. The engine still lacks: the session title and
    row token total (D-043), a session `message` in any fixture, `NSTimeZone.default` from the Windows zone (Known

@@ -1,4 +1,4 @@
-# Engine ↔ shell protocol, version 1.2
+# Engine ↔ shell protocol, version 1.3
 
 How `AgentHUD.exe` (the WPF shell, M7) and `agenthud-engine.exe` (Swift, Support + Core) talk on Windows (ADR-001,
 D-022, D-041). The engine computes; the shell shows what it is sent and sends back what the user did. No rule of Core
@@ -50,7 +50,7 @@ announces in `hello`. A reader ignores fields it does not know. Times are intege
 ### `hello`
 
 ```json
-{"v":1,"type":"hello","minor":2,"engine":{"version":"0"},"demo":false,"language":"en","strings":{"…":"…"}}
+{"v":1,"type":"hello","minor":3,"engine":{"version":"0"},"demo":false,"language":"en","strings":{"…":"…"}}
 ```
 
 `language` is the language Core resolved (`zh` or `en`). `strings` holds the words of the shell's own chrome
@@ -100,6 +100,16 @@ An approval: `id`, `source`, `vendor`, `sessionID`, `toolName`, `summary`, `deta
 `added`, `at`, `isQuestion`, `questions` (`[{key, question, header, multiSelect, options: [{label, description}]}]`),
 `isPlan`, `plan`, `answersPlan`, `alwaysAllowRule` (the rule an "Always allow" would add, or null when the client
 offers none — then the shell shows no such button), and from 1.1 `mark`.
+
+### Version 1.3
+
+1.3 adds the statistics window's figures. The shell sends `{"v":1,"type":"statistics"}` when the window opens and again
+with each new report; the engine answers `statistics`: `generatedAt`, `title`, `dimensions` (the token kinds counted)
+and `periods`, Today, the last seven days and the last thirty, each with `period`, `label`, `total`, `cost`,
+`cacheHits`, `models` (every model that spent tokens, the most first: `id`, `name`, `displayName`, `vendor`, `mark`,
+`tokens`, `share` of the period's whole, Core's `paletteIndex`), `listed` (how many of them the card names) and `rest`
+(`{text, tokens}` for the others, or null). It is the macOS Desktop's `UsagePeriodsCard` made by `ShellStatistics`, each
+word source-checked as the events' are. A 1.2 engine answers the request with `error` (an unknown type).
 
 ### Version 1.2
 

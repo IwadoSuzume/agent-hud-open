@@ -7,7 +7,7 @@ import Foundation
 /// own rules and formatting; the shell recomputes nothing.
 public enum ShellProtocol {
     public static let major: Int64 = 1
-    public static let minor: Int64 = 2
+    public static let minor: Int64 = 3
     /// The longest line either side takes.
     public static let lineLimit = 16 * 1024 * 1024
 
@@ -176,6 +176,8 @@ public enum ShellProtocol {
     public enum Command: Equatable, Sendable {
         case hello(minor: Int64, shellVersion: String?)
         case refresh
+        /// 1.3: the statistics window asks for its figures (`ShellStatistics`).
+        case statistics
         case answer(id: String, Answer)
         case updateSettings([String: JSONValue])
         case quit
@@ -221,6 +223,7 @@ public enum ShellProtocol {
             guard case .integer(let minor)? = fields["minor"] else { throw Rejected(description: "hello without minor") }
             return .hello(minor: minor, shellVersion: fields["shell"]?["version"].stringValue)
         case "refresh": return .refresh
+        case "statistics": return .statistics
         case "quit": return .quit
         case "update-settings":
             guard case .object(let patch)? = fields["patch"] else { throw Rejected(description: "update-settings without patch") }

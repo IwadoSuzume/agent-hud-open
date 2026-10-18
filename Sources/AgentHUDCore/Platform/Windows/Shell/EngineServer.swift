@@ -58,6 +58,9 @@ public final class EngineServer {
         case .refresh:
             guard let store else { return write(ShellProtocol.error("no hello yet")) }
             Task { await store.refresh() }
+        case .statistics:
+            guard let store else { return write(ShellProtocol.error("no hello yet")) }
+            write(ShellStatistics.message(store: store))
         case .answer(let id, let answer):
             guard let request = PermissionRequests.shared.pending.first(where: { $0.id == id }) else { return }
             guard let decision = answer.decision(for: request) else {

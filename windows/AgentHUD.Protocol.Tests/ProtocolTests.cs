@@ -164,6 +164,20 @@ public sealed class ProtocolTests
         Assert.IsNull(((QuotaAlertEvent)EngineMessage.Parse(old.ToJsonString())).Copy);
     }
 
+    /// <summary>1.3: the statistics window's Recent usage card, read as the engine made it.</summary>
+    [TestMethod]
+    public void TheStatisticsAreRead()
+    {
+        var statistics = (Statistics)EngineMessage.Parse(Line("engine-statistics.json"));
+        CollectionAssert.AreEqual(new[] { "today", "days7", "days30" }, statistics.Periods.Select(p => p.Period).ToArray());
+        foreach (var period in statistics.Periods.Where(p => p.Models.Count > 0))
+        {
+            Assert.AreEqual(1, period.Models.Sum(m => m.Share), 1e-9, "the shares make the whole bar");
+            Assert.IsLessThanOrEqualTo(period.Models.Count, period.Listed);
+            Assert.AreEqual(period.Models.Count > period.Listed, period.RestText is not null, "the rest is counted together");
+        }
+    }
+
     [TestMethod]
     public void TheEventsAreRead()
     {
@@ -207,6 +221,7 @@ public sealed class ProtocolTests
         {
             ["shell-hello.json"] = ShellMessage.Hello("0.1.0"),
             ["shell-refresh.json"] = ShellMessage.Refresh(),
+            ["shell-statistics.json"] = ShellMessage.Statistics(),
             ["shell-quit.json"] = ShellMessage.Quit(),
             ["shell-answer-allow.json"] = ShellMessage.Answer("demo-tests", ShellMessage.Decision.Allow),
             ["shell-answer-deny.json"] = ShellMessage.Answer("demo-tests", ShellMessage.Decision.Deny),

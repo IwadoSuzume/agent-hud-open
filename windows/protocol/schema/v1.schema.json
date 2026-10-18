@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/IwadoSuzume/agent-hud-open/windows/protocol/schema/v1.schema.json",
-  "title": "Agent HUD engine-shell protocol, version 1.0",
-  "description": "One message per line (docs/windows-port/PROTOCOL.md). Minor versions only add optional properties and message types; this file describes 1.0 exactly, and a reader ignores what it does not know.",
+  "title": "Agent HUD engine-shell protocol, version 1.3",
+  "description": "One message per line (docs/windows-port/PROTOCOL.md). Minor versions only add properties and message types; this file describes 1.3 as the engine of this version sends it, and a reader ignores what it does not know.",
   "oneOf": [
     { "$ref": "#/$defs/engineHello" },
     { "$ref": "#/$defs/lockHeld" },
@@ -13,7 +13,8 @@
     { "$ref": "#/$defs/refresh" },
     { "$ref": "#/$defs/quit" },
     { "$ref": "#/$defs/answer" },
-    { "$ref": "#/$defs/updateSettings" }
+    { "$ref": "#/$defs/updateSettings" },
+    { "$ref": "#/$defs/statistics" }, { "$ref": "#/$defs/statisticsRequest" }
   ],
   "$defs": {
     "metrics": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["value", "label"],
@@ -207,6 +208,31 @@
       "type": "object", "additionalProperties": false, "required": ["v", "type", "patch"],
       "properties": { "v": { "const": 1 }, "type": { "const": "update-settings" },
                       "patch": { "type": "object", "description": "Settings fields; Core decodes and validates them" } }
+    },
+    "statisticsRequest": { "type": "object", "additionalProperties": false, "required": ["v", "type"],
+                           "properties": { "v": { "const": 1 }, "type": { "const": "statistics" } } },
+    "statistics": {
+      "type": "object", "additionalProperties": false, "required": ["v", "type", "generatedAt", "title", "dimensions", "periods"],
+      "properties": {
+        "v": { "const": 1 }, "type": { "const": "statistics" }, "generatedAt": { "$ref": "#/$defs/timeOrNull" },
+        "title": { "type": "string" }, "dimensions": { "type": "string" },
+        "periods": { "type": "array", "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["period", "label", "total", "cost", "cacheHits", "models", "listed", "rest"],
+          "properties": {
+            "period": { "enum": ["today", "days7", "days30"] }, "label": { "type": "string" }, "total": { "type": "string" },
+            "cost": { "$ref": "#/$defs/textOrNull" }, "cacheHits": { "$ref": "#/$defs/textOrNull" },
+            "listed": { "type": "integer", "minimum": 0 },
+            "rest": { "oneOf": [ { "type": "null" },
+                                 { "type": "object", "additionalProperties": false, "required": ["text", "tokens"],
+                                   "properties": { "text": { "type": "string" }, "tokens": { "type": "string" } } } ] },
+            "models": { "type": "array", "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["id", "name", "displayName", "vendor", "mark", "tokens", "share", "paletteIndex"],
+              "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "displayName": { "type": "string" },
+                              "vendor": { "type": "string" }, "mark": { "type": "string" }, "tokens": { "type": "string" },
+                              "share": { "type": "number" }, "paletteIndex": { "type": "integer", "minimum": 0 } } } } } } }
+      }
     }
   }
 }

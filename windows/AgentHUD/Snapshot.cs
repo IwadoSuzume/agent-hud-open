@@ -17,8 +17,9 @@ namespace AgentHUD;
 
 static class Snapshot
 {
-    public static void Begin(App app, ShellModel model, List<IslandWindow> islands, string folder, string? feed)
+    public static void Begin(App app, ShellModel model, List<IslandWindow> islands, string folder, string? feed, Action<string> send)
     {
+        var askedForStatistics = false;
         var started = DateTime.UtcNow;
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         timer.Tick += (_, _) =>
@@ -29,6 +30,9 @@ static class Snapshot
                 if (DateTime.UtcNow - started > TimeSpan.FromSeconds(30)) { timer.Stop(); Finish(app, 1, "no demo state within 30 s"); }
                 return;
             }
+            // The statistics window's figures come on request: asked once, and drawn when they have come.
+            if (!askedForStatistics) { askedForStatistics = true; send(ShellMessage.Statistics()); }
+            if (model.Statistics is null && DateTime.UtcNow - started < TimeSpan.FromSeconds(30)) return;
             timer.Stop();
             try { Finish(app, Draw(islands.First(), folder, Feed(feed)), null); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException
@@ -107,23 +111,33 @@ static class Snapshot
             using (var file = File.Create(Path.Combine(folder, name + ".png"))) encoder.Save(file);
             report.AppendLine($"{name} {bitmap.PixelWidth}x{bitmap.PixelHeight}");
         }
-        status |= DrawSettings(island, folder, report);
+        status |= DrawWindow(new SettingsWindow(island.View.Model, _ => { }), "settings", folder, report);
+        status |= island.View.Model.Statistics is null ? Missing("statistics", report)
+                : DrawWindow(new StatisticsWindow(island.View.Model, _ => { }), "statistics", folder, report);
         File.WriteAllText(Path.Combine(folder, "snapshot.txt"), report.ToString());
         return status;
     }
 
-    /// <summary>The settings window, its content on a solid ground (the backdrop is the desktop's, which a picture has
-    /// none of), off the screen's pixels at 2x.</summary>
-    static int DrawSettings(IslandWindow island, string folder, StringBuilder report)
+    static int Missing(string name, StringBuilder report)
     {
-        var settings = new SettingsWindow(island.View.Model, _ => { }) { Left = -20000, Top = -20000, ShowActivated = false };
+        report.AppendLine($"{name} missing");
+        return 1;
+    }
+
+    /// <summary>A normal window (settings, statistics), its content on a solid ground (the backdrop is the desktop's,
+    /// which a picture has none of), off the screen's pixels at 2x.</summary>
+    static int DrawWindow(Window settings, string name, string folder, StringBuilder report)
+    {
+        settings.Left = -20000;
+        settings.Top = -20000;
+        settings.ShowActivated = false;
         try
         {
             settings.Show();
             settings.UpdateLayout();
             settings.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
             var content = (FrameworkElement)settings.Content;
-            if (content.ActualWidth < 1 || content.ActualHeight < 1) { report.AppendLine("settings 0x0"); return 1; }
+            if (content.ActualWidth < 1 || content.ActualHeight < 1) { report.AppendLine($"{name} 0x0"); return 1; }
             // The content and its margins: it is drawn where it stands in the window.
             var size = new Size(content.ActualWidth + content.Margin.Left + content.Margin.Right,
                                 content.ActualHeight + content.Margin.Top + content.Margin.Bottom);
@@ -136,8 +150,8 @@ static class Snapshot
             bitmap.Render(content);
             var encoder = new PngBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            using (var file = File.Create(Path.Combine(folder, "settings.png"))) encoder.Save(file);
-            report.AppendLine($"settings {bitmap.PixelWidth}x{bitmap.PixelHeight}");
+            using (var file = File.Create(Path.Combine(folder, name + ".png"))) encoder.Save(file);
+            report.AppendLine($"{name} {bitmap.PixelWidth}x{bitmap.PixelHeight}");
             return IsBlank(bitmap) ? 1 : 0;
         }
         finally { settings.Close(); }

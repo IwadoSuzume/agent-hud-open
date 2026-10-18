@@ -2,7 +2,7 @@
 .SYNOPSIS
   Gate G5's smoke test (docs/windows-port/PROGRESS.md): the Windows shell started with the engine's demo data draws the
   island at rest, open with its requests, as the usage panel, a question's and a plan's cards, and each kind of event's
-  line and card (the protocol's event fixtures, fed with --feed), and the settings window into PNG files (`AgentHUD --snapshot`), and ends with
+  line and card (the protocol's event fixtures, fed with --feed), the settings window and the statistics window into PNG files (`AgentHUD --snapshot`), and ends with
   status 0 within 30 seconds.
 
 .DESCRIPTION
@@ -55,7 +55,7 @@ $expected = @{ 'island-rest' = @(120, 40); 'island-open' = @(600, 200); 'island-
                'card-question' = @(600, 300); 'card-plan' = @(600, 300);
                'event-quota-line' = @(200, 40); 'event-quota-card' = @(600, 300); 'event-credits-line' = @(200, 40);
                'event-credits-card' = @(600, 200); 'event-reply-line' = @(200, 40); 'event-reply-card' = @(600, 150);
-               'settings' = @(800, 500) }
+               'settings' = @(800, 500); 'statistics' = @(1000, 200) }
 $report = Get-Content -LiteralPath (Join-Path $Out 'snapshot.txt')
 $failures = @()
 foreach ($name in $expected.Keys) {
