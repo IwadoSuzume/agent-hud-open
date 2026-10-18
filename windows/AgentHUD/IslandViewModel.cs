@@ -16,15 +16,38 @@ sealed class IslandViewModel : INotifyPropertyChanged
     readonly ShellModel model;
     readonly RequestPlacement placement;
     readonly Cards cards;
+    readonly EventQueue events;
     bool isOpen, resting;
 
-    public IslandViewModel(ShellModel model, RequestPlacement placement, Cards cards, string display)
+    public IslandViewModel(ShellModel model, RequestPlacement placement, Cards cards, EventQueue events, string display)
     {
         this.model = model;
         this.placement = placement;
         this.cards = cards;
+        this.events = events;
         Display = display;
     }
+
+    /// <summary>The news on this display's island (EventQueue): its short line at rest, its card when hovered.</summary>
+    public EventItem? Event => PictureEvent is { } picture ? Item(picture)
+        : events.Current is { Copy: not null } current && events.Display == Display && !Resting ? Item(current)
+        : null;
+
+    EventItem Item(HudEvent hudEvent) =>
+        new(hudEvent, hudEvent.Copy!, Artwork.Mark(hudEvent.Mark ?? hudEvent.Copy!.VendorName), Initial(hudEvent.Copy!.VendorName), model);
+
+    HudEvent? pictureEvent;
+
+    /// <summary>The snapshot's picture of an event's line or card, with the demo's requests set aside.</summary>
+    public HudEvent? PictureEvent
+    {
+        get => pictureEvent;
+        set { pictureEvent = value; Refresh(); }
+    }
+
+    public bool ShowsEventLine => Event is not null && !ShowsPanel;
+    public bool ShowsMarks => !ShowsPanel && Event is null;
+    public bool ShowsEventCard => Event is not null && ShowsPanel && (Waiting.Count == 0 || PictureEvent is not null) && !UsageOnly;
 
     public string Display { get; set; }
 
@@ -52,14 +75,14 @@ sealed class IslandViewModel : INotifyPropertyChanged
     public bool Waits(string requestId) => Waiting.Any(r => r.Id == requestId);
 
     /// <summary>A request of this display's waits: the island stays open for it.</summary>
-    public bool HoldsRequest => Waiting.Any(r => placement.DisplayOf(r.Id) == Display);
+    public bool HoldsRequest => PictureEvent is null && Waiting.Any(r => placement.DisplayOf(r.Id) == Display);
 
     public bool ShowsPanel => !Resting && (IsOpen || HoldsRequest);
 
     /// <summary>Requests wait somewhere: the panel is the event panel, not the usage panel.</summary>
-    public bool ShowsEvents => ShowsPanel && Waiting.Count > 0 && !UsageOnly;
+    public bool ShowsEvents => ShowsPanel && Waiting.Count > 0 && !UsageOnly && PictureEvent is null;
 
-    public bool ShowsUsage => ShowsPanel && (Waiting.Count == 0 || UsageOnly);
+    public bool ShowsUsage => ShowsPanel && ((Waiting.Count == 0 && Event is null) || UsageOnly);
 
     bool usageOnly;
 
@@ -116,3 +139,25 @@ sealed record AgentItem(AgentRow Row, ImageSource? Image, string Initial)
 
 /// <summary>One line of the queue: enough to decide whether to open it.</summary>
 sealed record ApprovalItem(Approval Request, ImageSource? Image, string Initial);
+
+/// <summary>The news on an island: the engine's words for it (`EventCopy`), its mark, and its accent — a warning in the
+/// warning colour, a reply in blue, other news in green, as the Desktop's alert accents go.</summary>
+sealed record EventItem(HudEvent Event, EventCopy Copy, ImageSource? Image, string Initial, ShellModel Model)
+{
+    static readonly SolidColorBrush Reply = Frozen(Color.FromRgb(0x0A, 0x84, 0xFF));
+
+    static SolidColorBrush Frozen(Color colour)
+    {
+        var brush = new SolidColorBrush(colour);
+        brush.Freeze();
+        return brush;
+    }
+
+    public bool IsReply => Event is CompletionEvent;
+    public bool IsNews => !IsReply;
+    public Brush Accent => IsReply ? Reply : Copy.Warning ? LevelBrush.Warning : LevelBrush.Ok;
+    public double UsedFraction => Copy.UsedPct is { } used ? System.Math.Clamp(used / 100.0, 0, 1) : 0;
+    public bool HasUsage => Copy.UsedPct is not null;
+    /// <summary>A reply is put away; other news opens the statistics (the Desktop's "View usage statistics").</summary>
+    public string Action => IsReply ? Model.Text("reply.dismiss") : Model.Text("alert.viewStatistics");
+}

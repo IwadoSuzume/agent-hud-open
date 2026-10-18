@@ -14,7 +14,7 @@ public sealed class ProtocolRejectedException(string message) : Exception(messag
 public static class ProtocolVersion
 {
     public const int Major = 1;
-    public const int Minor = 1;
+    public const int Minor = 2;
     /// <summary>The longest line either side takes.</summary>
     public const int LineLimit = 16 * 1024 * 1024;
 }
@@ -62,13 +62,24 @@ public sealed record Panel(DateTimeOffset Now, double? MaxUsedPct, IReadOnlyList
 public sealed record State(DateTimeOffset? GeneratedAt, bool Paused, string? Error, JsonObject Settings, Panel Panel,
                            IReadOnlyList<Approval> Approvals);
 
-public abstract record HudEvent(string Id);
+/// <summary>One figure of an event's card: its value and its label, both the engine's words.</summary>
+public sealed record Metric(string Value, string Label);
+
+/// <summary>An event card's words (1.2), the Desktop's own copy made by the engine: the short line beside the mark
+/// (`CompactTitle`; a reply's status), the sentence (`Title`; a reply's task), the badge, the figures, and whether the
+/// card is a warning. Null from a 1.1 engine, whose events the shell cannot word and does not show.</summary>
+public sealed record EventCopy(string VendorName, string? AgentName, string? DisplayName, string CompactTitle, string Title,
+                               string? Badge, bool Warning, double? UsedPct, IReadOnlyList<Metric> Metrics, string? OtherLimits);
+
+public abstract record HudEvent(string Id, EventCopy? Copy, string? Mark);
 public sealed record QuotaAlertEvent(string Id, string Alert, string AgentId, string Vendor, string Model, bool Preview,
                                      long? TimeToExhaust, string? TimeToExhaustText,
-                                     IReadOnlyList<string> AlsoExhausted) : HudEvent(Id);
-public sealed record ResetCreditsEvent(string Id, int Added, bool Preview, string Provider, string? AccountLabel) : HudEvent(Id);
+                                     IReadOnlyList<string> AlsoExhausted, EventCopy? Copy, string? Mark) : HudEvent(Id, Copy, Mark);
+public sealed record ResetCreditsEvent(string Id, int Added, bool Preview, string Provider, string? AccountLabel,
+                                       EventCopy? Copy) : HudEvent(Id, Copy, null);
 public sealed record CompletionEvent(string Id, string SessionId, string Vendor, string Task, string Model,
-                                     DateTimeOffset? StartedAt, DateTimeOffset CompletedAt) : HudEvent(Id);
+                                     DateTimeOffset? StartedAt, DateTimeOffset CompletedAt, EventCopy? Copy,
+                                     string? Mark) : HudEvent(Id, Copy, Mark);
 
 /// <summary>Reads one line from the engine.</summary>
 public static class EngineMessage
@@ -163,13 +174,28 @@ public static class EngineMessage
     {
         "quotaAlert" => new QuotaAlertEvent(Text(e, "id"), Text(e, "alert"), Text(e, "agentId"), Text(e, "vendor"),
             Text(e, "model"), Bool(e, "preview"), OptLong(e, "timeToExhaust"), OptText(e, "timeToExhaustText"),
-            Texts(e, "alsoExhausted")),
+            Texts(e, "alsoExhausted"), Copy(e), Has(e, "mark") ? Text(e, "mark") : null),
         "resetCredits" => new ResetCreditsEvent(Text(e, "id"), Int(e, "added"), Bool(e, "preview"), Text(e, "provider"),
-            OptText(e, "accountLabel")),
+            OptText(e, "accountLabel"), Copy(e)),
         "completion" => new CompletionEvent(Text(e, "id"), Text(e, "sessionID"), Text(e, "vendor"), Text(e, "task"),
-            Text(e, "model"), OptTime(e, "startedAt"), Time(e, "completedAt")),
+            Text(e, "model"), OptTime(e, "startedAt"), Time(e, "completedAt"), Copy(e), Has(e, "mark") ? Text(e, "mark") : null),
         var kind => throw Rejected($"unknown event {kind}"),
     };
+
+    /// <summary>An event's words (1.2): a quota alert's and reset credits' as they are, a reply's status and task in
+    /// the places of the short line and the sentence.</summary>
+    static EventCopy? Copy(JsonObject e)
+    {
+        if (!Has(e, "copy")) return null;
+        var c = Obj(e, "copy");
+        var metrics = Has(c, "metrics") ? Arr(c, "metrics").Select(m => new Metric(Text(m, "value"), Text(m, "label"))).ToList() : [];
+        return Has(c, "status")
+            ? new EventCopy(Text(c, "vendorName"), null, null, Text(c, "status"), Text(c, "title"), null, Bool(c, "warning"), null, metrics, null)
+            : new EventCopy(Text(c, "vendorName"), Has(c, "agentName") ? Text(c, "agentName") : null,
+                            Has(c, "displayName") ? Text(c, "displayName") : null, Text(c, "compactTitle"), Text(c, "title"),
+                            OptText(c, "badge"), Bool(c, "warning"), Has(c, "usedPct") ? OptNumber(c, "usedPct") : null, metrics,
+                            Has(c, "otherLimits") ? OptText(c, "otherLimits") : null);
+    }
 
     static StatusLevel Level(string text) => text switch
     {

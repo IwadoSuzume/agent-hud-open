@@ -1,4 +1,4 @@
-# Engine ↔ shell protocol, version 1.1
+# Engine ↔ shell protocol, version 1.2
 
 How `AgentHUD.exe` (the WPF shell, M7) and `agenthud-engine.exe` (Swift, Support + Core) talk on Windows (ADR-001,
 D-022, D-041). The engine computes; the shell shows what it is sent and sends back what the user did. No rule of Core
@@ -50,7 +50,7 @@ announces in `hello`. A reader ignores fields it does not know. Times are intege
 ### `hello`
 
 ```json
-{"v":1,"type":"hello","minor":1,"engine":{"version":"0"},"demo":false,"language":"en","strings":{"…":"…"}}
+{"v":1,"type":"hello","minor":2,"engine":{"version":"0"},"demo":false,"language":"en","strings":{"…":"…"}}
 ```
 
 `language` is the language Core resolved (`zh` or `en`). `strings` holds the words of the shell's own chrome
@@ -100,6 +100,16 @@ An approval: `id`, `source`, `vendor`, `sessionID`, `toolName`, `summary`, `deta
 `added`, `at`, `isQuestion`, `questions` (`[{key, question, header, multiSelect, options: [{label, description}]}]`),
 `isPlan`, `plan`, `answersPlan`, `alwaysAllowRule` (the rule an "Always allow" would add, or null when the client
 offers none — then the shell shows no such button), and from 1.1 `mark`.
+
+### Version 1.2
+
+1.2 adds to every `event` its `copy`, the card's words as the macOS Desktop's own copy makes them
+(`ShellEventCopy`: `QuotaAlertCopy`, `ResetCreditAlertCopy`, the reply card), so the shell never words an event: a
+quota alert's `vendorName`, `agentName`, `displayName`, `compactTitle` (the short line beside the mark), `title`,
+`badge`, `warning`, `usedPct`, `metrics` (`[{value, label}]`, three) and `otherLimits`; reset credits' `vendorName`,
+`compactTitle`, `title`, `badge`, `warning`, `metrics`; a reply's `status`, `title` (its task), `vendorName` and
+`warning`. A quota alert and a reply also carry their `mark`. A shell shows no event of a 1.1 engine, which sends no
+words for it.
 
 ### Version 1.1
 

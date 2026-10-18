@@ -10,13 +10,14 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using AgentHUD.Protocol;
 using AgentHUD.Shell;
 
 namespace AgentHUD;
 
 static class Snapshot
 {
-    public static void Begin(App app, ShellModel model, List<IslandWindow> islands, string folder)
+    public static void Begin(App app, ShellModel model, List<IslandWindow> islands, string folder, string? feed)
     {
         var started = DateTime.UtcNow;
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
@@ -29,7 +30,7 @@ static class Snapshot
                 return;
             }
             timer.Stop();
-            try { Finish(app, Draw(islands.First(), folder), null); }
+            try { Finish(app, Draw(islands.First(), folder, Feed(feed)), null); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException
                                                 or ArgumentException)
             {
@@ -39,27 +40,50 @@ static class Snapshot
         timer.Start();
     }
 
-    static int Draw(IslandWindow island, string folder)
+    /// <summary>The events of `--feed` (the protocol's `engine-event-*.json` fixtures, written by the engine), read as the
+    /// engine's lines are, by kind.</summary>
+    static Dictionary<string, HudEvent> Feed(string? folder)
+    {
+        var read = new Dictionary<string, HudEvent>();
+        if (folder is null) return read;
+        foreach (var file in Directory.GetFiles(folder, "engine-event-*.json"))
+        {
+            if (EngineMessage.Parse(File.ReadAllText(file).TrimEnd((char)10)) is not HudEvent hudEvent) continue;
+            // An event the engine sent no words for cannot be drawn, and must not pass as an empty card.
+            if (hudEvent.Copy is null) throw new InvalidOperationException($"{Path.GetFileName(file)} carries no copy (protocol 1.2)");
+            read[hudEvent switch { QuotaAlertEvent => "quota", ResetCreditsEvent => "credits", _ => "reply" }] = hudEvent;
+        }
+        return read;
+    }
+
+    static int Draw(IslandWindow island, string folder, Dictionary<string, HudEvent> feed)
     {
         Directory.CreateDirectory(folder);
         var report = new StringBuilder();
         var status = 0;
-        var pictures = new (string Name, bool Resting, bool Usage, string? Request)[]
+        var pictures = new List<(string Name, bool Resting, bool Usage, string? Request, HudEvent? Event, bool Open)>
         {
-            ("island-rest", true, false, null), ("island-open", false, false, null), ("island-usage", false, true, null),
-            ("card-question", false, false, "demo-question"), ("card-plan", false, false, "demo-plan"),
+            ("island-rest", true, false, null, null, false), ("island-open", false, false, null, null, true),
+            ("island-usage", false, true, null, null, true),
+            ("card-question", false, false, "demo-question", null, true), ("card-plan", false, false, "demo-plan", null, true),
         };
-        foreach (var (name, resting, usage, request) in pictures)
+        foreach (var (kind, hudEvent) in feed)
+        {
+            pictures.Add(($"event-{kind}-line", false, false, null, hudEvent, false));
+            pictures.Add(($"event-{kind}-card", false, false, null, hudEvent, true));
+        }
+        foreach (var (name, resting, usage, request, hudEvent, open) in pictures)
         {
             island.View.Resting = resting;
             island.View.UsageOnly = usage;
+            island.View.PictureEvent = hudEvent;
             if (request is not null)
             {
                 // The card asked for, or no picture: a request the demo does not hold must not pass as another's card.
                 if (island.View.Waits(request) == false) { report.AppendLine($"{name} no request {request}"); status = 1; continue; }
                 island.OpenRequestForPicture(request);
             }
-            island.ForceOpen(!resting);
+            island.ForceOpen(open);
             island.UpdateLayout();
             // Let the bindings and a render pass catch up before the picture is taken.
             island.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);

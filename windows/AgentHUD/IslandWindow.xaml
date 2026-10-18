@@ -62,9 +62,24 @@
     <Border x:Name="Island" HorizontalAlignment="Center" VerticalAlignment="Top" Background="{StaticResource Ground}"
             CornerRadius="0,0,14,14" SnapsToDevicePixels="True">
       <StackPanel>
+        <!-- At rest with news: its mark, its agent, and the engine's short line in the news's accent. -->
+        <ContentControl Content="{Binding Event}" Focusable="False" Margin="14,7,14,8"
+                        Visibility="{Binding ShowsEventLine, Converter={StaticResource Shown}}">
+          <ContentControl.ContentTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal">
+                <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MarkTemplate}" Width="17" Height="17" />
+                <TextBlock Text="{Binding Copy.VendorName}" FontWeight="SemiBold" FontSize="13" Margin="8,0,0,0" VerticalAlignment="Center" />
+                <Ellipse Width="6" Height="6" Fill="{Binding Accent}" Margin="16,0,6,0" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Copy.CompactTitle}" Foreground="{Binding Accent}" FontWeight="Medium" VerticalAlignment="Center"
+                           MaxWidth="220" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </DataTemplate>
+          </ContentControl.ContentTemplate>
+        </ContentControl>
         <!-- At rest: Core's logo queue, a mark each; a mark whose agent waits on the user wears a sign. -->
         <ItemsControl ItemsSource="{Binding Marks}" Margin="14,6,14,7"
-                      Visibility="{Binding ShowsPanel, Converter={StaticResource Shown}, ConverterParameter=invert}">
+                      Visibility="{Binding ShowsMarks, Converter={StaticResource Shown}}">
           <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate>
@@ -85,6 +100,62 @@
         <StackPanel x:Name="PanelContent" Width="400" Margin="0,8,0,10">
           <TextBlock Text="{Binding Error}" Foreground="{x:Static local:LevelBrush.Warning}" Margin="16,0,16,6" TextWrapping="Wrap"
                      Visibility="{Binding Error, Converter={StaticResource Shown}}" />
+
+          <!-- Hovered news: the Desktop's detail card in the engine's words — its agent, badge, sentence, figures and
+               bar; a reply's status and task. Its button opens the statistics, or puts a reply away. -->
+          <ContentControl Content="{Binding Event}" Focusable="False" Visibility="{Binding ShowsEventCard, Converter={StaticResource Shown}}">
+            <ContentControl.ContentTemplate>
+              <DataTemplate>
+                <StackPanel Margin="18,4,18,4">
+                  <Grid>
+                    <StackPanel Orientation="Horizontal">
+                      <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MarkTemplate}" Width="22" Height="22" />
+                      <StackPanel Margin="9,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Copy.VendorName}" FontWeight="SemiBold" FontSize="13" />
+                        <TextBlock Text="{Binding Copy.AgentName}" FontSize="10" Foreground="{StaticResource Secondary}"
+                                   Visibility="{Binding Copy.AgentName, Converter={StaticResource Shown}}" />
+                      </StackPanel>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                      <Ellipse Width="5" Height="5" Fill="{Binding Accent}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding Copy.Badge}" FontSize="10" FontWeight="Medium" Foreground="{Binding Accent}"
+                                 Visibility="{Binding Copy.Badge, Converter={StaticResource Shown}}" />
+                      <TextBlock Text="{Binding Copy.CompactTitle}" FontSize="10" FontWeight="Medium" Foreground="{Binding Accent}"
+                                 Visibility="{Binding IsReply, Converter={StaticResource Shown}}" />
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock Text="{Binding Copy.Title}" Foreground="#94FFFFFF" FontSize="12" Margin="0,16,0,0" TextWrapping="Wrap" />
+                  <ItemsControl ItemsSource="{Binding Copy.Metrics}" Margin="0,16,0,0">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <StackPanel>
+                          <TextBlock Text="{Binding Value}" FontSize="23" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding Label}" FontSize="10" Foreground="#66FFFFFF" Margin="0,4,0,0" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <StackPanel Margin="0,16,0,0" Visibility="{Binding HasUsage, Converter={StaticResource Shown}}">
+                    <Grid>
+                      <TextBlock Text="{Binding Copy.AgentName}" FontSize="10" Foreground="#6BFFFFFF" />
+                      <TextBlock Text="{Binding Copy.Metrics[0].Value}" FontSize="10" Foreground="#6BFFFFFF" HorizontalAlignment="Right" />
+                    </Grid>
+                    <Grid Height="4" Margin="0,7,0,0">
+                      <Border CornerRadius="2" Background="{StaticResource Track}" />
+                      <Border CornerRadius="2" HorizontalAlignment="Left" Background="{Binding Accent}"
+                              Width="{Binding UsedFraction, Converter={StaticResource Fraction}, ConverterParameter=364}" />
+                    </Grid>
+                    <TextBlock Text="{Binding Copy.OtherLimits}" FontSize="10" Foreground="{Binding Accent}" Margin="0,7,0,0" TextWrapping="Wrap"
+                               Visibility="{Binding Copy.OtherLimits, Converter={StaticResource Shown}}" />
+                  </StackPanel>
+                  <Button Style="{StaticResource CardButton}" Content="{Binding Action}" Tag="{Binding}" Click="OnEventAction"
+                          Margin="0,16,0,4" Padding="12,7" HorizontalAlignment="Stretch" Background="{Binding Accent}"
+                          BorderBrush="{Binding Accent}" Foreground="Black" />
+                </StackPanel>
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
 
           <StackPanel Visibility="{Binding ShowsEvents, Converter={StaticResource Shown}}">
           <!-- The open request's card: the same CardModel while the request waits, so its fields keep what is typed. -->

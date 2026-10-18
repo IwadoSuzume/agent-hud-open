@@ -22,6 +22,8 @@ public enum ShellStrings {
         "approval.question": ("在问你问题", "Asks a question"),
         "approval.plan": ("有计划待审", "Has a plan to review"),
         "alert.dismiss": ("知道了", "Dismiss"),
+        "alert.viewStatistics": ("查看用量统计", "View usage statistics"),
+        "reply.dismiss": ("关闭回复提醒", "Dismiss reply"),
         // A question card (PermissionQuestionViews.swift).
         "question.chooseAny": ("可多选", "Choose any"),
         "question.other": ("其他", "Other"),

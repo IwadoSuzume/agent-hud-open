@@ -7,7 +7,7 @@ import Foundation
 /// own rules and formatting; the shell recomputes nothing.
 public enum ShellProtocol {
     public static let major: Int64 = 1
-    public static let minor: Int64 = 1
+    public static let minor: Int64 = 2
     /// The longest line either side takes.
     public static let lineLimit = 16 * 1024 * 1024
 
@@ -44,18 +44,22 @@ public enum ShellProtocol {
                 "timeToExhaust": alert.timeToExhaust.map { .integer(Int64($0.rounded())) } ?? .null,
                 "timeToExhaustText": alert.timeToExhaust.map { .string(Countdown.forecast($0)) } ?? .null,
                 "alsoExhausted": .array(alert.otherExhaustedWindows.map { .string($0.id) }),
+                // 1.2: the card's words, by the Desktop's own copy (ShellEventCopy).
+                "copy": ShellEventCopy.quota(alert), "mark": .string(VendorMark.key(alert.agent.vendor)),
             ])])
         } + update.resetCreditGrants.map { grant in
             message("event", ["event": .object([
                 "kind": .string("resetCredits"), "id": .string(grant.id.uuidString.lowercased()),
                 "added": .integer(Int64(grant.added)), "preview": .bool(grant.isPreview),
                 "provider": .string(grant.account.account.provider), "accountLabel": text(grant.account.label),
+                "copy": ShellEventCopy.resetCredits(grant),
             ])])
         } + update.completions.map { completion in
             message("event", ["event": .object([
                 "kind": .string("completion"), "id": .string(completion.id), "sessionID": .string(completion.sessionID),
                 "vendor": .string(completion.agentVendor), "task": .string(completion.task), "model": .string(completion.model),
                 "startedAt": time(completion.startedAt), "completedAt": time(completion.completedAt),
+                "copy": ShellEventCopy.completion(completion), "mark": .string(VendorMark.key(completion.agentVendor)),
             ])])
         }
     }

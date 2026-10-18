@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
   Gate G5's smoke test (docs/windows-port/PROGRESS.md): the Windows shell started with the engine's demo data draws the
-  island at rest, open with its requests, as the usage panel, and a question's and a plan's cards into PNG files (`AgentHUD --snapshot`), and ends with
+  island at rest, open with its requests, as the usage panel, a question's and a plan's cards, and each kind of event's
+  line and card (the protocol's event fixtures, fed with --feed) into PNG files (`AgentHUD --snapshot`), and ends with
   status 0 within 30 seconds.
 
 .DESCRIPTION
@@ -36,7 +37,8 @@ try {
     $env:APPDATA = Join-Path $profileRoot 'Roaming'
     $env:LOCALAPPDATA = Join-Path $profileRoot 'Local'
     $started = Get-Date
-    $process = Start-Process -FilePath $shell -PassThru -ArgumentList @('--snapshot', "`"$Out`"", '--engine', "`"$Engine`"", '--language', 'en')
+    $process = Start-Process -FilePath $shell -PassThru -ArgumentList @('--snapshot', "`"$Out`"", '--engine', "`"$Engine`"", '--language', 'en',
+                                                                 '--feed', "`"$(Join-Path $root 'windows\protocol\fixtures')`"")
     if (-not $process.WaitForExit(30000)) {
         Stop-Process -Id $process.Id -Force
         throw 'the shell did not end within 30 s'
@@ -50,7 +52,9 @@ try {
 
 # Each picture: present, drawn, at least as large as the island's least extent at 2x, at most a display's.
 $expected = @{ 'island-rest' = @(120, 40); 'island-open' = @(600, 200); 'island-usage' = @(600, 400);
-               'card-question' = @(600, 300); 'card-plan' = @(600, 300) }
+               'card-question' = @(600, 300); 'card-plan' = @(600, 300);
+               'event-quota-line' = @(200, 40); 'event-quota-card' = @(600, 300); 'event-credits-line' = @(200, 40);
+               'event-credits-card' = @(600, 200); 'event-reply-line' = @(200, 40); 'event-reply-card' = @(600, 150) }
 $report = Get-Content -LiteralPath (Join-Path $Out 'snapshot.txt')
 $failures = @()
 foreach ($name in $expected.Keys) {

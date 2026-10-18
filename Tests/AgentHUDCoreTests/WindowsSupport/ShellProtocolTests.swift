@@ -151,7 +151,7 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
 
     func testShellMessagesAreTheCommandsTheyStandFor() throws {
         let expected: [String: ShellProtocol.Command] = [
-            "shell-hello.json": .hello(minor: 1, shellVersion: "0.1.0"),
+            "shell-hello.json": .hello(minor: ShellProtocol.minor, shellVersion: "0.1.0"),
             "shell-refresh.json": .refresh,
             "shell-quit.json": .quit,
             "shell-answer-allow.json": .answer(id: "demo-tests", .allow),
@@ -234,6 +234,28 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(ShellStrings.current["menu.quit"], "退出")
         L10n.setLanguage(.en)
         XCTAssertEqual(ShellStrings.current["menu.quit"], "Quit")
+    }
+
+    /// An event's words (protocol 1.2) are the Desktop's copy: every `L10n.text` call of ShellEventCopy.swift is found
+    /// in the Desktop's sources as written, interpolations and all (white space aside, as the two indent differently).
+    func testTheEventsWordsAreTheDesktopsCopy() throws {
+        func squeezed(_ text: String) -> String { text.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
+        let desktop = Self.root.appendingPathComponent("Sources/AgentHUDDesktop", isDirectory: true)
+        var sources = ""
+        let walker = try XCTUnwrap(FileManager.default.enumerator(atPath: desktop.path))
+        for case let path as String in walker where path.hasSuffix(".swift") {
+            sources += (try? String(contentsOf: desktop.appendingPathComponent(path), encoding: .utf8)) ?? ""
+        }
+        sources = squeezed(sources)
+        let copy = try String(contentsOf: Self.root.appendingPathComponent("Sources/AgentHUDCore/Platform/Windows/Shell/ShellEventCopy.swift"),
+                              encoding: .utf8)
+        // A call, its interpolations one level deep: `L10n.text("\(names)额度仍已耗尽", "Still exhausted: \(names)")`.
+        let call = try NSRegularExpression(pattern: #"L10n\.text\((?:[^()]|\([^()]*\))*\)"#)
+        let calls = call.matches(in: copy, range: NSRange(copy.startIndex..., in: copy)).compactMap { Range($0.range, in: copy).map { String(copy[$0]) } }
+        XCTAssertGreaterThanOrEqual(calls.count, 20, "the calls are found")
+        for found in calls {
+            XCTAssertTrue(sources.contains(squeezed(found)), found)
+        }
     }
 }
 #endif

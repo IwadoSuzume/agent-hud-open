@@ -91,8 +91,11 @@ deprecated` in `Providers/Antigravity/AntigravityCLI.swift`; `result of call to 
    answers and its note, a plan answered elsewhere), typing that takes the keyboard only once clicked, the Windows demo's
    question and plan, `scripts\windows\ui-check.ps1` (opt-in; 14 checks passed locally). A person should still type an
    answer through a Chinese input method once (the check bypasses input methods).
-4. M7 next, in this order: events (quota alerts, reset credits, completions: their words need more `ShellStrings`, D-043) on the pointer's
-   display; the settings window (patches through `update-settings`; Core validates); the statistics window (needs a
+4. M7 step 4 (D-047): events on the island — protocol 1.2 (each event's words, the Desktop's copy, checked against its
+   sources), `EventQueue` (the Desktop's alert queue for news), the event line at rest and its card when hovered, the
+   snapshot's six event pictures from the fixtures (`--feed`). Not yet: replies listed beside a waiting request; a
+   reply's return to its session and token-usage actions (session navigation is macOS-only so far).
+5. M7 next, in this order: the settings window (patches through `update-settings`; Core validates); the statistics window (needs a
    protocol addition for the statistics data); light/dark and Mica for the normal windows; launch at login (`Run` key);
    docks on other edges and dragging; full-screen apps; then the review. The engine still lacks: the session title and
    row token total (D-043), a session `message` in any fixture, `NSTimeZone.default` from the Windows zone (Known

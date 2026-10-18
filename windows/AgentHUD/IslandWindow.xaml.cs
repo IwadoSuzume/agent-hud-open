@@ -28,8 +28,8 @@ public partial class IslandWindow : Window
     readonly RequestPlacement placement;
     readonly Action refreshAll;
 
-    internal IslandWindow(ShellModel model, RequestPlacement placement, Cards cards, Native.Monitor monitor, Action<string> send,
-                          Action refreshAll)
+    internal IslandWindow(ShellModel model, RequestPlacement placement, Cards cards, EventQueue events, Native.Monitor monitor,
+                          Action<string> send, Action refreshAll)
     {
         InitializeComponent();
         this.model = model;
@@ -37,7 +37,7 @@ public partial class IslandWindow : Window
         this.send = send;
         this.refreshAll = refreshAll;
         Monitor = monitor;
-        view = new IslandViewModel(model, placement, cards, monitor.Device);
+        view = new IslandViewModel(model, placement, cards, events, monitor.Device);
         DataContext = view;
         pointer = new DispatcherTimer(TimeSpan.FromMilliseconds(40), DispatcherPriority.Input, (_, _) => Track(), Dispatcher);
     }
@@ -90,6 +90,7 @@ public partial class IslandWindow : Window
         if (over != inside)
         {
             inside = over;
+            ((App)Application.Current).HoldEvent(Monitor.Device, over);
             Feed(over ? new HoverEvent.PointerEntered(now) : new HoverEvent.PointerExited(now));
         }
         if (deadline is { } due && now >= due) Feed(new HoverEvent.TimerFired(now));
@@ -138,6 +139,14 @@ public partial class IslandWindow : Window
     void Answer(object sender, ShellMessage.Decision decision)
     {
         if (CardOf(sender) is { } card) Decide(ShellMessage.Answer(card.Request.Id, decision));
+    }
+
+    /// <summary>The news card's button: a reply is put away; other news opens the statistics and goes.</summary>
+    void OnEventAction(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is not EventItem item) return;
+        if (!item.IsReply) ((App)Application.Current).OpenStatistics();
+        ((App)Application.Current).DismissEvent();
     }
 
     /// <summary>A queued request's line: it opens here, closing the one before, and moves to this display.</summary>

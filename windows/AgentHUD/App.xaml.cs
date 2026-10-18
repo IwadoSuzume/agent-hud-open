@@ -19,6 +19,9 @@ public partial class App : Application
     readonly ShellModel model = new();
     readonly RequestPlacement placement = new();
     readonly Cards cards;
+    readonly EventQueue events = new();
+    DispatcherTimer? eventClock;
+    string? feedFolder;
     readonly List<IslandWindow> islands = [];
     EngineConnection? engine;
     Tray? tray;
@@ -43,6 +46,7 @@ public partial class App : Application
                 case "--demo": arguments.Add("--demo"); break;
                 case "--language" when i + 1 < e.Args.Length: arguments.AddRange(["--language", e.Args[++i]]); break;
                 case "--engine" when i + 1 < e.Args.Length: enginePath = e.Args[++i]; break;
+                case "--feed" when i + 1 < e.Args.Length: feedFolder = Path.GetFullPath(e.Args[++i]); break;
                 case "--snapshot" when i + 1 < e.Args.Length:
                     snapshotFolder = Path.GetFullPath(e.Args[++i]);
                     if (!arguments.Contains("--demo")) arguments.Add("--demo");
@@ -71,12 +75,15 @@ public partial class App : Application
             Log($"engine: {line}");
         };
         model.Changed += OnModelChanged;
+        model.EventArrived += OnEvent;
+        eventClock = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => TickEvents(), Dispatcher);
+        eventClock.Start();
 
         BuildIslands();
         SystemEvents.DisplaySettingsChanged += OnDisplaysChanged;
         if (snapshotFolder is null) tray = new Tray(model, OpenSettings, OpenStatistics, Quit);
         engine.Start(ShellVersion);
-        if (snapshotFolder is not null) Snapshot.Begin(this, model, islands, snapshotFolder);
+        if (snapshotFolder is not null) Snapshot.Begin(this, model, islands, snapshotFolder, feedFolder);
     }
 
     void OnModelChanged()
@@ -101,16 +108,54 @@ public partial class App : Application
     void PlaceRequests()
     {
         var monitors = islands.Select(i => i.Monitor).ToList();
-        if (monitors.Count == 0) return;
+        if (PointerDisplay() is not { } pointer) return;
+        placement.Update((model.State?.Approvals ?? []).Select(r => r.Id), pointer,
+                         monitors.Select(m => m.Device).ToList());
+        cards.Sync(model.State?.Approvals ?? []);
+    }
+
+    /// <summary>The display the pointer is on (the primary one when it cannot be told).</summary>
+    string? PointerDisplay()
+    {
+        var monitors = islands.Select(i => i.Monitor).ToList();
+        if (monitors.Count == 0) return null;
         var pointer = monitors.FirstOrDefault(m => m.Primary) ?? monitors[0];
         if (Native.GetCursorPos(out var cursor))
         {
             pointer = monitors.FirstOrDefault(m => cursor.X >= m.Bounds.Left && cursor.X < m.Bounds.Right
                                                    && cursor.Y >= m.Bounds.Top && cursor.Y < m.Bounds.Bottom) ?? pointer;
         }
-        placement.Update((model.State?.Approvals ?? []).Select(r => r.Id), pointer.Device,
-                         monitors.Select(m => m.Device).ToList());
-        cards.Sync(model.State?.Approvals ?? []);
+        return pointer.Device;
+    }
+
+    bool RequestWaits => model.State?.Approvals.Count > 0;
+
+    /// <summary>An event from the engine: on the pointer's display when it comes up (EventQueue).</summary>
+    void OnEvent(HudEvent hudEvent)
+    {
+        if (PointerDisplay() is not { } pointer) return;
+        events.Add(hudEvent, RequestWaits, pointer, DateTimeOffset.Now);
+        RefreshIslands();
+    }
+
+    void TickEvents()
+    {
+        if (PointerDisplay() is not { } pointer) return;
+        var before = events.Current;
+        events.Tick(RequestWaits, pointer, DateTimeOffset.Now);
+        if (!ReferenceEquals(before, events.Current)) RefreshIslands();
+    }
+
+    /// <summary>The pointer over an island that shows the event holds it there.</summary>
+    internal void HoldEvent(string display, bool inside)
+    {
+        if (events.Current is not null && events.Display == display) events.Hold(inside, DateTimeOffset.Now);
+    }
+
+    internal void DismissEvent()
+    {
+        events.Dismiss();
+        RefreshIslands();
     }
 
     void RefreshIslands()
@@ -142,7 +187,7 @@ public partial class App : Application
                 existing.Place(monitor);
                 continue;
             }
-            var made = new IslandWindow(model, placement, cards, monitor, Send, RefreshIslands);
+            var made = new IslandWindow(model, placement, cards, events, monitor, Send, RefreshIslands);
             islands.Add(made);
             made.Show();
         }
@@ -153,9 +198,9 @@ public partial class App : Application
 
     internal void Send(string line) => engine?.Send(line);
 
-    void OpenSettings() => Log("Settings window: M7 step 3");
+    void OpenSettings() => Log("Settings window: a later M7 step");
 
-    void OpenStatistics() => Log("Statistics window: M7 step 4");
+    internal void OpenStatistics() => Log("Statistics window: a later M7 step");
 
     internal void Quit() => Quit(0);
 

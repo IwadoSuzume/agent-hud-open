@@ -40,7 +40,7 @@ public sealed class ProtocolTests
     public void TheEnginesHelloIsRead()
     {
         var hello = (EngineHello)EngineMessage.Parse(Line("engine-hello.json"));
-        Assert.AreEqual(1, hello.Minor, "the engine speaks 1.1");
+        Assert.AreEqual(ProtocolVersion.Minor, hello.Minor, "the engine speaks this version");
         Assert.IsTrue(hello.Demo);
         Assert.AreEqual("en", hello.Language);
         Assert.AreEqual("Quit", hello.Strings["menu.quit"]);
@@ -127,8 +127,9 @@ public sealed class ProtocolTests
         Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(state.ToJsonString()), "an unknown level");
         // A number out of range or a key given twice is refused like the rest, not thrown as .NET's own error.
         var hello = Line("engine-hello.json");
-        StringAssert.Contains(hello, "\"minor\":1");
-        Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(hello.Replace("\"minor\":1", "\"minor\":99999999999")));
+        var minor = $"\"minor\":{ProtocolVersion.Minor}";
+        StringAssert.Contains(hello, minor);
+        Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(hello.Replace(minor, "\"minor\":99999999999")));
         Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(hello.Replace("\"demo\":true", "\"demo\":true,\"demo\":false")));
     }
 
@@ -141,6 +142,26 @@ public sealed class ProtocolTests
                                "type-missing.json", "type-unknown.json" };
         foreach (var name in envelope)
             Assert.ThrowsExactly<ProtocolRejectedException>(() => EngineMessage.Parse(Line(Path.Combine("invalid", name))), name);
+    }
+
+    /// <summary>1.2: every event carries its card's words, the engine's; a 1.1 event without them is read, wordless.</summary>
+    [TestMethod]
+    public void EachEventCarriesItsWords()
+    {
+        var alert = (QuotaAlertEvent)EngineMessage.Parse(Line("engine-event-quota-alert.json"));
+        Assert.IsNotNull(alert.Copy);
+        Assert.HasCount(3, alert.Copy.Metrics);
+        Assert.IsFalse(string.IsNullOrEmpty(alert.Copy.CompactTitle));
+        Assert.IsFalse(string.IsNullOrEmpty(alert.Copy.Title));
+        var credits = (ResetCreditsEvent)EngineMessage.Parse(Line("engine-event-reset-credits.json"));
+        Assert.HasCount(3, credits.Copy!.Metrics);
+        var reply = (CompletionEvent)EngineMessage.Parse(Line("engine-event-completion.json"));
+        Assert.AreEqual("New reply", reply.Copy!.CompactTitle, "a reply's status stands where the short line does");
+        Assert.AreEqual(reply.Task, reply.Copy.Title);
+        var old = JsonNode.Parse(Line("engine-event-quota-alert.json"))!.AsObject();
+        old["event"]!.AsObject().Remove("copy");
+        old["event"]!.AsObject().Remove("mark");
+        Assert.IsNull(((QuotaAlertEvent)EngineMessage.Parse(old.ToJsonString())).Copy);
     }
 
     [TestMethod]
