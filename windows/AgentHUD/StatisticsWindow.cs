@@ -33,7 +33,10 @@ sealed class StatisticsWindow : Window
         FontSize = 13;
         model.Changed += AskAgain;
         model.StatisticsChanged += Draw;
-        Closed += (_, _) => { model.Changed -= AskAgain; model.StatisticsChanged -= Draw; };
+        // Light or dark as the application draws it (App.FollowAppearance), redrawn when that changes.
+        var app = (App)Application.Current;
+        app.AppearanceChanged += Draw;
+        Closed += (_, _) => { model.Changed -= AskAgain; model.StatisticsChanged -= Draw; app.AppearanceChanged -= Draw; };
         Draw();
         AskAgain();
     }
@@ -48,9 +51,7 @@ sealed class StatisticsWindow : Window
         send(ShellMessage.Statistics());
     }
 
-#pragma warning disable WPF0001 // ThemeMode: the Fluent theme, experimental in WPF's API but shipped and supported.
-    bool IsLight => Application.Current?.ThemeMode == ThemeMode.Light;
-#pragma warning restore WPF0001
+    bool IsLight => Application.Current is App app && !app.IsDark;
 
     Brush Ink => IsLight ? Brushes.Black : Brushes.White;
     Brush Secondary => new SolidColorBrush(IsLight ? Color.FromRgb(0x5F, 0x5F, 0x66) : Color.FromRgb(0x9A, 0x9A, 0xA0));

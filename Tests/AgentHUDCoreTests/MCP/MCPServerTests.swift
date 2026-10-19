@@ -21,7 +21,12 @@ final class MCPServerTests: XCTestCase {
         let result = try probe.response(to: claude)["result"]
         XCTAssertEqual(result["capabilities"], .object(["tools": .object(["listChanged": .bool(false)])]))
         XCTAssertEqual(result["serverInfo"], .object(["name": .string("agent-hud"), "title": .string("Agent HUD"), "version": .string("1.2.3")]))
-        XCTAssertEqual(result["instructions"].stringValue, "Agent HUD shows AI coding agents' quota, usage and sessions at the Mac's notch. "
+        #if os(Windows)
+        let place = "at the top of the screen"
+        #else
+        let place = "at the Mac's notch"
+        #endif
+        XCTAssertEqual(result["instructions"].stringValue, "Agent HUD shows AI coding agents' quota, usage and sessions \(place). "
                        + "These tools read what its hover panel shows and rearrange it, for every screen or for one, "
                        + "and restyle one screen's resting HUD. A change is a draft until the user presses Save in the panel.")
         XCTAssertEqual(result.objectValue?.keys.sorted(), ["capabilities", "instructions", "protocolVersion", "serverInfo"],

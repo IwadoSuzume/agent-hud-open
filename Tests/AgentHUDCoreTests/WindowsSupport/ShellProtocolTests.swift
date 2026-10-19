@@ -123,8 +123,6 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         try assertMatches(state, "engine-state.later.json")
     }
 
-    /// 1.3: the statistics window's Recent usage card, as the Desktop's UsagePeriodsCard makes it from the demo's report:
-    /// three periods, each with its total, cost and cache share and the models that spent the most.
     /// 1.5: the clients the build looks for, as the settings window lists them: the demo's sources, and the clients
     /// this build does not read, which say so.
     func testTheSourcesAreTheSharedFixture() throws {
@@ -142,6 +140,8 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         try assertMatches(message, "engine-sources.json")
     }
 
+    /// 1.3: the statistics window's Recent usage card, as the Desktop's UsagePeriodsCard makes it from the demo's report:
+    /// three periods, each with its total, cost and cache share and the models that spent the most.
     @MainActor
     func testTheStatisticsAreTheSharedFixture() throws {
         let agents = DemoData.everyAgent
@@ -290,6 +290,36 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(ShellStrings.current["settings.wait.1"], "1 minute")
         XCTAssertEqual(ShellStrings.current["settings.wait.30"], "30 minutes")
         XCTAssertEqual(Settings.approvalWaitChoices.filter { ShellStrings.current["settings.wait.\($0)"] == nil }, [], "every choice is named")
+    }
+
+    /// 1.5's source rules are the Desktop's (`SourceDetector.resolve` and `detect`, macOS code the engine may not link):
+    /// the two functions' bodies are compared as written, white space aside, so an upstream change to either shows here.
+    /// The one difference meant is the home folder, `UserHome.directory` for `fileManager.homeDirectoryForCurrentUser`.
+    func testTheSourcesRulesAreTheDesktopsCopy() throws {
+        func squeezed(_ text: String) -> String { text.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
+        /// The function `name`'s text, from its declaration to the brace that closes it.
+        func function(_ name: String, in text: String) throws -> String {
+            let start = try XCTUnwrap(text.range(of: "static func \(name)("), name)
+            var depth = 0, opened = false
+            var index = start.lowerBound
+            while index < text.endIndex {
+                let character = text[index]
+                if character == "{" { depth += 1; opened = true }
+                if character == "}" { depth -= 1; if opened, depth == 0 { return String(text[start.lowerBound...index]) } }
+                index = text.index(after: index)
+            }
+            XCTFail("\(name) has no closing brace")
+            return ""
+        }
+        let desktop = try String(contentsOf: Self.root.appendingPathComponent("Sources/AgentHUDDesktop/System/SourceDetector.swift"),
+                                 encoding: .utf8)
+        let engine = try String(contentsOf: Self.root.appendingPathComponent("Sources/AgentHUDCore/Platform/Windows/Shell/ShellSources.swift"),
+                                encoding: .utf8)
+        for name in ["resolve", "detect"] {
+            let theirs = squeezed(try function(name, in: desktop))
+                .replacingOccurrences(of: "fileManager.homeDirectoryForCurrentUser", with: "UserHome.directory")
+            XCTAssertEqual(squeezed(try function(name, in: engine)), theirs, "ShellSources.\(name) is SourceDetector.\(name)")
+        }
     }
 
     /// An event's words (protocol 1.2) are the Desktop's copy: every `L10n.text` call of ShellEventCopy.swift is found

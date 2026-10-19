@@ -23,9 +23,11 @@ public static class CardRules
         : request.IsPlan ? CardKind.PlanElsewhere
         : CardKind.Plain;
 
-    /// <summary>The change's lines when the request carries one; then the detail is not shown, as on the Desktop.</summary>
+    /// <summary>The change's lines when the request carries one; then the detail is not shown, as on the Desktop. A
+    /// question's card and a plan's own card show neither, whatever the request carries (PermissionOpenRow asks
+    /// <c>isQuestion</c> and <c>answersPlan</c> first).</summary>
     public static IReadOnlyList<DiffLine> Diff(Approval request) =>
-        request.Removed is null && request.Added is null ? []
+        Kind(request) is CardKind.Question or CardKind.Plan || request.Removed is null && request.Added is null ? []
         : Lines(request.Removed, added: false).Concat(Lines(request.Added, added: true)).ToList();
 
     /// <summary>The detail, for a request that carries no change (a question's card and a plan's own card show neither).</summary>

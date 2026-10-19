@@ -64,6 +64,9 @@ public sealed class ShellModel
     public int IntSetting(string name, int fallback) =>
         State?.Settings[name] is System.Text.Json.Nodes.JsonValue value && value.TryGetValue(out int number) ? number : fallback;
 
+    public string? StringSetting(string name) =>
+        State?.Settings[name] is System.Text.Json.Nodes.JsonValue value && value.TryGetValue(out string? text) ? text : null;
+
     public bool BoolSetting(string name, bool fallback) =>
         State?.Settings[name] is System.Text.Json.Nodes.JsonValue value && value.TryGetValue(out bool flag) ? flag : fallback;
 

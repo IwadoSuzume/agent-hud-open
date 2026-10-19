@@ -199,7 +199,12 @@ struct MCPServer {
             }
         case .reply(.failure(let sentence)): text = sentence
         case .notRunning: text = "Agent HUD is not running. Open Agent HUD and try again."
+        #if os(Windows)
+        // The Windows shell does not serve the agent tools yet and has no Experimental pane (BLOCKERS B-002).
+        case .off: text = "Agent HUD's agent tools are not available on Windows yet."
+        #else
         case .off: text = "Agent HUD's agent tools are off. Turn them on in Settings › Experimental."
+        #endif
         case .unanswered: text = "Agent HUD did not answer. Try again."
         }
         let block: JSONValue = .object(["type": .string("text"), "text": .string(text)])

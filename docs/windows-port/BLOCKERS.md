@@ -36,6 +36,44 @@ no milestone left to own it (M7 review round 1): symptom, what was tried, sugges
   results back. The engine keeps the MCP side (Core's `MCPAppChannel`); the shell only draws and measures. Then make
   `--mcp` reach the running engine through its pipe (D-040), and test it with an MCP client fixture as the macOS tests
   do.
+- **What `--mcp` says on Windows meanwhile** (M7 review round 2). The macOS answer, "Turn them on in Settings ›
+  Experimental", names a pane the Windows shell does not have, and the server's instructions said the HUD shows "at the
+  Mac's notch". From M7 round 3 Core answers on Windows that the agent tools are not available on Windows yet, and its
+  instructions say "at the top of the screen" (one `#if os(Windows)` each in `MCPServer.swift` and `MCPTools.swift`;
+  macOS's words unchanged).
+
+## B-004 — OPEN — The hover panel's balances, accounts, notices and token periods, and replies beside a request (2026-10-19)
+
+- **Symptom.** TASK.md §1 goal 1 names the panel's quota, balance, 24 h tokens and sessions. The Windows panel shows the
+  agent rows (quota) and the sessions; protocol 1.0–1.5 carries none of the following, so the shell shows none of them
+  (PROTOCOL.md, Version 1.0; the shell may not work them out, TASK.md M7):
+  - API balances: Core's `ReportView.billing` (`APIBilling`) with `level(of:)` and `assessment(of:)`;
+  - the grouping of rows into accounts: `ReportView.rowGroups` and `accountSections(_:)`;
+  - the account and source notices: `ReportView.accountNotice(for:)` and `accountSourceNotice(for:)`;
+  - the token panel and its periods (24h, 7d, 30d: Core's `PanelLayoutFilters`, the Desktop's `TokenPeriodPicker`);
+  - replies listed beside a waiting request (D-047: the Windows event queue holds them until the requests are answered).
+- **Tried.** D-043 (M6) left them to a later minor version; M7 rounds 1–2 built the shell's other parts first, and M7
+  review round 2 found them without an owner. M8 (packaging) and M9 (wrap-up) add no protocol.
+- **Suggestion.** One minor version each, in this order: `panel.billing[]` (each balance's text, level and assessment
+  words, made by `ReportView`), `panel.accounts[]` (sections in Core's order, each with its rows' ids and its notice),
+  a `tokens` request and answer like 1.3's `statistics` (the figures for the chosen period, made in the engine), and the
+  replies as `state.replies[]` beside `requests`. Each is checked against shared fixtures on both sides, as 1.1–1.5 are.
+
+## B-005 — OPEN — The dock's and the windows' remaining options (2026-10-19)
+
+- **Symptom.** On Windows the HUD is the dock (D-051) and the settings and statistics windows are their first pages
+  (D-048, D-049). Not served: the Simple panel (drawn as the dock); the logo size, spacing and edge distance; the bounds
+  shown while dragging; moving the HUD to another display (D-051); the settings window's panes other than General
+  (sources, panel layout, experimental); the statistics pages other than Recent usage (token charts, heatmap, agent
+  cards, API billing, sessions and a session's page, D-049).
+- **Tried.** M7 placed the HUD on every edge of each display and opened both windows with their first page; M7 review
+  round 2 found the rest without an owner.
+- **Suggestion.** The dock's options are `Settings` values Core already validates: the shell needs only their
+  placement maths from Core (a `placement` answer that includes size, spacing and edge distance, as 1.4's does for the
+  edge), and a drop on another display is a patch of that display's entry in `screens`. Each statistics page is a
+  request and answer like 1.3's, made by the Desktop's computation moved into or mirrored in Core with its
+  `L10n.text` calls source-checked (D-049). The settings panes need the sources (1.5) plus the panel layout's
+  descriptions, which Core's `PanelLayout` already holds.
 
 ## B-003 — OPEN — The panel's session title and row token count are not shown on Windows (2026-10-18)
 

@@ -50,4 +50,19 @@ public sealed class CardRulesTests
         Assert.AreEqual(CardKind.Question, CardRules.Kind(Request("demo-question") with { Questions = [] }),
                         "a question routes as a question whatever it holds, never to Allow and Deny");
     }
+
+    [TestMethod]
+    public void AQuestionAndAPlansOwnCardShowNoChangeWhateverTheRequestCarries()
+    {
+        foreach (var id in new[] { "demo-question", "demo-plan" })
+        {
+            var carrying = Request(id) with { Removed = "old line", Added = "new line" };
+            Assert.IsEmpty(CardRules.Diff(carrying), id);
+            Assert.IsNull(CardRules.Detail(carrying), id);
+        }
+        // A plan answered in its own client is a notice beside the request's answers: its change is shown, as on the Desktop.
+        var elsewhere = Request("demo-plan") with { AnswersPlan = false, Removed = "old line", Added = "new line" };
+        Assert.AreEqual(CardKind.PlanElsewhere, CardRules.Kind(elsewhere));
+        CollectionAssert.AreEqual(new[] { "−old line", "+new line" }, CardRules.Diff(elsewhere).Select(l => l.Sign + l.Text).ToArray());
+    }
 }

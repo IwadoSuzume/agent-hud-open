@@ -186,6 +186,22 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
         func hooked() -> Bool { ((try? String(contentsOf: settingsFile, encoding: .utf8)) ?? "").contains("--permission-hook") }
         XCTAssertTrue(hooked(), "the hook is set at start")
 
+        // The clients the settings window lists, looked for in this home (1.5): only Claude, whose projects folder the
+        // test made, is found; nothing of the machine's own clients is.
+        served.send(#"{"v":1,"type":"sources"}"#)
+        let sources = try XCTUnwrap(served.next(type("sources")), "the sources are answered")["sources"].arrayValue ?? []
+        XCTAssertFalse(sources.isEmpty)
+        XCTAssertEqual(sources.filter { $0["detected"] == .bool(true) }.map { $0["id"].stringValue }, ["claude-code"])
+        // The first start's live-status defaults are saved (DesktopApplication.start): on for the client found, off for
+        // every other client the Desktop gives one to.
+        let saved = URL(fileURLWithPath: try XCTUnwrap(environment["APPDATA"]), isDirectory: true)
+            .appendingPathComponent("Agent HUD Open/settings.json")
+        let stored = try XCTUnwrap(SettingsFile(url: saved)?.data(forKey: SettingsStore.Keys.settings), "the settings are written")
+        let preferences = try JSONDecoder().decode(Settings.self, from: stored).liveStatusPreferences
+        XCTAssertEqual(preferences["claude"], true)
+        XCTAssertEqual(Set(preferences.filter { $0.value }.keys), ["claude"])
+        XCTAssertGreaterThan(preferences.count, 1, "the clients not found are given theirs too")
+
         // The user takes the hook out by hand; a clock tick (10 s) and an unrelated setting leave it out.
         try Data(#"{"model":"opus"}"#.utf8).write(to: settingsFile)
         served.send(#"{"v":1,"type":"update-settings","patch":{"hoverDelayMs":500}}"#)

@@ -2,8 +2,10 @@
 
 What the Windows build does for each client, and the source each Windows-specific fact rests on (TASK.md §3, §7.2).
 A fact without a source is not used: the client, or that part of it, is **not supported on Windows**, Core treats it
-as absent (`PlatformSupport`, so it is neither read nor given hooks), and the settings window's Agents list says so
-("Not supported on Windows"; protocol 1.5, D-053).
+as absent (`PlatformSupport`, so it is neither read nor given hooks). The settings window's Agents list has a row
+for each client the Desktop's source list names and says "Not supported on Windows" on those rows (protocol 1.5,
+D-053); a part of a client that has no row of its own (the Claude and Codex desktop apps, DeepSeek Harness's app,
+Qoder CN, QoderWork) is unsupported without a line in the window, and `docs/windows.md` (M9) lists them.
 
 Status: ✅ supported, tested on Windows with fixtures · 🔶 not supported on Windows (reason given) · ⏳ planned, with
 its milestone. State at M5 (2026-10-18). Hook forms per client: D-037, each run through its client's shell in

@@ -91,7 +91,11 @@ final class MCPToolsOffTests: XCTestCase, @unchecked Sendable {
         let probe = MCPServerProbe(answer: .off)
         let line = #"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_panel","arguments":{}}}"#
         let response = try probe.response(to: line)
+        #if os(Windows)
+        XCTAssertEqual(response["result"].blockText, "Agent HUD's agent tools are not available on Windows yet.")
+        #else
         XCTAssertEqual(response["result"].blockText, "Agent HUD's agent tools are off. Turn them on in Settings › Experimental.")
+        #endif
         XCTAssertEqual(response["result"]["isError"], .bool(true))
         probe.answer = .notRunning
         XCTAssertEqual(try probe.response(to: line)["result"].blockText, "Agent HUD is not running. Open Agent HUD and try again.",

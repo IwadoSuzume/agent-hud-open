@@ -57,10 +57,10 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-#pragma warning disable WPF0001 // ThemeMode: the Fluent theme, experimental in WPF's API but shipped and supported.
-        // The normal windows' controls as Windows 11 draws them; the settings window then follows the appearance setting.
-        ThemeMode = ThemeMode.Dark;
-#pragma warning restore WPF0001
+        // The normal windows' controls as Windows 11 draws them, light or dark as the appearance setting says, followed
+        // with each state and as Windows' app mode changes (WM_SETTINGCHANGE), whichever window is open.
+        FollowAppearance();
+        SystemEvents.UserPreferenceChanged += OnSystemPreference;
         var arguments = new List<string>();
         var enginePath = EngineConnection.DefaultEnginePath;
         for (var i = 0; i < e.Args.Length; i++)
@@ -143,6 +143,34 @@ public partial class App : Application
         tray?.Refresh();
         RefreshIslands();
         FollowLaunchAtLogin();
+        FollowAppearance();
+    }
+
+    bool? dark;
+
+    /// <summary>Whether the normal windows draw dark; they redraw on <see cref="AppearanceChanged"/>.</summary>
+    internal bool IsDark => dark ?? true;
+    internal event Action? AppearanceChanged;
+
+    void OnSystemPreference(object? sender, UserPreferenceChangedEventArgs e) => Dispatcher.BeginInvoke(FollowAppearance);
+
+    /// <summary>The application's theme: Fluent's resources are merged at the application, and the island's own
+    /// templates name every colour they draw, so only the normal windows (settings, statistics) take it.</summary>
+    void FollowAppearance()
+    {
+        var isDark = Appearance.IsDark(model.StringSetting("appearance"), AppsUseLightTheme());
+        if (dark == isDark) return;
+        dark = isDark;
+#pragma warning disable WPF0001 // ThemeMode: the Fluent theme, experimental in WPF's API but shipped and supported.
+        ThemeMode = isDark ? ThemeMode.Dark : ThemeMode.Light;
+#pragma warning restore WPF0001
+        AppearanceChanged?.Invoke();
+    }
+
+    static bool AppsUseLightTheme()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+        return key?.GetValue("AppsUseLightTheme") is not int value || value != 0;
     }
 
     /// <summary>New requests go to the display the pointer is on (docs/hud.md, Approvals).</summary>
@@ -333,6 +361,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         SystemEvents.DisplaySettingsChanged -= OnDisplaysChanged;
+        SystemEvents.UserPreferenceChanged -= OnSystemPreference;
         tray?.Dispose();
         foreach (var island in islands) island.Close();
         if (!quitting) engine?.Quit(TimeSpan.FromSeconds(3));

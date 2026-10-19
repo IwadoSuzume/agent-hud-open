@@ -88,12 +88,12 @@ resolved language, by the rules the macOS panel uses: `resetText` is `AgentRow.r
 reset's time has passed, "—" for an account that is not current), `phaseText` is `UsageStore.sessionStatusLabel`
 ("Needs approval", "Status out of date", "Live status off", or the running or idle time), `project` is
 `SessionProject`'s title (a repository's worktrees share it), `tokensText` is `TokenFormat.inOut` (the in/out pair,
-not the panel row's shorter total, which comes with the row's title in M7, D-043). A reset more than a day off is
+not the panel row's shorter total, which comes with the row's title later, BLOCKERS B-003). A reset more than a day off is
 labelled by weekday and time in the engine's time zone, Windows' own (`WindowsTimeZone`, D-050).
 
 Version 1.0 does not carry the balances (`billing`), the grouping of rows into accounts, the account and source
 notices, or the token columns of the last 24 hours. The shell shows none of them until a minor version adds them, and
-never works them out from the fields above (grouping rows by `vendor`, summing sessions' tokens): those are Core's rules.
+never works them out from the fields above (grouping rows by `vendor`, summing sessions' tokens): those are Core's rules. Their owner is BLOCKERS B-004.
 
 An approval: `id`, `source`, `vendor`, `sessionID`, `toolName`, `summary`, `detail`, `project`, `path`, `removed`,
 `added`, `at`, `isQuestion`, `questions` (`[{key, question, header, multiSelect, options: [{label, description}]}]`),
