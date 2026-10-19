@@ -350,6 +350,11 @@ public partial class App : Application
         // The engine owns the lock, the hooks and the approvals: without it there is nothing to show.
         if (status == 3) { Shutdown(3); return; }
         var why = lastComplaint is { } complaint ? Environment.NewLine + complaint : "";
+        // A library the engine needs is not on this machine: the Swift runtime comes with the package, the Microsoft
+        // Visual C++ runtime is Windows' own to install and keep up to date (D-055).
+        if (Package.IsMissingLibrary(status))
+            why = Environment.NewLine + "A library it needs was not found. Agent HUD needs the Microsoft Visual C++ Redistributable (x64): "
+                + Package.VisualCppRedistributablePage;
         if (snapshotFolder is null)
             MessageBox.Show($"Agent HUD's engine stopped (status {status?.ToString() ?? "unknown"}).{why}", "Agent HUD",
                             MessageBoxButton.OK, MessageBoxImage.Warning);

@@ -16,11 +16,9 @@ static class LoginItem
     static string? Command => Environment.ProcessPath is { } path ? $"\"{path}\"" : null;
 
     /// <summary>Whether this copy may register itself, as the Desktop's `LoginItem.isAvailable` lets only an installed app:
-    /// never a build's own output folder (`bin\Debug`, `bin\Release`), which a developer's run would otherwise leave in
-    /// the user's Run key.</summary>
-    static bool IsAvailable => Environment.ProcessPath is { } path
-        && !path.Contains(@"\bin\Debug\", StringComparison.OrdinalIgnoreCase)
-        && !path.Contains(@"\bin\Release\", StringComparison.OrdinalIgnoreCase);
+    /// only a copy of the portable package, which build-windows.ps1 marks (D-055), never a build's output folder or a
+    /// developer's own published folder, which would otherwise be left in the user's Run key.</summary>
+    static bool IsAvailable => Environment.ProcessPath is not null && AgentHUD.Shell.Package.IsPackaged(AppContext.BaseDirectory);
 
     /// <summary>Registers the shell when it never was: no value of ours, and no record that the user turned one off.</summary>
     public static void RegisterIfNeverRegistered()

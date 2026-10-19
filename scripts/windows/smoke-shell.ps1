@@ -6,16 +6,18 @@
   status 0 within 30 seconds.
 
 .DESCRIPTION
-  Builds windows\AgentHUD in Release (warnings as errors), runs it against -Engine in a temporary profile (the demo
-  writes only its own settings.demo.json, D-021), and checks snapshot.txt: each picture present, not blank, and of a
-  plausible size. Telemetry is off as in test-dotnet.ps1 (D-042).
+  Builds windows\AgentHUD in Release (warnings as errors), or takes -Shell, an AgentHUD.exe already built (the
+  package's, check-package.ps1), runs it against -Engine in a temporary profile (the demo writes only its own
+  settings.demo.json, D-021), and checks snapshot.txt: each picture present, not blank, and of a plausible size.
+  Telemetry is off as in test-dotnet.ps1 (D-042).
 
 .EXAMPLE
   scripts\windows\smoke-shell.ps1 -Engine "$env:LOCALAPPDATA\agenthud-dev\build\out\Products\Release-windows-x86_64\agenthud-engine.exe"
 #>
 param(
     [Parameter(Mandatory = $true)] [string] $Engine,
-    [string] $Out = ""
+    [string] $Out = "",
+    [string] $Shell = ""
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -25,9 +27,14 @@ $env:DOTNET_NOLOGO = '1'
 $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
 
 if (-not (Test-Path -LiteralPath $Engine)) { throw "no engine at $Engine" }
-& dotnet build (Join-Path $root 'windows\AgentHUD\AgentHUD.csproj') -c Release
-if ($LASTEXITCODE -ne 0) { throw "dotnet build failed with $LASTEXITCODE" }
-$shell = Join-Path $root 'windows\AgentHUD\bin\Release\net10.0-windows\AgentHUD.exe'
+if ($Shell) {
+    if (-not (Test-Path -LiteralPath $Shell)) { throw "no shell at $Shell" }
+    $shell = $Shell
+} else {
+    & dotnet build (Join-Path $root 'windows\AgentHUD\AgentHUD.csproj') -c Release
+    if ($LASTEXITCODE -ne 0) { throw "dotnet build failed with $LASTEXITCODE" }
+    $shell = Join-Path $root 'windows\AgentHUD\bin\Release\net10.0-windows\AgentHUD.exe'
+}
 
 if (-not $Out) { $Out = Join-Path ([IO.Path]::GetTempPath()) ("agenthud-snapshot-" + [Guid]::NewGuid().ToString('N')) }
 $profileRoot = Join-Path ([IO.Path]::GetTempPath()) ("agenthud-smokeprofile-" + [Guid]::NewGuid().ToString('N'))

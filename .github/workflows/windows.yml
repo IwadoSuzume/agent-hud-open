@@ -126,6 +126,19 @@ jobs:
           path: ${{ runner.temp }}/snapshot
           if-no-files-found: ignore
 
+      - name: Package (M8)
+        # The portable zip (scripts/build-windows.ps1, DECISIONS.md D-055), checked by check-package.ps1: its files and
+        # notices, and the engine and the shell running from the package with no Swift folder on PATH. A workflow
+        # artifact only: nothing is signed or released (TASK.md M8).
+        run: scripts/build-windows.ps1 -Out "$env:RUNNER_TEMP\package"
+
+      - name: Keep the package
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenthud-windows-x64
+          path: ${{ runner.temp }}/package/*.zip
+          if-no-files-found: error
+
       - name: Compile a smoke package
         # Proves the toolchain, the Windows SDK and the linker work on the runner before the port's own targets do.
         run: |

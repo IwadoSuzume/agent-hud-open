@@ -12,15 +12,16 @@ public enum MCPTools {
     public static let discardPanelDraft = "discard_panel_draft"
     static let names = [getPanel, getPanelImage, setPanelLayout, discardPanelDraft]
 
-    /// What a client's model is told about the server before it has called anything.
     #if os(Windows)
-    // The Windows HUD sits at the top of the screen, not at a notch (BLOCKERS B-002).
+    /// What a client's model is told about the server before it has called anything. The Windows HUD sits at the top of
+    /// the screen, not at a notch (BLOCKERS B-002).
     static let instructions = """
         Agent HUD shows AI coding agents' quota, usage and sessions at the top of the screen. \
         These tools read what its hover panel shows and rearrange it, for every screen or for one, \
         and restyle one screen's resting HUD. A change is a draft until the user presses Save in the panel.
         """
     #else
+    /// What a client's model is told about the server before it has called anything.
     static let instructions = """
         Agent HUD shows AI coding agents' quota, usage and sessions at the Mac's notch. \
         These tools read what its hover panel shows and rearrange it, for every screen or for one, \
