@@ -80,8 +80,9 @@ final class FileChangeMonitorWindowsTests: XCTestCase {
         let monitor = FileChangeMonitor(directories: [watched])
         _ = monitor.consumePaths()
         try FileManager.default.removeItem(at: watched)
-        let dropped = try await eventually { monitor.consumePaths() == nil }
-        XCTAssertTrue(dropped, "what changed under a removed directory is unknown")
+        // At once, whether or not the watch heard of it: an empty directory's removal names nothing inside it.
+        XCTAssertNil(monitor.consumePaths(), "what changed under a removed directory is unknown")
+        XCTAssertTrue(monitor.consumeChanges(), "and counts as a change")
         monitor.update()
         XCTAssertFalse(monitor.isWatching)
     }

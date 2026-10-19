@@ -177,7 +177,7 @@ final class FileChangeMonitor {
             state.paths = []
             return changed
         }
-        return changed || !isWatching
+        return changed || !isWatching || aWatchedDirectoryIsGone
     }
 
     /// Files reported since the previous call, or nil when a full scan is needed: the first call, dropped events,
@@ -189,7 +189,14 @@ final class FileChangeMonitor {
             state.paths = []
             return paths
         }
-        return isWatching ? paths : nil
+        return isWatching && !aWatchedDirectoryIsGone ? paths : nil
+    }
+
+    /// A watched directory that was removed or renamed since `update()`: what changed under it is unknown, as FSEvents
+    /// reports a changed root on macOS. `ReadDirectoryChangesW` names changes inside a directory, so an empty directory
+    /// removed with the watch's handle open may end its watch late or not at all; its absence is checked here instead.
+    private var aWatchedDirectoryIsGone: Bool {
+        (watched ?? []).contains { WindowsFiles.attributes($0) == nil }
     }
 
     private func stopWatches() {

@@ -36,6 +36,12 @@ final class ProcessLinesTests: XCTestCase {
         for _ in 0..<20 { XCTAssertEqual(ProcessLines.mentioning(["antigravity", "agy"], in: listing).count, 1) }
         let each = Date().timeIntervalSince(began) / 20
         print(String(format: "a %d KB process listing: %.2f ms", listing.utf8.count / 1024, each * 1000))
+        #if os(Windows)
+        // GitHub's Windows runners took 12.5–24 ms (swift-corelibs Foundation), the port's machine about 10: the guard
+        // there is twice the macOS bound (docs/windows-port DECISIONS.md D-056).
+        XCTAssertLessThan(each, 0.04)
+        #else
         XCTAssertLessThan(each, 0.02)
+        #endif
     }
 }
