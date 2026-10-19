@@ -20,7 +20,9 @@ static class LoginItem
     /// developer's own published folder, which would otherwise be left in the user's Run key.</summary>
     static bool IsAvailable => Environment.ProcessPath is not null && AgentHUD.Shell.Package.IsPackaged(AppContext.BaseDirectory);
 
-    /// <summary>Registers the shell when it never was: no value of ours, and no record that the user turned one off.</summary>
+    /// <summary>Registers the shell when it never was: no value of ours, and no record that the user turned one off. A
+    /// value of ours that names another place (the folder was moved, or a newer copy was unpacked elsewhere) is pointed
+    /// at this copy; Task Manager's record of the user's choice is left as it is.</summary>
     public static void RegisterIfNeverRegistered()
     {
         if (!IsAvailable) return;
@@ -29,6 +31,11 @@ static class LoginItem
             using var run = Registry.CurrentUser.OpenSubKey(RunKey);
             using var approved = Registry.CurrentUser.OpenSubKey(ApprovedKey);
             if (run?.GetValue(Name) is null && approved?.GetValue(Name) is null) Set(true);
+            else if (run?.GetValue(Name) is string registered && Command is { } command && registered != command)
+            {
+                using var writable = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+                writable?.SetValue(Name, command, RegistryValueKind.String);
+            }
         }
         catch (Exception error) when (error is UnauthorizedAccessException or System.Security.SecurityException or System.IO.IOException)
         {

@@ -13,11 +13,16 @@ What it needs
 Running it
 - Unpack the folder somewhere it can stay (for example under your user folder), then start AgentHUD.exe.
 - AgentHUD.exe --demo shows example data without reading any client.
-- The clients' hooks and MCP servers run agenthud-engine.exe from this folder. If you move or delete the folder, turn
-  off Settings > Client hooks first, then turn them on again from the new place.
+- The clients' hooks and any MCP server you added run agenthud-engine.exe from this folder. Before you move the folder
+  or unpack a newer version elsewhere, turn off Settings > Client hooks (it removes the hook entries Agent HUD added),
+  then turn it on again from the new place. An MCP entry you added yourself stays until you remove it with the
+  client's own command (for example `claude mcp remove`); add it again with the new path.
+- Launch at login follows the copy you run: starting a copy from another folder points the entry at that copy, and an
+  entry you disabled in Task Manager stays disabled.
 
 Removing it
-1. In Settings, turn off Client hooks (this removes Agent HUD's entries from the clients' settings) and Launch at login.
+1. In Settings, turn off Client hooks (this removes the hook entries Agent HUD added to the clients' settings) and
+   Launch at login. Remove an MCP entry you added with the client's own command.
 2. Quit Agent HUD from its tray icon and delete this folder.
 3. Agent HUD's own settings and usage history are in %APPDATA%\Agent HUD Open, and its instance lock in
    %LOCALAPPDATA%\app.agenthud; delete both folders too if you want nothing left.

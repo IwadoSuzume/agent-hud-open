@@ -87,11 +87,16 @@ try {
         $start.CreateNoWindow = $true
         $start.EnvironmentVariables['Path'] = $bare
         $process = [Diagnostics.Process]::Start($start)
-        $complaint = $process.StandardError.ReadToEnd()
-        $null = $process.StandardOutput.ReadToEnd()
+        # Both streams are read in the background, so that a hung engine is stopped by the 30 s bound below.
+        $errorText = $process.StandardError.ReadToEndAsync()
+        $outputText = $process.StandardOutput.ReadToEndAsync()
         if (-not $process.WaitForExit(30000)) { $process.Kill(); $failures += 'the packaged engine did not end within 30 s' }
-        elseif ($process.ExitCode -eq -1073741515) { $failures += 'the packaged engine is missing a library (0xC0000135)' }
-        elseif ($process.ExitCode -ne 2) { $failures += "the packaged engine ended with $($process.ExitCode), not 2: $($complaint.Trim())" }
+        else {
+            $process.WaitForExit()  # the streams' end, once the process is gone
+            $complaint = $errorText.Result
+            if ($process.ExitCode -eq -1073741515) { $failures += 'the packaged engine is missing a library (0xC0000135)' }
+            elseif ($process.ExitCode -ne 2) { $failures += "the packaged engine ended with $($process.ExitCode), not 2: $($complaint.Trim())" }
+        }
     }
 
     if (-not $failures -and -not $NoShell) {

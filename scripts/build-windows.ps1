@@ -11,7 +11,7 @@
   3. The shell: `dotnet publish windows\AgentHUD -c Release -r win-x64 --self-contained false`: it runs on the
      machine's .NET 10 Desktop Runtime, which Windows keeps up to date (D-055).
   4. The folder `Agent HUD Open`: the shell, agenthud-engine.exe, the Swift runtime libraries the engine loads (copied
-     unchanged from the toolchain's runtime folder, the folder on PATH that holds swiftCore.dll), LICENSE.txt,
+     unchanged from the Swift 6.4.1 runtime folder on PATH, `...\Runtimes\6.4.1\usr\bin`), LICENSE.txt,
      THIRD_PARTY_NOTICES.txt, RUNTIME_NOTICES.txt, README.txt and the package marker 'agenthud-package.json'.
      The Microsoft Visual C++ runtime is not copied: Microsoft asks for its central install (D-055).
   5. The zip AgentHUD-Open-<version>-windows-x64.zip in -Out: entries in ordinal name order, with forward slashes and
@@ -71,12 +71,23 @@ if ($swiftVersion -notmatch [regex]::Escape("Swift version $runtimeVersion")) {
 }
 & (Join-Path $root 'scripts\windows\build.ps1') -c release --product agenthud-engine --package-path $buildRoot --scratch-path $ScratchPath
 if ($LASTEXITCODE -ne 0) { throw "swift build failed with $LASTEXITCODE" }
-$binPath = (& swift build -c release --package-path $buildRoot --scratch-path $ScratchPath --show-bin-path 2>$null | Select-Object -Last 1).Trim()
-$engine = Join-Path $binPath 'agenthud-engine.exe'
+# Windows PowerShell 5.1 turns a native command's standard error into a terminating error under 'Stop', even when
+# discarded: the commands below that may write to it run where errors only continue, and their status is checked.
+$ErrorActionPreference = 'Continue'
+$binPath = (& swift build -c release --package-path $buildRoot --scratch-path $ScratchPath --show-bin-path 2>$null | Select-Object -Last 1)
+$binStatus = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($binStatus -ne 0 -or -not $binPath) { throw "swift build --show-bin-path failed with $binStatus" }
+$engine = Join-Path "$binPath".Trim() 'agenthud-engine.exe'
 if (-not (Test-Path -LiteralPath $engine)) { throw "no agenthud-engine.exe in $binPath" }
 
-$runtime = $env:Path.Split(';') | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ 'swiftCore.dll')) } | Select-Object -First 1
-if (-not $runtime) { throw 'no folder on PATH holds swiftCore.dll (the Swift runtime)' }
+# The runtime the notices describe: the folder of Swift $runtimeVersion's own runtime (`...\Runtimes\6.4.1\usr\bin`)
+# on PATH, whatever other Swift runtime comes earlier.
+$candidates = @($env:Path.Split(';') | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ 'swiftCore.dll')) })
+$runtime = $candidates | Where-Object { $_ -match ('[\\/]Runtimes[\\/]' + [regex]::Escape($runtimeVersion) + '[\\/]usr[\\/]bin[\\/]?$') } | Select-Object -First 1
+if (-not $runtime) {
+    throw "no folder on PATH is the Swift $runtimeVersion runtime (...\Runtimes\$runtimeVersion\usr\bin); folders with swiftCore.dll: $($candidates -join '; ')"
+}
 # What agenthud-engine.exe loads from the Swift runtime, directly or through another of these (measured with
 # `dumpbin /dependents`, D-055); check-package.ps1 starts the engine with no Swift folder on PATH to prove the list.
 $runtimeLibraries = @(
@@ -110,10 +121,16 @@ Copy-Item -LiteralPath (Join-Path $root 'windows\packaging\README.txt') -Destina
 
 $commit = 'unknown'; $commitTime = [DateTimeOffset]::new(2026, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
 if (Get-Command git -ErrorAction SilentlyContinue) {
+    # A source tree without git metadata (a downloaded zip) is no error: the package says 'unknown' (see above for 5.1).
+    $ErrorActionPreference = 'Continue'
     $head = (& git -C $root rev-parse HEAD 2>$null)
-    if ($LASTEXITCODE -eq 0 -and $head) {
+    $headStatus = $LASTEXITCODE
+    $when = if ($headStatus -eq 0 -and $head) { (& git -C $root log -1 --format=%cI HEAD 2>$null) } else { $null }
+    $whenStatus = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($headStatus -eq 0 -and $head -and $whenStatus -eq 0 -and $when) {
         $commit = "$head".Trim()
-        $commitTime = [DateTimeOffset]::Parse("$(& git -C $root log -1 --format=%cI HEAD)".Trim(), [Globalization.CultureInfo]::InvariantCulture)
+        $commitTime = [DateTimeOffset]::Parse("$when".Trim(), [Globalization.CultureInfo]::InvariantCulture)
     }
 }
 # The marker launch at login looks for (AgentHUD.Shell.Package.MarkerFileName): only a packaged copy registers itself.

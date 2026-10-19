@@ -1,3 +1,10 @@
 # The shell protocol's schema and fixtures are bytes both readers compare exactly: one LF-ended line each, never
 # converted at checkout (docs/windows-port/PROTOCOL.md; Git for Windows defaults to core.autocrlf=true).
 windows/protocol/** -text
+
+# Text files the Windows package carries (scripts/build-windows.ps1, D-055): the same bytes whatever core.autocrlf a
+# builder has. The root and bundled THIRD_PARTY_NOTICES.txt stay byte-identical (TASK.md section 8).
+LICENSE text eol=lf
+THIRD_PARTY_NOTICES.txt text eol=lf
+Sources/AgentHUDDesktop/Resources/THIRD_PARTY_NOTICES.txt text eol=lf
+windows/packaging/*.txt text eol=lf

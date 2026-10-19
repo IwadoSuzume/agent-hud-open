@@ -136,6 +136,8 @@ final class FileChangeMonitor {
     private let changes: Changes
     private var watches: [Watch] = []
     private var watched: [String]?
+    /// Watched directories already reported gone since the last `update()`, so each removal asks for a full scan once.
+    private var reportedGone: Set<String> = []
 
     /// - onChange: called after each batch of file events, on a watch thread.
     init(directories: [URL], onChange: (@Sendable () -> Void)? = nil) {
@@ -160,6 +162,7 @@ final class FileChangeMonitor {
         guard existing != watched || watches.contains(where: \.hasEnded) else { return }
         stopWatches()
         watched = existing
+        reportedGone = []
         changes.withLock { $0 = .init() }
         guard !existing.isEmpty else { return }
         watches = existing.compactMap { Watch(directory: $0, changes: changes) }
@@ -177,7 +180,7 @@ final class FileChangeMonitor {
             state.paths = []
             return changed
         }
-        return changed || !isWatching || aWatchedDirectoryIsGone
+        return changed || !isWatching || reportNewlyGoneDirectories()
     }
 
     /// Files reported since the previous call, or nil when a full scan is needed: the first call, dropped events,
@@ -189,14 +192,19 @@ final class FileChangeMonitor {
             state.paths = []
             return paths
         }
-        return isWatching && !aWatchedDirectoryIsGone ? paths : nil
+        let gone = reportNewlyGoneDirectories()
+        return isWatching && !gone ? paths : nil
     }
 
-    /// A watched directory that was removed or renamed since `update()`: what changed under it is unknown, as FSEvents
-    /// reports a changed root on macOS. `ReadDirectoryChangesW` names changes inside a directory, so an empty directory
-    /// removed with the watch's handle open may end its watch late or not at all; its absence is checked here instead.
-    private var aWatchedDirectoryIsGone: Bool {
-        (watched ?? []).contains { WindowsFiles.attributes($0) == nil }
+    /// Whether a watched directory was removed or renamed since the last report: what changed under it is unknown, so
+    /// the reader scans everything, once; later checks go on as before until `update()` watches what exists now. As on
+    /// macOS, where the removal arrives as one change that names the path. `ReadDirectoryChangesW` names changes inside
+    /// a directory, so an empty directory removed while its watch's handle is open may end that watch late or not at
+    /// all; the directory's absence is looked for here as well.
+    private func reportNewlyGoneDirectories() -> Bool {
+        let gone = (watched ?? []).filter { !reportedGone.contains($0) && WindowsFiles.attributes($0) == nil }
+        reportedGone.formUnion(gone)
+        return !gone.isEmpty
     }
 
     private func stopWatches() {
