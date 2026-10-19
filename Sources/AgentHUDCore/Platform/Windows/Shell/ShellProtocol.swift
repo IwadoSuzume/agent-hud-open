@@ -7,7 +7,7 @@ import Foundation
 /// own rules and formatting; the shell recomputes nothing.
 public enum ShellProtocol {
     public static let major: Int64 = 1
-    public static let minor: Int64 = 3
+    public static let minor: Int64 = 4
     /// The longest line either side takes.
     public static let lineLimit = 16 * 1024 * 1024
 
@@ -28,10 +28,26 @@ public enum ShellProtocol {
     /// The whole of what the HUD shows, as `store` shows it on macOS: its view, and its labels by the same rules
     /// (`AgentRow.resetLabel`, `UsageStore.sessionStatusLabel`), so the shell has nothing to decide.
     @MainActor
-    public static func state(store: UsageStore, approvals: [PermissionRequest]) throws -> JSONValue {
-        message("state", ["generatedAt": time(store.report?.generatedAt), "paused": .bool(store.isPaused),
-                          "error": text(store.lastError), "settings": try JSONValue.from(store.settings.settings),
-                          "panel": panel(store), "approvals": .array(approvals.map(approval))])
+    public static func state(store: UsageStore, approvals: [PermissionRequest], displays: [Display] = []) throws -> JSONValue {
+        let settings = store.settings.settings
+        // 1.4: each display the shell named, placed as Core places it (`Settings.placement(on:hasNotch:)`: its own
+        // placement, or the default its hardware deserves), in Core's own encoding.
+        var placements: [String: JSONValue] = [:]
+        for display in displays {
+            placements[display.key] = try JSONValue.from(settings.placement(on: display.key, hasNotch: display.hasNotch))
+        }
+        return message("state", ["generatedAt": time(store.report?.generatedAt), "paused": .bool(store.isPaused),
+                                 "error": text(store.lastError), "settings": try JSONValue.from(settings),
+                                 "panel": panel(store), "approvals": .array(approvals.map(approval)),
+                                 "placements": .object(placements)])
+    }
+
+    /// A display the shell draws a HUD on (1.4): its stable key, under which Core keeps its placement, and whether it
+    /// has a notch (no Windows display has one).
+    public struct Display: Equatable, Sendable {
+        public let key: String
+        public let hasNotch: Bool
+        public init(key: String, hasNotch: Bool) { self.key = key; self.hasNotch = hasNotch }
     }
 
     /// What the HUD presents once, as `IslandEventTracker` decided it.
@@ -178,6 +194,8 @@ public enum ShellProtocol {
         case refresh
         /// 1.3: the statistics window asks for its figures (`ShellStatistics`).
         case statistics
+        /// 1.4: the displays the shell draws on, each with its key; the state then places each.
+        case displays([Display])
         case answer(id: String, Answer)
         case updateSettings([String: JSONValue])
         case quit
@@ -224,6 +242,14 @@ public enum ShellProtocol {
             return .hello(minor: minor, shellVersion: fields["shell"]?["version"].stringValue)
         case "refresh": return .refresh
         case "statistics": return .statistics
+        case "displays":
+            guard case .array(let listed)? = fields["displays"] else { throw Rejected(description: "displays without a list") }
+            return .displays(try listed.map { item in
+                guard case .string(let key) = item["key"], !key.isEmpty, case .bool(let notch) = item["hasNotch"] else {
+                    throw Rejected(description: "a display without key or hasNotch")
+                }
+                return Display(key: key, hasNotch: notch)
+            })
         case "quit": return .quit
         case "update-settings":
             guard case .object(let patch)? = fields["patch"] else { throw Rejected(description: "update-settings without patch") }

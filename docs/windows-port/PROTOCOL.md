@@ -1,4 +1,4 @@
-# Engine ↔ shell protocol, version 1.3
+# Engine ↔ shell protocol, version 1.4
 
 How `AgentHUD.exe` (the WPF shell, M7) and `agenthud-engine.exe` (Swift, Support + Core) talk on Windows (ADR-001,
 D-022, D-041). The engine computes; the shell shows what it is sent and sends back what the user did. No rule of Core
@@ -50,7 +50,7 @@ announces in `hello`. A reader ignores fields it does not know. Times are intege
 ### `hello`
 
 ```json
-{"v":1,"type":"hello","minor":3,"engine":{"version":"0"},"demo":false,"language":"en","strings":{"…":"…"}}
+{"v":1,"type":"hello","minor":4,"engine":{"version":"0"},"demo":false,"language":"en","strings":{"…":"…"}}
 ```
 
 `language` is the language Core resolved (`zh` or `en`). `strings` holds the words of the shell's own chrome
@@ -99,6 +99,16 @@ An approval: `id`, `source`, `vendor`, `sessionID`, `toolName`, `summary`, `deta
 `added`, `at`, `isQuestion`, `questions` (`[{key, question, header, multiSelect, options: [{label, description}]}]`),
 `isPlan`, `plan`, `answersPlan`, `alwaysAllowRule` (the rule an "Always allow" would add, or null when the client
 offers none — then the shell shows no such button), and from 1.1 `mark`.
+
+### Version 1.4
+
+1.4 places each display's HUD as Core does. The shell sends `{"v":1,"type":"displays","displays":[{"key","hasNotch"}]}`
+at the start and whenever its displays change (the key is the monitor's device interface path, stable across restarts);
+every `state` then carries `placements`, by key, each display's `ScreenPlacement` in Core's encoding as
+`Settings.placement(on:hasNotch:)` resolves it (its saved placement, or the default for its hardware: a Windows display
+has no notch, so the dock on the top edge at its centre). Dragging the HUD to another edge is an `update-settings` patch of
+`screens`, every other display's placement as saved and this one's with its edge and offset changed (a notch placement
+becomes the dock, docs/hud.md), which Core validates.
 
 ### Version 1.3
 

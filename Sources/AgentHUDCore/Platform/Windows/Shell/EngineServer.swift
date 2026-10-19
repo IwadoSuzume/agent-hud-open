@@ -31,6 +31,8 @@ public final class EngineServer {
     private var tracker = IslandEventTracker()
     private var observedClients: Set<String> = []
     private var stateScheduled = false
+    /// The displays the shell draws on (1.4), placed in each state.
+    private var displays: [ShellProtocol.Display] = []
     private var started = false
     private var stopped = false
     private let deepseekQuestions = DeepSeekQuestionObserver()
@@ -58,6 +60,9 @@ public final class EngineServer {
         case .refresh:
             guard let store else { return write(ShellProtocol.error("no hello yet")) }
             Task { await store.refresh() }
+        case .displays(let listed):
+            displays = listed
+            if store != nil { scheduleState() }
         case .statistics:
             guard let store else { return write(ShellProtocol.error("no hello yet")) }
             write(ShellStatistics.message(store: store))
@@ -199,7 +204,7 @@ public final class EngineServer {
     private func sendState() {
         guard let store, !stopped else { return }
         do {
-            write(try ShellProtocol.state(store: store, approvals: PermissionRequests.shared.pending))
+            write(try ShellProtocol.state(store: store, approvals: PermissionRequests.shared.pending, displays: displays))
         } catch {
             write(ShellProtocol.error("state: \(error)"))
         }

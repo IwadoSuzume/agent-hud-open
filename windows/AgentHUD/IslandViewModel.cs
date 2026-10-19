@@ -46,7 +46,8 @@ sealed class IslandViewModel : INotifyPropertyChanged
     }
 
     public bool ShowsEventLine => Event is not null && !ShowsPanel;
-    public bool ShowsMarks => !ShowsPanel && Event is null;
+    /// <summary>A dock keeps its marks over its open panel (docs/hud.md); the news line takes their place at rest.</summary>
+    public bool ShowsMarks => !ShowsEventLine;
     public bool ShowsEventCard => Event is not null && ShowsPanel && (Waiting.Count == 0 || PictureEvent is not null) && !UsageOnly;
 
     public string Display { get; set; }

@@ -14,7 +14,7 @@ public sealed class ProtocolRejectedException(string message) : Exception(messag
 public static class ProtocolVersion
 {
     public const int Major = 1;
-    public const int Minor = 3;
+    public const int Minor = 4;
     /// <summary>The longest line either side takes.</summary>
     public const int LineLimit = 16 * 1024 * 1024;
 }
@@ -57,10 +57,21 @@ public sealed record Approval(string Id, string Source, string Vendor, string Se
 public sealed record Panel(DateTimeOffset Now, double? MaxUsedPct, IReadOnlyList<GlowSegment> Glow,
                            IReadOnlyList<AgentRow> Agents, IReadOnlyList<Session> Sessions, IReadOnlyList<QueueMark> Marks);
 
+public enum HudMode { Notch, Logos, Simple }
+
+public enum HudEdge { Top, Right, Bottom, Left }
+
+/// <summary>Where one display's HUD is (1.4), as Core placed it: its mode, the edge it is parked on, its centre along
+/// that edge as a share of the edge, and its marks' size and distance from the edge in points. <see cref="Encoded"/> is
+/// Core's own encoding, from which the shell makes a patch when the HUD is dragged.</summary>
+public sealed record Placement(HudMode Mode, HudEdge Edge, double Offset, double LogoSize, double LogoEdgeDistance,
+                               double GapScale, bool ShowsLogos, JsonObject Encoded);
+
 /// <summary>The whole of what the HUD shows. <see cref="Settings"/> is Core's own encoding, kept as JSON: the shell
-/// edits it by sending patches, and Core validates them.</summary>
+/// edits it by sending patches, and Core validates them. <see cref="Placements"/> (1.4) by display key; empty from an
+/// older engine.</summary>
 public sealed record State(DateTimeOffset? GeneratedAt, bool Paused, string? Error, JsonObject Settings, Panel Panel,
-                           IReadOnlyList<Approval> Approvals);
+                           IReadOnlyList<Approval> Approvals, IReadOnlyDictionary<string, Placement> Placements);
 
 /// <summary>One figure of an event's card: its value and its label, both the engine's words.</summary>
 public sealed record Metric(string Value, string Label);
@@ -148,8 +159,18 @@ public static class EngineMessage
                           ? Arr(panel, "marks").Select(m => new QueueMark(Text(m, "key"), Text(m, "vendor"), Bool(m, "isWorking"),
                                                                           Bool(m, "waiting"))).ToList()
                           : []),
-            Arr(message, "approvals").Select(ParseApproval).ToList());
+            Arr(message, "approvals").Select(ParseApproval).ToList(),
+            Has(message, "placements")
+                ? Obj(message, "placements").ToDictionary(p => p.Key, p => ParsePlacement(p.Value as JsonObject ?? throw Rejected($"placement {p.Key}")))
+                : new Dictionary<string, Placement>());
     }
+
+    static Placement ParsePlacement(JsonObject p) => new(
+        Text(p, "mode") switch { "notch" => HudMode.Notch, "logos" => HudMode.Logos, "simple" => HudMode.Simple, var m => throw Rejected($"unknown mode {m}") },
+        Text(p, "edge") switch { "top" => HudEdge.Top, "right" => HudEdge.Right, "bottom" => HudEdge.Bottom, "left" => HudEdge.Left,
+                                 var e => throw Rejected($"unknown edge {e}") },
+        OptNumber(p, "offset") ?? 0.5, OptNumber(p, "logoSize") ?? 20, OptNumber(p, "logoEdgeDistance") ?? 2,
+        OptNumber(p, "gapScale") ?? 0.4, Bool(p, "showsLogos"), (JsonObject)p.DeepClone());
 
     static Statistics ParseStatistics(JsonObject message) => new(
         OptTime(message, "generatedAt"), Text(message, "title"), Text(message, "dimensions"),
@@ -286,6 +307,25 @@ public static class ShellMessage
         Line(new() { ["minor"] = ProtocolVersion.Minor, ["shell"] = new JsonObject { ["version"] = shellVersion }, ["type"] = "hello" });
 
     public static string Refresh() => Line(new() { ["type"] = "refresh" });
+
+    /// <summary>1.4: the displays the shell draws on, by their stable keys; each state then places them.</summary>
+    public static string Displays(IEnumerable<(string Key, bool HasNotch)> displays) =>
+        Line(new() { ["type"] = "displays", ["displays"] = new JsonArray(displays.Select(d =>
+            (JsonNode?)new JsonObject { ["hasNotch"] = d.HasNotch, ["key"] = d.Key }).ToArray()) });
+
+    /// <summary>1.4: a display's HUD moved to <paramref name="edge"/> at <paramref name="offset"/> along it, as a patch
+    /// of Core's `screens`: every other display's placement as it is, this one's in its own encoding with the mode, edge
+    /// and offset changed (a notch dragged becomes the dock, docs/hud.md). Core validates it.</summary>
+    public static string MovePlacement(JsonObject settings, string key, Placement current, HudEdge edge, double offset)
+    {
+        var screens = settings["screens"] is JsonObject saved ? (JsonObject)saved.DeepClone() : new JsonObject();
+        var moved = (JsonObject)current.Encoded.DeepClone();
+        if (current.Mode == HudMode.Notch) moved["mode"] = "logos";
+        moved["edge"] = edge.ToString().ToLowerInvariant();
+        moved["offset"] = Math.Clamp(offset, 0, 1);
+        screens[key] = moved;
+        return UpdateSettings(new JsonObject { ["screens"] = screens });
+    }
 
     /// <summary>1.3: the statistics window asks for its figures; the engine answers with `statistics`.</summary>
     public static string Statistics() => Line(new() { ["type"] = "statistics" });

@@ -77,7 +77,10 @@
   <Grid>
     <Border x:Name="Island" HorizontalAlignment="Center" VerticalAlignment="Top" Background="{StaticResource Ground}"
             CornerRadius="0,0,14,14" SnapsToDevicePixels="True">
-      <StackPanel>
+      <!-- The HUD's rest (the news line or the marks) on its edge, the panel opening inward from it (ApplyPlacement). -->
+      <DockPanel x:Name="IslandLayout" LastChildFill="True">
+        <StackPanel x:Name="RestPart" DockPanel.Dock="Top" Background="Transparent" Cursor="SizeAll"
+                    PreviewMouseLeftButtonDown="OnRestDown" PreviewMouseMove="OnRestMove" PreviewMouseLeftButtonUp="OnRestUp">
         <!-- At rest with news: its mark, its agent, and the engine's short line in the news's accent. -->
         <ContentControl Content="{Binding Event}" Focusable="False" Margin="14,7,14,8"
                         Visibility="{Binding ShowsEventLine, Converter={StaticResource Shown}}">
@@ -94,12 +97,12 @@
           </ContentControl.ContentTemplate>
         </ContentControl>
         <!-- At rest: Core's logo queue, a mark each; a mark whose agent waits on the user wears a sign. -->
-        <ItemsControl ItemsSource="{Binding Marks}" Margin="14,6,14,7"
+        <ItemsControl x:Name="MarksList" ItemsSource="{Binding Marks}" Margin="10,2,10,3"
                       Visibility="{Binding ShowsMarks, Converter={StaticResource Shown}}">
           <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Grid Margin="4,0">
+              <Grid Margin="4">
                 <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MarkTemplate}" />
                 <Ellipse Width="7" Height="7" Fill="{x:Static local:LevelBrush.Warning}" Stroke="#FF121214" StrokeThickness="1.5"
                          HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-2,-3,0"
@@ -108,6 +111,7 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        </StackPanel>
 
         <!-- Open: the event panel while requests wait (the open one whole, the rest a line each), else the usage panel.
              It follows its content up to the display's height less 80 pt (PanelMaxHeight) and scrolls beyond. -->
@@ -403,7 +407,7 @@
           </StackPanel>
         </StackPanel>
         </ScrollViewer>
-      </StackPanel>
+      </DockPanel>
     </Border>
   </Grid>
 </Window>

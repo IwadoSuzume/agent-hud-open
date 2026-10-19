@@ -92,10 +92,16 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         XCTAssertFalse(store.view.rows.isEmpty)
         XCTAssertTrue(store.view.sessions.contains { $0.phase.state == .waitingForApproval }, "a demo request makes a session wait")
         XCTAssertNotNil(plan.plan, "the plan request carries its plan")
-        let state = try ShellProtocol.state(store: store, approvals: approvals)
+        // 1.4: two displays, one with a placement of its own on the left edge, the other on Core's default.
+        settings.update { $0.screens["DISPLAY-B"] = ScreenPlacement(mode: .logos, edge: .left, offset: 0.3) }
+        let displays = [ShellProtocol.Display(key: "DISPLAY-A", hasNotch: false), ShellProtocol.Display(key: "DISPLAY-B", hasNotch: false)]
+        let state = try ShellProtocol.state(store: store, approvals: approvals, displays: displays)
         let sessions = state["panel"]["sessions"].arrayValue ?? []
         XCTAssertTrue(sessions.contains { $0["phase"].stringValue == "waitingForApproval" && $0["phaseText"].stringValue == "Needs approval" },
                       "the status words are UsageStore.sessionStatusLabel's")
+        XCTAssertEqual(state["placements"]["DISPLAY-A"]["mode"].stringValue, "logos", "a display without a notch defaults to the dock")
+        XCTAssertEqual(state["placements"]["DISPLAY-A"]["edge"].stringValue, "top")
+        XCTAssertEqual(state["placements"]["DISPLAY-B"]["edge"].stringValue, "left", "a display keeps its own placement")
         try assertMatches(state, "engine-state.demo.json")
     }
 
@@ -189,6 +195,7 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
             "shell-answer-keep-planning.json": .answer(id: "demo-plan", .keepPlanning(note: "Split step 2")),
             "shell-update-settings.json": .updateSettings(["language": .string("zh-Hans"), "approvalWaitMinutes": .integer(5)]),
             "shell-statistics.json": .statistics,
+            "shell-displays.json": .displays([.init(key: "DISPLAY-A", hasNotch: false)]),
         ]
         let present = Set(try FileManager.default.contentsOfDirectory(atPath: Self.fixtures.path).filter { $0.hasPrefix("shell-") })
         XCTAssertEqual(present, Set(expected.keys), "every shell fixture is checked here")

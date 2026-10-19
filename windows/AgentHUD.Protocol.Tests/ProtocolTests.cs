@@ -222,6 +222,7 @@ public sealed class ProtocolTests
             ["shell-hello.json"] = ShellMessage.Hello("0.1.0"),
             ["shell-refresh.json"] = ShellMessage.Refresh(),
             ["shell-statistics.json"] = ShellMessage.Statistics(),
+            ["shell-displays.json"] = ShellMessage.Displays([("DISPLAY-A", false)]),
             ["shell-quit.json"] = ShellMessage.Quit(),
             ["shell-answer-allow.json"] = ShellMessage.Answer("demo-tests", ShellMessage.Decision.Allow),
             ["shell-answer-deny.json"] = ShellMessage.Answer("demo-tests", ShellMessage.Decision.Deny),

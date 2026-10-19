@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -39,6 +41,7 @@ public partial class IslandWindow : Window
         Monitor = monitor;
         view = new IslandViewModel(model, placement, cards, events, monitor.Device);
         DataContext = view;
+        Island.SizeChanged += (_, _) => PositionAlongSide();
         pointer = new DispatcherTimer(TimeSpan.FromMilliseconds(40), DispatcherPriority.Input, (_, _) => Track(), Dispatcher);
     }
 
@@ -65,25 +68,125 @@ public partial class IslandWindow : Window
         return IntPtr.Zero;
     }
 
-    /// <summary>At the top centre of <paramref name="monitor"/>, sized in its own pixels; WPF then lays the window out
-    /// at that display's DPI (Per-Monitor-V2).</summary>
+    /// <summary>On <paramref name="monitor"/>, sized and placed in its own pixels as its placement says; WPF then lays the
+    /// window out at that display's DPI (Per-Monitor-V2).</summary>
     internal void Place(Native.Monitor monitor)
     {
         Monitor = monitor;
         view.Display = monitor.Device;
+        ApplyPlacement(force: true);
+    }
+
+    // Placement (1.4): where Core puts this display's HUD — the dock on an edge at a share of it — or, while it is being
+    // dragged, where the pointer would drop it.
+    static readonly Placement Default = new(HudMode.Logos, HudEdge.Top, 0.5, 20, 2, 0.4, true, new System.Text.Json.Nodes.JsonObject());
+    (HudEdge Edge, double Offset)? dragTarget;
+    (HudEdge Edge, double Offset, Native.RECT Bounds, double Scale)? applied;
+
+    Placement Saved => model.State?.Placements.GetValueOrDefault(Monitor.Key) ?? Default;
+
+    /// <summary>The HUD on its edge: its rest docked there, the panel opening inward, the window along the edge at the
+    /// offset (the island at the notch's place for a notch placement, which a Windows display only has if chosen).</summary>
+    internal void ApplyPlacement(bool force = false)
+    {
+        var saved = Saved;
+        // The drop is shown until the engine's state carries it.
+        if (dragTarget is { } target && !dragging && saved.Edge == target.Edge && Math.Abs(saved.Offset - target.Offset) < 0.001)
+            dragTarget = null;
+        var edge = dragTarget?.Edge ?? (saved.Mode == HudMode.Notch ? HudEdge.Top : saved.Edge);
+        var offset = dragTarget?.Offset ?? (saved.Mode == HudMode.Notch ? 0.5 : saved.Offset);
+        if (!force && applied is { } last && last.Edge == edge && Math.Abs(last.Offset - offset) < 0.0001
+            && last.Bounds.Equals(Monitor.Bounds) && last.Scale == Monitor.Scale) return;
+        applied = (edge, offset, Monitor.Bounds, Monitor.Scale);
+
+        var horizontal = edge is HudEdge.Top or HudEdge.Bottom;
+        DockPanel.SetDock(RestPart, edge switch { HudEdge.Top => Dock.Top, HudEdge.Bottom => Dock.Bottom, HudEdge.Left => Dock.Left, _ => Dock.Right });
+        Island.CornerRadius = edge switch
+        {
+            HudEdge.Top => new CornerRadius(0, 0, 14, 14), HudEdge.Bottom => new CornerRadius(14, 14, 0, 0),
+            HudEdge.Left => new CornerRadius(0, 14, 14, 0), _ => new CornerRadius(14, 0, 0, 14),
+        };
+        Island.HorizontalAlignment = edge switch { HudEdge.Left => HorizontalAlignment.Left, HudEdge.Right => HorizontalAlignment.Right, _ => HorizontalAlignment.Center };
+        Island.VerticalAlignment = edge == HudEdge.Bottom ? VerticalAlignment.Bottom : VerticalAlignment.Top;
+        var panel = new FrameworkElementFactory(typeof(StackPanel));
+        panel.SetValue(StackPanel.OrientationProperty, horizontal ? Orientation.Horizontal : Orientation.Vertical);
+        MarksList.ItemsPanel = new ItemsPanelTemplate(panel);
+
         // As tall as the display, the panel at most 80 pt short of it (docs/hud.md, Usage panel).
-        Height = monitor.Bounds.Height / monitor.Scale;
+        Width = horizontal ? 640 : 480;
+        Height = Monitor.Bounds.Height / Monitor.Scale;
         PanelScroll.MaxHeight = Math.Max(120, Height - 80);
+        PositionAlongSide();
         if (handle == IntPtr.Zero) return;
-        var width = (int)Math.Round(Width * monitor.Scale);
-        var height = monitor.Bounds.Height;
-        var x = monitor.Bounds.Left + (monitor.Bounds.Width - width) / 2;
-        Native.SetWindowPos(handle, Native.HWND_TOPMOST, x, monitor.Bounds.Top, width, height, Native.SWP_NOACTIVATE);
+        var bounds = Monitor.Bounds;
+        var width = (int)Math.Round(Width * Monitor.Scale);
+        var x = edge switch
+        {
+            HudEdge.Left => bounds.Left,
+            HudEdge.Right => bounds.Right - width,
+            _ => Math.Clamp(bounds.Left + (int)Math.Round(offset * bounds.Width) - width / 2, bounds.Left, bounds.Right - width),
+        };
+        Native.SetWindowPos(handle, Native.HWND_TOPMOST, x, bounds.Top, width, bounds.Height, Native.SWP_NOACTIVATE);
+    }
+
+    /// <summary>On a side edge, the HUD's centre at its share of the edge, kept on the display.</summary>
+    void PositionAlongSide()
+    {
+        if (applied is not { } placed || placed.Edge is HudEdge.Top or HudEdge.Bottom || Island.ActualHeight <= 0)
+        {
+            Island.Margin = new Thickness(0);
+            return;
+        }
+        var top = Math.Clamp(placed.Offset * Height - Island.ActualHeight / 2, 0, Math.Max(0, Height - Island.ActualHeight));
+        Island.Margin = new Thickness(0, top, 0, 0);
+    }
+
+    // Dragging (docs/hud.md, Placement): the HUD follows the pointer to the nearest edge of its display, and the drop is
+    // a patch of Core's `screens` (a notch becomes the dock); the panel stays shut while it moves.
+    Native.POINT? pressedAt;
+    bool dragging;
+
+    void OnRestDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!Native.GetCursorPos(out var at)) return;
+        pressedAt = at;
+        // Held from the press: the pointer leaves the drawn pixels at once, and a transparent pixel passes its moves on.
+        RestPart.CaptureMouse();
+    }
+
+    void OnRestMove(object sender, MouseEventArgs e)
+    {
+        if (pressedAt is not { } start || e.LeftButton != MouseButtonState.Pressed || !Native.GetCursorPos(out var now)) return;
+        if (!dragging)
+        {
+            if (Math.Abs(now.X - start.X) + Math.Abs(now.Y - start.Y) < 6 * Monitor.Scale) return;
+            dragging = true;
+            Feed(new HoverEvent.ForceCollapse());
+        }
+        var b = Monitor.Bounds;
+        var x = Math.Clamp(now.X, b.Left, b.Right - 1);
+        var y = Math.Clamp(now.Y, b.Top, b.Bottom - 1);
+        var distances = new[] { (HudEdge.Top, y - b.Top), (HudEdge.Bottom, b.Bottom - 1 - y), (HudEdge.Left, x - b.Left), (HudEdge.Right, b.Right - 1 - x) };
+        var edge = distances.MinBy(d => d.Item2).Item1;
+        var offset = edge is HudEdge.Top or HudEdge.Bottom ? (x - b.Left) / (double)b.Width : (y - b.Top) / (double)b.Height;
+        dragTarget = (edge, Math.Round(offset, 4));
+        ApplyPlacement();
+    }
+
+    void OnRestUp(object sender, MouseButtonEventArgs e)
+    {
+        pressedAt = null;
+        RestPart.ReleaseMouseCapture();
+        if (!dragging) return;
+        dragging = false;
+        if (dragTarget is { } target && model.State is { } state)
+            send(ShellMessage.MovePlacement(state.Settings, Monitor.Key, Saved, target.Edge, target.Offset));
+        e.Handled = true;
     }
 
     void Track()
     {
-        if (!IsVisible || Island.ActualWidth <= 0) return;
+        if (!IsVisible || Island.ActualWidth <= 0 || dragging) return;
         var now = DateTimeOffset.Now;
         // Typing holds the island open, whatever the pointer does.
         var over = typing || PointerOverIsland();

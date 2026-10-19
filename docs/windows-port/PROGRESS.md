@@ -101,11 +101,16 @@ deprecated` in `Providers/Antigravity/AntigravityCLI.swift`; `result of call to 
    engine (19 checks passed locally).
 6. M7 step 6 (D-049): the statistics window's Recent usage card (protocol 1.3), `--show-stats`, its snapshot. G1 for
    step 4 (`da4f908`): macOS run 39172797224 green on attempt 2 after the agreed single rerun of the upstream flake.
-7. M7 next, in this order: the other
-   settings panes the shell can honour (agents and their live status need the agent list in the protocol); docks on
-   other edges and dragging; full-screen apps; the timezone (below); then the review. The engine still lacks: the session title and
-   row token total (D-043), a session `message` in any fixture, `NSTimeZone.default` from the Windows zone (Known
-   issues). Visual Studio may be used (Environment); the gates build with `dotnet`.
+7. M7 step 7 (D-050): the engine's time zone is Windows' own.
+8. M7 step 8 (D-051): the HUD on any edge per display (protocol 1.4: displays named by their monitor interface path,
+   placed by Core), dragged live to the nearest edge and saved as a patch of `screens`; `ui-check.ps1` drags it (23
+   checks passed locally).
+9. M7 next: full-screen apps (the HUD stays out of their way, optional in TASK.md); then the review (round 1 on
+   `5ab51fc...HEAD`, push, CI both platforms, port-tester with G5's smoke test and, on an idle desktop, `ui-check.ps1`,
+   port-reviewer). Left for later minor versions, recorded in D-043/D-049/D-051: the other settings panes (agents need
+   the agent list in the protocol), the other statistics pages, the Simple panel, logo size and spacing, the session
+   title and row token total, a session `message` in a fixture. Visual Studio may be used (Environment); the gates
+   build with `dotnet`.
 
 ## Known issues / TODO
 

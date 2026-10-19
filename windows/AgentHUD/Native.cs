@@ -81,8 +81,35 @@ static class Native
     [DllImport("user32.dll")]
     public static extern bool IsWindow(IntPtr hwnd);
 
-    /// <summary>One display: its device name, whole area and work area in physical pixels, and its DPI scale.</summary>
-    public sealed record Monitor(string Device, RECT Bounds, RECT Work, double Scale, bool Primary);
+    /// <summary>One display: its device name, whole area and work area in physical pixels, its DPI scale, and the key Core
+    /// keeps its placement under (1.4): the monitor's device interface path, stable across restarts and the order Windows
+    /// numbers its displays in, else the device name.</summary>
+    public sealed record Monitor(string Device, RECT Bounds, RECT Work, double Scale, bool Primary, string Key);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct DISPLAY_DEVICE
+    {
+        public int Size;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string Name;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string String;
+        public uint Flags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string Id;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string Key;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern bool EnumDisplayDevicesW(string? device, uint index, ref DISPLAY_DEVICE info, uint flags);
+
+    const uint EDD_GET_DEVICE_INTERFACE_NAME = 1;
+
+    /// <summary>The first monitor attached to the adapter output <paramref name="device"/>, by its interface path.</summary>
+    static string KeyOf(string device)
+    {
+        var monitor = new DISPLAY_DEVICE { Size = Marshal.SizeOf<DISPLAY_DEVICE>() };
+        return EnumDisplayDevicesW(device, 0, ref monitor, EDD_GET_DEVICE_INTERFACE_NAME) && !string.IsNullOrEmpty(monitor.Id)
+            ? monitor.Id
+            : device;
+    }
 
     public static List<Monitor> Monitors()
     {
@@ -93,7 +120,7 @@ static class Native
             if (!GetMonitorInfoW(handle, ref info)) return true;
             // MDT_EFFECTIVE_DPI (0); 96 when the call fails.
             var scale = GetDpiForMonitor(handle, 0, out var dpi, out _) == 0 ? dpi / 96.0 : 1.0;
-            found.Add(new Monitor(info.Device, info.Monitor, info.Work, scale, (info.Flags & MONITORINFOF_PRIMARY) != 0));
+            found.Add(new Monitor(info.Device, info.Monitor, info.Work, scale, (info.Flags & MONITORINFOF_PRIMARY) != 0, KeyOf(info.Device)));
             return true;
         }, IntPtr.Zero);
         return found;

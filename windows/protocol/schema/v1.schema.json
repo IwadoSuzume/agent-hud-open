@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/IwadoSuzume/agent-hud-open/windows/protocol/schema/v1.schema.json",
-  "title": "Agent HUD engine-shell protocol, version 1.3",
-  "description": "One message per line (docs/windows-port/PROTOCOL.md). Minor versions only add properties and message types; this file describes 1.3 as the engine of this version sends it, and a reader ignores what it does not know.",
+  "title": "Agent HUD engine-shell protocol, version 1.4",
+  "description": "One message per line (docs/windows-port/PROTOCOL.md). Minor versions only add properties and message types; this file describes 1.4 as the engine of this version sends it, and a reader ignores what it does not know.",
   "oneOf": [
     { "$ref": "#/$defs/engineHello" },
     { "$ref": "#/$defs/lockHeld" },
@@ -14,7 +14,8 @@
     { "$ref": "#/$defs/quit" },
     { "$ref": "#/$defs/answer" },
     { "$ref": "#/$defs/updateSettings" },
-    { "$ref": "#/$defs/statistics" }, { "$ref": "#/$defs/statisticsRequest" }
+    { "$ref": "#/$defs/statistics" }, { "$ref": "#/$defs/statisticsRequest" },
+    { "$ref": "#/$defs/displays" }
   ],
   "$defs": {
     "metrics": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["value", "label"],
@@ -49,7 +50,7 @@
     },
     "state": {
       "type": "object", "additionalProperties": false,
-      "required": ["v", "type", "generatedAt", "paused", "error", "settings", "panel", "approvals"],
+      "required": ["v", "type", "generatedAt", "paused", "error", "settings", "panel", "approvals", "placements"],
       "properties": {
         "v": { "const": 1 }, "type": { "const": "state" },
         "generatedAt": { "$ref": "#/$defs/timeOrNull" },
@@ -57,6 +58,7 @@
         "error": { "$ref": "#/$defs/textOrNull" },
         "settings": { "type": "object", "description": "Core's own encoding of Settings; Core validates every change" },
         "panel": { "$ref": "#/$defs/panel" },
+        "placements": { "type": "object", "additionalProperties": { "$ref": "#/$defs/placement" } },
         "approvals": { "type": "array", "items": { "$ref": "#/$defs/approval" } }
       }
     },
@@ -232,6 +234,28 @@
               "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "displayName": { "type": "string" },
                               "vendor": { "type": "string" }, "mark": { "type": "string" }, "tokens": { "type": "string" },
                               "share": { "type": "number" }, "paletteIndex": { "type": "integer", "minimum": 0 } } } } } } }
+      }
+    },
+    "displays": {
+      "type": "object", "additionalProperties": false, "required": ["v", "type", "displays"],
+      "properties": { "v": { "const": 1 }, "type": { "const": "displays" },
+                      "displays": { "type": "array", "items": {
+                        "type": "object", "additionalProperties": false, "required": ["key", "hasNotch"],
+                        "properties": { "key": { "type": "string", "minLength": 1 }, "hasNotch": { "type": "boolean" } } } } }
+    },
+    "placement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode", "edge", "offset", "logoSize", "logoEdgeDistance", "gapScale", "showsLogos", "simpleSize", "ringWidth",
+                   "showsRings", "showsNumbers", "separatesAgents", "appearance", "material", "glassStyle", "glassTransparency",
+                   "solidTransparency"],
+      "properties": {
+        "mode": { "enum": ["notch", "logos", "simple"] }, "edge": { "enum": ["top", "right", "bottom", "left"] },
+        "offset": { "type": "number" }, "logoSize": { "type": "number" }, "logoEdgeDistance": { "type": "number" },
+        "gapScale": { "type": "number" }, "showsLogos": { "type": "boolean" }, "simpleSize": { "type": "number" },
+        "ringWidth": { "type": "number" }, "showsRings": { "type": "boolean" }, "showsNumbers": { "type": "boolean" },
+        "separatesAgents": { "type": "boolean" }, "appearance": { "enum": ["dark", "light", "system"] },
+        "material": { "enum": ["solid", "glass"] }, "glassStyle": { "enum": ["clear", "regular", "material"] },
+        "glassTransparency": { "type": "number" }, "solidTransparency": { "type": "number" }
       }
     }
   }

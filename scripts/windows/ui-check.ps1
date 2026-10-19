@@ -31,6 +31,13 @@ public static class UiCheckInput {
   [DllImport("user32.dll")] static extern uint SendInput(uint n, INPUT[] inputs, int size);
   public static uint ForegroundPid() { uint p; GetWindowThreadProcessId(GetForegroundWindow(), out p); return p; }
   public static void Click(int x, int y) { SetCursorPos(x, y); mouse_event(2, 0, 0, 0, IntPtr.Zero); mouse_event(4, 0, 0, 0, IntPtr.Zero); }
+  /// A press at one point, the pointer moved in steps, and the release at the other.
+  public static void Drag(int x0, int y0, int x1, int y1) {
+    // A moment over the dock first, as a hand would rest there, so the window under the pointer is known before the press.
+    SetCursorPos(x0, y0); System.Threading.Thread.Sleep(300); mouse_event(2, 0, 0, 0, IntPtr.Zero); System.Threading.Thread.Sleep(100);
+    for (int i = 1; i <= 20; i++) { SetCursorPos(x0 + (x1 - x0) * i / 20, y0 + (y1 - y0) * i / 20); System.Threading.Thread.Sleep(25); }
+    mouse_event(4, 0, 0, 0, IntPtr.Zero);
+  }
   static void Key(ushort vk, ushort scan, uint flags) {
     var down = new INPUT { type = 1, ki = new KEYBDINPUT { vk = vk, scan = scan, flags = flags } };
     var up = new INPUT { type = 1, ki = new KEYBDINPUT { vk = vk, scan = scan, flags = flags | 2 } };
@@ -155,6 +162,40 @@ try {
         $state = $hooks.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern).Current.ToggleState
         $saved = SavedSettings
         Check ($state -eq [Windows.Automation.ToggleState]::On -and $saved.clientHooks -eq $true) 'Cancel keeps the hooks on'
+    }
+} finally {
+    Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+}
+
+# The dock: dragged on the primary display to its left edge, it goes there, and the engine keeps it there (D-051).
+Add-Type -AssemblyName System.Windows.Forms
+$env:APPDATA = Join-Path $profileRoot 'Roaming'; $env:LOCALAPPDATA = Join-Path $profileRoot 'Local'
+$process = Start-Process -FilePath $shell -PassThru -ArgumentList @('--demo', '--engine', "`"$Engine`"", '--language', 'en')
+$env:APPDATA = $realRoaming; $env:LOCALAPPDATA = $realLocal
+try {
+    Start-Sleep -Seconds 5
+    $mine = New-Object Windows.Automation.PropertyCondition ([Windows.Automation.AutomationElement]::ProcessIdProperty), $process.Id
+    $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+    function PrimaryMarks {
+        All | Where-Object { $_.Current.AutomationId -eq 'MarksList' } | Where-Object {
+            $r = $_.Current.BoundingRectangle
+            $r.X -ge $screen.Left -and $r.X -lt $screen.Right -and $r.Y -ge $screen.Top -and $r.Y -lt $screen.Bottom
+        } | Select-Object -First 1
+    }
+    $marks = PrimaryMarks
+    Check ([bool]$marks) 'the dock rests on the primary display'
+    if ($marks) {
+        $r = $marks.Current.BoundingRectangle
+        Check ([Math]::Abs(($r.X + $r.Width / 2) - ($screen.Left + $screen.Width / 2)) -lt 40 -and $r.Y -lt $screen.Top + 60) "it starts at the top centre, Core's default"
+        $toY = [int]($screen.Top + $screen.Height * 0.3)
+        [UiCheckInput]::Drag([int]($r.X + 12), [int]($r.Y + $r.Height / 2), $screen.Left + 3, $toY)
+        Start-Sleep -Milliseconds 1500
+        $moved = (PrimaryMarks).Current.BoundingRectangle
+        Check ($moved.X -lt $screen.Left + 60 -and [Math]::Abs(($moved.Y + $moved.Height / 2) - $toY) -lt $screen.Height * 0.1) 'the drop puts it on the left edge where it was let go'
+        $saved = SavedSettings
+        $placements = @($saved.screens.PSObject.Properties | ForEach-Object { $_.Value })
+        Check ($placements.Count -eq 1 -and $placements[0].edge -eq 'left' -and [Math]::Abs($placements[0].offset - 0.3) -lt 0.05) 'the engine keeps the display on the left edge'
     }
 } finally {
     Stop-Process -Id $process.Id -ErrorAction SilentlyContinue

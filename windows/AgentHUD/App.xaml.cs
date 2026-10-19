@@ -91,6 +91,7 @@ public partial class App : Application
         SystemEvents.DisplaySettingsChanged += OnDisplaysChanged;
         if (snapshotFolder is null) tray = new Tray(model, OpenSettings, OpenStatistics, Quit);
         engine.Start(ShellVersion);
+        TellDisplays();
         if (snapshotFolder is not null) Snapshot.Begin(this, model, islands, snapshotFolder, feedFolder, Send);
         // As the macOS app's `--show-settings`: the window once the engine has said hello (its words are the engine's).
         else if (showSettings || showStats) model.Changed += OpenSettingsOnce;
@@ -171,7 +172,11 @@ public partial class App : Application
 
     void RefreshIslands()
     {
-        foreach (var island in islands) island.View.Refresh();
+        foreach (var island in islands)
+        {
+            island.View.Refresh();
+            island.ApplyPlacement();
+        }
     }
 
     void OnDisplaysChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(BuildIslands, DispatcherPriority.Background);
@@ -184,7 +189,7 @@ public partial class App : Application
         if (monitors.Count == 0 && snapshotFolder is not null)
         {
             var area = new Native.RECT { Left = 0, Top = 0, Right = 1920, Bottom = 1080 };
-            monitors.Add(new Native.Monitor(@"\\.\SNAPSHOT", area, area, 1.0, true));
+            monitors.Add(new Native.Monitor(@"\\.\SNAPSHOT", area, area, 1.0, true, "SNAPSHOT"));
         }
         foreach (var island in islands.Where(i => monitors.All(m => m.Device != i.Monitor.Device)).ToList())
         {
@@ -205,6 +210,14 @@ public partial class App : Application
         // A request whose display went away moves to the pointer's.
         PlaceRequests();
         RefreshIslands();
+        TellDisplays();
+    }
+
+    /// <summary>The engine places each display the shell draws on (1.4): told at the start and whenever they change.</summary>
+    void TellDisplays()
+    {
+        if (engine is null || islands.Count == 0) return;
+        Send(ShellMessage.Displays(islands.Select(i => (i.Monitor.Key, false))));
     }
 
     internal void Send(string line) => engine?.Send(line);
