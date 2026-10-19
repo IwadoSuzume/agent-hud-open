@@ -42,6 +42,16 @@ no milestone left to own it (M7 review round 1): symptom, what was tried, sugges
   instructions say "at the top of the screen" (one `#if os(Windows)` each in `MCPServer.swift` and `MCPTools.swift`;
   macOS's words unchanged).
 
+## B-003 — OPEN — The panel's session title and row token count are not shown on Windows (2026-10-18)
+
+- **Symptom.** The Desktop's hover panel titles a session with its short task and terminal
+  (`HoverPanelView.sessionTitle`), and each agent row shows its in/out token pair (`TokenFormat.inOut`). Protocol 1.4
+  carries neither, so the Windows panel shows the project and the row's figures without them (D-043, M6 round 3).
+- **Tried.** D-043 named M7 as the owner "when the shell's panel needs them". M7 round 1's review found it unowned.
+- **Suggestion.** Add both to a later minor version: `title` on `panel.sessions[]` and `tokensText` on
+  `panel.agents[]`, made by Core's own functions (moved from the Desktop into Core where they are Desktop-only), and
+  checked as 1.1's labels are. The shell only binds them.
+
 ## B-004 — OPEN — The hover panel's balances, accounts, notices and token periods, and replies beside a request (2026-10-19)
 
 - **Symptom.** TASK.md §1 goal 1 names the panel's quota, balance, 24 h tokens and sessions. The Windows panel shows the
@@ -74,13 +84,3 @@ no milestone left to own it (M7 review round 1): symptom, what was tried, sugges
   request and answer like 1.3's, made by the Desktop's computation moved into or mirrored in Core with its
   `L10n.text` calls source-checked (D-049). The settings panes need the sources (1.5) plus the panel layout's
   descriptions, which Core's `PanelLayout` already holds.
-
-## B-003 — OPEN — The panel's session title and row token count are not shown on Windows (2026-10-18)
-
-- **Symptom.** The Desktop's hover panel titles a session with its short task and terminal
-  (`HoverPanelView.sessionTitle`), and each agent row shows its in/out token pair (`TokenFormat.inOut`). Protocol 1.4
-  carries neither, so the Windows panel shows the project and the row's figures without them (D-043, M6 round 3).
-- **Tried.** D-043 named M7 as the owner "when the shell's panel needs them". M7 round 1's review found it unowned.
-- **Suggestion.** Add both to a later minor version: `title` on `panel.sessions[]` and `tokensText` on
-  `panel.agents[]`, made by Core's own functions (moved from the Desktop into Core where they are Desktop-only), and
-  checked as 1.1's labels are. The shell only binds them.
