@@ -21,7 +21,25 @@ public partial class App : Application
     readonly RequestPlacement placement = new();
     readonly Cards cards;
     readonly EventQueue events = new();
-    DispatcherTimer? eventClock;
+    DispatcherTimer? eventClock, fullScreenClock;
+
+    /// <summary>The HUD on a display a full-screen app holds steps aside, unless a request of the user waits there
+    /// (FullScreen). The desktop and the taskbar cover a display too, and are no app.</summary>
+    void StepAsideForFullScreen()
+    {
+        var front = Native.GetForegroundWindow();
+        var covered = new Native.RECT();
+        var frontIsDesktopOrHud = front == IntPtr.Zero || !Native.GetWindowRect(front, out covered)
+            || (Native.GetWindowThreadProcessId(front, out var owner) != 0 && owner == Environment.ProcessId)
+            || Native.ClassName(front) is "Progman" or "WorkerW" or "Shell_TrayWnd" or "Shell_SecondaryTrayWnd";
+        foreach (var island in islands)
+        {
+            var b = island.Monitor.Bounds;
+            var covers = FullScreen.Covers(new ScreenRect(covered.Left, covered.Top, covered.Right, covered.Bottom),
+                                           new ScreenRect(b.Left, b.Top, b.Right, b.Bottom));
+            island.StepAside(!FullScreen.ShowsHud(covers, frontIsDesktopOrHud, island.View.HoldsRequest));
+        }
+    }
     string? feedFolder;
     readonly List<IslandWindow> islands = [];
     EngineConnection? engine;
@@ -86,6 +104,8 @@ public partial class App : Application
         model.EventArrived += OnEvent;
         eventClock = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => TickEvents(), Dispatcher);
         eventClock.Start();
+        fullScreenClock = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => StepAsideForFullScreen(), Dispatcher);
+        fullScreenClock.Start();
 
         BuildIslands();
         SystemEvents.DisplaySettingsChanged += OnDisplaysChanged;

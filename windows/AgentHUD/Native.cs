@@ -81,6 +81,18 @@ static class Native
     [DllImport("user32.dll")]
     public static extern bool IsWindow(IntPtr hwnd);
 
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint process);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern int GetClassNameW(IntPtr hwnd, System.Text.StringBuilder name, int capacity);
+
+    public static string ClassName(IntPtr hwnd)
+    {
+        var name = new System.Text.StringBuilder(256);
+        return GetClassNameW(hwnd, name, name.Capacity) > 0 ? name.ToString() : "";
+    }
+
     /// <summary>One display: its device name, whole area and work area in physical pixels, its DPI scale, and the key Core
     /// keeps its placement under (1.4): the monitor's device interface path, stable across restarts and the order Windows
     /// numbers its displays in, else the device name.</summary>

@@ -215,6 +215,13 @@ public partial class IslandWindow : Window
         return cursor.X >= topLeft.X && cursor.X < bottomRight.X && cursor.Y >= topLeft.Y && cursor.Y < bottomRight.Y;
     }
 
+    /// <summary>A full-screen app holds this display: the HUD draws nothing, and every pixel passes its clicks on.</summary>
+    internal void StepAside(bool aside)
+    {
+        var visibility = aside ? Visibility.Collapsed : Visibility.Visible;
+        if (Island.Visibility != visibility) Island.Visibility = visibility;
+    }
+
     /// <summary>For the snapshot: opens a request's card here, as a click on its line does.</summary>
     internal void OpenRequestForPicture(string requestId)
     {

@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $shell = Join-Path $root 'windows\AgentHUD\bin\Release\net10.0-windows\AgentHUD.exe'
 if (-not (Test-Path -LiteralPath $shell)) { throw "build windows\AgentHUD in Release first ($shell)" }
-Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Windows.Forms, System.Drawing
 Add-Type @'
 using System; using System.Runtime.InteropServices;
 public static class UiCheckInput {
@@ -29,6 +29,7 @@ public static class UiCheckInput {
   [StructLayout(LayoutKind.Sequential)] struct KEYBDINPUT { public ushort vk; public ushort scan; public uint flags; public uint time; public IntPtr extra; }
   [StructLayout(LayoutKind.Explicit, Size = 40)] struct INPUT { [FieldOffset(0)] public uint type; [FieldOffset(8)] public KEYBDINPUT ki; }
   [DllImport("user32.dll")] static extern uint SendInput(uint n, INPUT[] inputs, int size);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
   public static uint ForegroundPid() { uint p; GetWindowThreadProcessId(GetForegroundWindow(), out p); return p; }
   public static void Click(int x, int y) { SetCursorPos(x, y); mouse_event(2, 0, 0, 0, IntPtr.Zero); mouse_event(4, 0, 0, 0, IntPtr.Zero); }
   /// A press at one point, the pointer moved in steps, and the release at the other.
@@ -49,6 +50,8 @@ public static class UiCheckInput {
 }
 '@
 
+# Physical pixels everywhere, as UI Automation gives them: the pointer, the screens and a test window's bounds.
+[UiCheckInput]::SetProcessDPIAware() | Out-Null
 $failures = 0
 function Check([bool] $ok, [string] $what) {
     if ($ok) { Write-Host "PASS $what" } else { Write-Host "FAIL $what"; $script:failures++ }
@@ -169,7 +172,6 @@ try {
 }
 
 # The dock: dragged on the primary display to its left edge, it goes there, and the engine keeps it there (D-051).
-Add-Type -AssemblyName System.Windows.Forms
 $env:APPDATA = Join-Path $profileRoot 'Roaming'; $env:LOCALAPPDATA = Join-Path $profileRoot 'Local'
 $process = Start-Process -FilePath $shell -PassThru -ArgumentList @('--demo', '--engine', "`"$Engine`"", '--language', 'en')
 $env:APPDATA = $realRoaming; $env:LOCALAPPDATA = $realLocal
@@ -196,6 +198,26 @@ try {
         $saved = SavedSettings
         $placements = @($saved.screens.PSObject.Properties | ForEach-Object { $_.Value })
         Check ($placements.Count -eq 1 -and $placements[0].edge -eq 'left' -and [Math]::Abs($placements[0].offset - 0.3) -lt 0.05) 'the engine keeps the display on the left edge'
+    }
+
+    # A full-screen app on a display without a request steps its HUD aside, and the HUD comes back after (D-052).
+    $other = [System.Windows.Forms.Screen]::AllScreens | Where-Object { -not $_.Primary } | Select-Object -First 1
+    if ($other) {
+        function OtherDock {
+            All | Where-Object { $_.Current.AutomationId -eq 'MarksList' -and -not $_.Current.IsOffscreen } |
+                Where-Object { $r = $_.Current.BoundingRectangle; $other.Bounds.Contains([int]($r.X + $r.Width / 2), [int]($r.Y + $r.Height / 2)) }
+        }
+        $shownBefore = [bool](OtherDock)
+        $form = New-Object System.Windows.Forms.Form
+        $form.FormBorderStyle = 'None'; $form.StartPosition = 'Manual'; $form.Bounds = $other.Bounds; $form.BackColor = 'Black'
+        $form.Show(); $form.Activate(); [System.Windows.Forms.Application]::DoEvents()
+        Start-Sleep -Milliseconds 2500
+        $shownUnder = [bool](OtherDock)
+        $form.Close(); [System.Windows.Forms.Application]::DoEvents()
+        Start-Sleep -Milliseconds 2500
+        Check ($shownBefore -and -not $shownUnder -and [bool](OtherDock)) 'a full-screen app on a display steps its HUD aside until it goes'
+    } else {
+        Write-Host 'SKIP a full-screen app (one display only)'
     }
 } finally {
     Stop-Process -Id $process.Id -ErrorAction SilentlyContinue

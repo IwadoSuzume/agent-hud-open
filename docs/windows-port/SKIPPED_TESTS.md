@@ -10,7 +10,7 @@ not listed here counts as a failure. Three mechanisms, each listed below, and ca
    missing.
 
 State at M7 step 7 (2026-10-18, Windows 11 26200, Swift 6.4.1, `test.ps1`): 1457 pass, 4 runtime skips, 34 listed skips,
-7 excluded files, 0 failures. The C# tests (`scripts\windows\test-dotnet.ps1`): 38 pass (14 protocol, 24 shell), none skipped.
+7 excluded files, 0 failures. The C# tests (`scripts\windows\test-dotnet.ps1`): 40 pass (14 protocol, 26 shell), none skipped.
 
 ## AgentHUDSupportTests
 
