@@ -53,7 +53,9 @@ public static class UiCheckInput {
 # Physical pixels everywhere, as UI Automation gives them: the pointer, the screens and a test window's bounds.
 [UiCheckInput]::SetProcessDPIAware() | Out-Null
 $failures = 0
-function Check([bool] $ok, [string] $what) {
+function Check($ok, [string] $what) {
+    # Any value, as PowerShell reads it as a condition: an empty result is a failure, never a stopped run.
+    $ok = [bool]$ok
     if ($ok) { Write-Host "PASS $what" } else { Write-Host "FAIL $what"; $script:failures++ }
 }
 
@@ -82,6 +84,17 @@ try {
     }
 
     Check ([UiCheckInput]::ForegroundPid() -eq $before) 'starting takes no focus'
+    # A request holds its line at rest and opens nothing by itself; hovering the line opens the queue (docs/hud.md).
+    # The line is found by its count ("x7", with the multiplication sign): the line itself is a ContentControl, which UI Automation does not list.
+    $requestLine = All | Where-Object { $_.Current.ControlType -eq [Windows.Automation.ControlType]::Text -and $_.Current.Name -match ('^' + [char]0xD7 + '[0-9]+$') -and
+            -not $_.Current.IsOffscreen -and $_.Current.BoundingRectangle.Width -gt 0 } |
+        Select-Object -First 1
+    Check ([bool]$requestLine -and -not (Line 'Which database?')) 'a waiting request shows its line and opens nothing by itself'
+    if ($requestLine) {
+        $r = $requestLine.Current.BoundingRectangle
+        [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point([int]($r.X + $r.Width / 2), [int]($r.Y + $r.Height / 2))
+        Start-Sleep -Milliseconds 1200
+    }
     $line = Line 'Which database?'
     Check ([bool]$line) 'the question waits in the queue'
     ClickOn $line
@@ -97,9 +110,11 @@ try {
     # A Chinese character too, written as its code so the script reads the same in any code page.
     $answer = "Postgres, $([char]0x7528) SQLite later"
     [UiCheckInput]::Type($answer)
-    Start-Sleep -Milliseconds 400
+    # The input queue and the binding take their time on a busy machine (one run in several read the field early).
+    Start-Sleep -Milliseconds 1000
     $value = $field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value
     Check ($value -eq $answer) 'the field holds what was typed'
+    if ($value -ne $answer) { Write-Host "  typed '$answer', the field holds '$value'" }
     [UiCheckInput]::Enter()
     Start-Sleep -Milliseconds 700
     Check ([bool](Named 'Submit')) 'Enter goes on to the next question'

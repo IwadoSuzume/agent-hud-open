@@ -1,4 +1,4 @@
-# Engine ↔ shell protocol, version 1.4
+# Engine ↔ shell protocol, version 1.5
 
 How `AgentHUD.exe` (the WPF shell, M7) and `agenthud-engine.exe` (Swift, Support + Core) talk on Windows (ADR-001,
 D-022, D-041). The engine computes; the shell shows what it is sent and sends back what the user did. No rule of Core
@@ -99,6 +99,15 @@ An approval: `id`, `source`, `vendor`, `sessionID`, `toolName`, `summary`, `deta
 `added`, `at`, `isQuestion`, `questions` (`[{key, question, header, multiSelect, options: [{label, description}]}]`),
 `isPlan`, `plan`, `answersPlan`, `alwaysAllowRule` (the rule an "Always allow" would add, or null when the client
 offers none — then the shell shows no such button), and from 1.1 `mark`.
+
+### Version 1.5
+
+1.5 lists the clients the build looks for, as the settings window's Agents section shows them. The shell sends
+`{"v":1,"type":"sources"}` when the window opens; the engine answers `sources`: `title` and `sources`, each with `id`,
+`name`, `mark`, `detail`, `status` (the Desktop's words: "Installed", "Ready", "Not detected"…), `detected` and
+`supported` — Core's `PlatformSupport` verdict; a client this build does not read says "Not supported on Windows"
+whatever was found. It is the Desktop's `SourceDetector` made by `ShellSources`, its words source-checked; the demo
+answers with the demo's own list (`DemoData.sources`), never the machine's. A 1.4 engine answers with `error`.
 
 ### Version 1.4
 

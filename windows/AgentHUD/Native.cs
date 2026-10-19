@@ -87,6 +87,11 @@ static class Native
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     static extern int GetClassNameW(IntPtr hwnd, System.Text.StringBuilder name, int capacity);
 
+    public const long WS_CAPTION = 0x00C00000;
+
+    /// <summary>The window has a title bar (WS_CAPTION), as a maximised window keeps and a full-screen app has not.</summary>
+    public static bool HasCaption(IntPtr hwnd) => (GetWindowLongPtr(hwnd, -16 /* GWL_STYLE */).ToInt64() & WS_CAPTION) == WS_CAPTION;
+
     public static string ClassName(IntPtr hwnd)
     {
         var name = new System.Text.StringBuilder(256);

@@ -57,7 +57,12 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
         var lines: [Data] { lock.withLock { received } }
         var messages: [JSONValue] { lines.compactMap { try? JSONValue.parse($0) } }
 
-        func send(_ line: String) { input.fileHandleForWriting.write(Data((line + "\n").utf8)) }
+        /// A line to the engine; an engine that has gone fails the test that sent it, not the whole run (`write(_:)` traps
+        /// on a closed pipe).
+        func send(_ line: String, file: StaticString = #filePath, line number: UInt = #line) {
+            do { try input.fileHandleForWriting.write(contentsOf: Data((line + "\n").utf8)) }
+            catch { XCTFail("the engine is gone: \(error)", file: file, line: number) }
+        }
 
         /// The first message after the first `skip` that `matches`, waiting up to `seconds`.
         func next(after skip: Int = 0, seconds: Double = 30, _ matches: (JSONValue) -> Bool) -> JSONValue? {
@@ -139,6 +144,11 @@ final class EngineServeEndToEndTests: XCTestCase, @unchecked Sendable {
         XCTAssertNotNil(served.next(after: served.lines.count - 1) {
             $0["type"].stringValue == "state" && !($0["approvals"].arrayValue ?? []).contains { $0["id"].stringValue == request }
         }, "the answered request leaves the state")
+
+        // The demo lists the demo's clients, never what this machine has installed.
+        served.send(#"{"v":1,"type":"sources"}"#)
+        let sources = try XCTUnwrap(served.next(type("sources")), "the sources are answered")
+        XCTAssertEqual((sources["sources"].arrayValue ?? []).map { $0["id"].stringValue }, DemoData.sources.map(\.id))
 
         served.send("not a message")
         XCTAssertNotNil(served.next(type("error")), "a line the engine cannot take is answered with error")

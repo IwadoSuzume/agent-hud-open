@@ -17,6 +17,14 @@ public sealed class FullScreenTests
     }
 
     [TestMethod]
+    public void AMaximisedWindowWithItsCaptionIsNoFullScreenApp()
+    {
+        Assert.IsTrue(FullScreen.IsFullScreen(new ScreenRect(0, 0, 2560, 1440), hasCaption: false, Display));
+        Assert.IsFalse(FullScreen.IsFullScreen(new ScreenRect(-8, -8, 2568, 1448), hasCaption: true, Display),
+                       "maximised over an auto-hiding taskbar");
+    }
+
+    [TestMethod]
     public void TheHudStepsAsideForAFullScreenAppButNeverHidesARequest()
     {
         Assert.IsFalse(FullScreen.ShowsHud(frontCoversDisplay: true, frontIsDesktopOrHud: false, requestWaitsHere: false));

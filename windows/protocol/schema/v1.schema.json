@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/IwadoSuzume/agent-hud-open/windows/protocol/schema/v1.schema.json",
-  "title": "Agent HUD engine-shell protocol, version 1.4",
-  "description": "One message per line (docs/windows-port/PROTOCOL.md). Minor versions only add properties and message types; this file describes 1.4 as the engine of this version sends it, and a reader ignores what it does not know.",
+  "title": "Agent HUD engine-shell protocol, version 1.5",
+  "description": "One message per line (docs/windows-port/PROTOCOL.md). Minor versions only add properties and message types; this file describes 1.5 as the engine of this version sends it, and a reader ignores what it does not know.",
   "oneOf": [
     { "$ref": "#/$defs/engineHello" },
     { "$ref": "#/$defs/lockHeld" },
@@ -15,7 +15,7 @@
     { "$ref": "#/$defs/answer" },
     { "$ref": "#/$defs/updateSettings" },
     { "$ref": "#/$defs/statistics" }, { "$ref": "#/$defs/statisticsRequest" },
-    { "$ref": "#/$defs/displays" }
+    { "$ref": "#/$defs/displays" }, { "$ref": "#/$defs/sources" }, { "$ref": "#/$defs/sourcesRequest" }
   ],
   "$defs": {
     "metrics": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["value", "label"],
@@ -256,6 +256,20 @@
         "separatesAgents": { "type": "boolean" }, "appearance": { "enum": ["dark", "light", "system"] },
         "material": { "enum": ["solid", "glass"] }, "glassStyle": { "enum": ["clear", "regular", "material"] },
         "glassTransparency": { "type": "number" }, "solidTransparency": { "type": "number" }
+      }
+    },
+    "sourcesRequest": { "type": "object", "additionalProperties": false, "required": ["v", "type"],
+                        "properties": { "v": { "const": 1 }, "type": { "const": "sources" } } },
+    "sources": {
+      "type": "object", "additionalProperties": false, "required": ["v", "type", "title", "sources"],
+      "properties": {
+        "v": { "const": 1 }, "type": { "const": "sources" }, "title": { "type": "string" },
+        "sources": { "type": "array", "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "name", "mark", "detail", "status", "supported", "detected"],
+          "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "mark": { "type": "string" },
+                          "detail": { "type": "string" }, "status": { "type": "string" }, "supported": { "type": "boolean" },
+                          "detected": { "type": "boolean" } } } }
       }
     }
   }

@@ -45,9 +45,27 @@ sealed class IslandViewModel : INotifyPropertyChanged
         set { pictureEvent = value; Refresh(); }
     }
 
-    public bool ShowsEventLine => Event is not null && !ShowsPanel;
-    /// <summary>A dock keeps its marks over its open panel (docs/hud.md); the news line takes their place at rest.</summary>
-    public bool ShowsMarks => !ShowsEventLine;
+    /// <summary>The pieces shown (IslandParts, the Desktop's ScreenHUD): the panel only while hovered open; at rest a
+    /// request's line beside the marks, else news's line in their place.</summary>
+    IslandParts Parts => IslandParts.At(IsOpen, Resting, HoldsRequest, Event is not null);
+
+    public bool ShowsEventLine => Parts.EventLine;
+    /// <summary>A dock keeps its marks over its open panel and beside a waiting request's line, the waiting mark wearing
+    /// its sign (docs/hud.md); the news line takes their place at rest.</summary>
+    public bool ShowsMarks => Parts.Marks;
+
+    /// <summary>At rest, a request waiting on this display holds its line (the Desktop's PermissionAlertCompactView): the
+    /// open request's mark, project or vendor and kind, and how many wait. Hovering opens the queue, as on macOS; a
+    /// request never opens the panel by itself.</summary>
+    public bool ShowsRequestLine => Parts.RequestLine;
+
+    public RequestLineItem? RequestLine =>
+        placement.OpenRequest(Waiting.Select(r => r.Id).ToList()) is { } id && Waiting.FirstOrDefault(r => r.Id == id) is { } request
+            ? new RequestLineItem(request, Artwork.Mark(request.Mark), Initial(request.Vendor),
+                                  request.IsQuestion ? model.Text("approval.questionShort")
+                                  : request.IsPlan ? model.Text("approval.planShort") : model.Text("approval.waitingShort"),
+                                  Waiting.Count > 1 ? "×" + Waiting.Count : null)
+            : null;
     public bool ShowsEventCard => Event is not null && ShowsPanel && (Waiting.Count == 0 || PictureEvent is not null) && !UsageOnly;
 
     public string Display { get; set; }
@@ -80,7 +98,7 @@ sealed class IslandViewModel : INotifyPropertyChanged
     /// <summary>A request of this display's waits: the island stays open for it.</summary>
     public bool HoldsRequest => PictureEvent is null && Waiting.Any(r => placement.DisplayOf(r.Id) == Display);
 
-    public bool ShowsPanel => !Resting && (IsOpen || HoldsRequest);
+    public bool ShowsPanel => Parts.Panel;
 
     /// <summary>Requests wait somewhere: the panel is the event panel, not the usage panel.</summary>
     public bool ShowsEvents => ShowsPanel && Waiting.Count > 0 && !UsageOnly && PictureEvent is null;
@@ -143,24 +161,25 @@ sealed record AgentItem(AgentRow Row, ImageSource? Image, string Initial)
 /// <summary>One line of the queue: enough to decide whether to open it.</summary>
 sealed record ApprovalItem(Approval Request, ImageSource? Image, string Initial);
 
-/// <summary>The news on an island: the engine's words for it (`EventCopy`), its mark, and its accent — a warning in the
-/// warning colour, a reply in blue, other news in green, as the Desktop's alert accents go.</summary>
+/// <summary>The news on an island: the engine's words for it (`EventCopy`), its mark, and its accent, the Desktop's
+/// IslandAlert accents (DesktopColours): a reply's, a warning's, or other news's.</summary>
 sealed record EventItem(HudEvent Event, EventCopy Copy, ImageSource? Image, string Initial, ShellModel Model)
 {
-    static readonly SolidColorBrush Reply = Frozen(Color.FromRgb(0x0A, 0x84, 0xFF));
-
-    static SolidColorBrush Frozen(Color colour)
-    {
-        var brush = new SolidColorBrush(colour);
-        brush.Freeze();
-        return brush;
-    }
+    static readonly SolidColorBrush Turn = LevelBrush.Frozen(DesktopColours.TurnAccent);
+    static readonly SolidColorBrush Warning = LevelBrush.Frozen(DesktopColours.WarningAccent);
+    static readonly SolidColorBrush Calm = LevelBrush.Frozen(DesktopColours.CalmAccent);
 
     public bool IsReply => Event is CompletionEvent;
     public bool IsNews => !IsReply;
-    public Brush Accent => IsReply ? Reply : Copy.Warning ? LevelBrush.Warning : LevelBrush.Ok;
+    public Brush Accent => IsReply ? Turn : Copy.Warning ? Warning : Calm;
     public double UsedFraction => Copy.UsedPct is { } used ? System.Math.Clamp(used / 100.0, 0, 1) : 0;
     public bool HasUsage => Copy.UsedPct is not null;
     /// <summary>A reply is put away; other news opens the statistics (the Desktop's "View usage statistics").</summary>
     public string Action => IsReply ? Model.Text("reply.dismiss") : Model.Text("alert.viewStatistics");
+}
+
+/// <summary>A waiting request's line at rest: its mark, its project (else its vendor), its kind and the count waiting.</summary>
+sealed record RequestLineItem(Approval Request, ImageSource? Image, string Initial, string Status, string? Count)
+{
+    public string Title => Request.Project ?? Request.Vendor;
 }

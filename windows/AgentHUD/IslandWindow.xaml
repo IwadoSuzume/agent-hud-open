@@ -80,7 +80,26 @@
       <!-- The HUD's rest (the news line or the marks) on its edge, the panel opening inward from it (ApplyPlacement). -->
       <DockPanel x:Name="IslandLayout" LastChildFill="True">
         <StackPanel x:Name="RestPart" DockPanel.Dock="Top" Background="Transparent" Cursor="SizeAll"
-                    PreviewMouseLeftButtonDown="OnRestDown" PreviewMouseMove="OnRestMove" PreviewMouseLeftButtonUp="OnRestUp">
+                    PreviewMouseLeftButtonDown="OnRestDown" PreviewMouseMove="OnRestMove" PreviewMouseLeftButtonUp="OnRestUp"
+                    LostMouseCapture="OnRestCaptureLost">
+        <!-- At rest with a request waiting here: its mark, project or vendor, kind and how many wait; hovering opens it. -->
+        <ContentControl x:Name="RequestLine" Content="{Binding RequestLine}" Focusable="False" Margin="14,7,14,8"
+                        Visibility="{Binding ShowsRequestLine, Converter={StaticResource Shown}}">
+          <ContentControl.ContentTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal">
+                <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource MarkTemplate}" Width="17" Height="17" />
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" Margin="8,0,0,0" VerticalAlignment="Center"
+                           MaxWidth="200" TextTrimming="CharacterEllipsis" />
+                <Ellipse Width="6" Height="6" Fill="{x:Static local:LevelBrush.Warning}" Margin="16,0,6,0" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Status}" Foreground="{x:Static local:LevelBrush.Warning}" FontWeight="Medium" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Count}" Foreground="{StaticResource Secondary}" Margin="8,0,0,0" VerticalAlignment="Center"
+                           Visibility="{Binding Count, Converter={StaticResource Shown}}" />
+              </StackPanel>
+            </DataTemplate>
+          </ContentControl.ContentTemplate>
+        </ContentControl>
+
         <!-- At rest with news: its mark, its agent, and the engine's short line in the news's accent. -->
         <ContentControl Content="{Binding Event}" Focusable="False" Margin="14,7,14,8"
                         Visibility="{Binding ShowsEventLine, Converter={StaticResource Shown}}">
@@ -190,13 +209,37 @@
                     </StackPanel>
                     <TextBlock Text="{Binding Request.Summary}" FontWeight="SemiBold" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap" />
 
-                    <!-- A plain request: what an allow lets run, the rule Always allow adds, and the answers. -->
+                    <!-- What an allow lets run (CardRules): the change's lines, − removed and + added, else the detail. -->
+                    <Border Background="{StaticResource Inset}" CornerRadius="7" Margin="0,6,0,0" Padding="9"
+                            Visibility="{Binding HasDiff, Converter={StaticResource Shown}}">
+                      <ItemsControl ItemsSource="{Binding Diff}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Grid Margin="0,0,0,1">
+                              <Grid.ColumnDefinitions><ColumnDefinition Width="14" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                              <TextBlock x:Name="Sign" Text="{Binding Sign}" FontFamily="Cascadia Mono, Consolas" FontSize="11" FontWeight="Bold"
+                                         Foreground="{x:Static local:LevelBrush.Critical}" Opacity="0.8" />
+                              <TextBlock x:Name="Line" Grid.Column="1" Text="{Binding Text}" FontFamily="Cascadia Mono, Consolas" FontSize="11"
+                                         Foreground="{x:Static local:LevelBrush.Critical}" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                            <DataTemplate.Triggers>
+                              <DataTrigger Binding="{Binding Added}" Value="True">
+                                <Setter TargetName="Sign" Property="Foreground" Value="{x:Static local:LevelBrush.Ok}" />
+                                <Setter TargetName="Line" Property="Foreground" Value="{x:Static local:LevelBrush.Ok}" />
+                              </DataTrigger>
+                            </DataTemplate.Triggers>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Border>
+                    <Border Background="{StaticResource Inset}" CornerRadius="7" Margin="0,6,0,0" Padding="8,6"
+                            Visibility="{Binding Detail, Converter={StaticResource Shown}}">
+                      <TextBlock Text="{Binding Detail}" Foreground="{StaticResource Secondary}" TextWrapping="Wrap" MaxHeight="96"
+                                 TextTrimming="CharacterEllipsis" FontFamily="Cascadia Mono, Consolas" FontSize="11" />
+                    </Border>
+
+                    <!-- A plain request: the rule Always allow adds, and the answers. -->
                     <StackPanel Visibility="{Binding IsPlain, Converter={StaticResource Shown}}">
-                      <Border Background="{StaticResource Inset}" CornerRadius="7" Margin="0,6,0,0" Padding="8,6"
-                              Visibility="{Binding Subject, Converter={StaticResource Shown}}">
-                        <TextBlock Text="{Binding Subject}" Foreground="{StaticResource Secondary}" TextWrapping="Wrap" MaxHeight="96"
-                                   TextTrimming="CharacterEllipsis" FontFamily="Cascadia Mono, Consolas" FontSize="11" />
-                      </Border>
                       <TextBlock Text="{Binding AlwaysRule}" Foreground="{StaticResource Secondary}" FontSize="11" Margin="0,6,0,0"
                                  TextWrapping="Wrap" Visibility="{Binding AlwaysRule, Converter={StaticResource Shown}}" />
                       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">

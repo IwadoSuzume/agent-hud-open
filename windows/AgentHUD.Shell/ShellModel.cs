@@ -19,6 +19,11 @@ public sealed class ShellModel
     /// <summary>Raised when the statistics come.</summary>
     public event Action? StatisticsChanged;
 
+    /// <summary>The engine's last answer to a `sources` request (1.5).</summary>
+    public Sources? Sources { get; private set; }
+
+    public event Action? SourcesChanged;
+
     /// <summary>The last error the engine reported about a line of the shell's.</summary>
     public string? LastError { get; private set; }
 
@@ -36,6 +41,7 @@ public sealed class ShellModel
             case LockHeld held: LockHeld = held; Changed?.Invoke(); break;
             case EngineError error: LastError = error.Message; break;
             case Statistics statistics: Statistics = statistics; StatisticsChanged?.Invoke(); break;
+            case Sources sources: Sources = sources; SourcesChanged?.Invoke(); break;
             case HudEvent hudEvent:
                 events.Enqueue(hudEvent);
                 EventArrived?.Invoke(hudEvent);
@@ -61,8 +67,11 @@ public sealed class ShellModel
     public bool BoolSetting(string name, bool fallback) =>
         State?.Settings[name] is System.Text.Json.Nodes.JsonValue value && value.TryGetValue(out bool flag) ? flag : fallback;
 
-    /// <summary>The hover delays the user set (Core's `hoverDelayMs`, `collapseDelayMs`; Core's defaults before the
-    /// first state).</summary>
-    public HoverConfig Hover => new(TimeSpan.FromMilliseconds(IntSetting("hoverDelayMs", 400)),
-                                    TimeSpan.FromMilliseconds(IntSetting("collapseDelayMs", 200)));
+    /// <summary>The hover delays the user set (Core's `hoverDelayMs`, `collapseDelayMs`, from the state); null before the
+    /// first state, when the island draws nothing to hover.</summary>
+    public HoverConfig? Hover =>
+        State?.Settings["hoverDelayMs"] is System.Text.Json.Nodes.JsonValue hover && hover.TryGetValue(out int open)
+        && State.Settings["collapseDelayMs"] is System.Text.Json.Nodes.JsonValue collapse && collapse.TryGetValue(out int close)
+            ? new HoverConfig(TimeSpan.FromMilliseconds(open), TimeSpan.FromMilliseconds(close))
+            : null;
 }

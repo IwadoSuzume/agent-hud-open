@@ -178,6 +178,20 @@ public sealed class ProtocolTests
         }
     }
 
+    /// <summary>1.5: the clients the build looks for, read as the engine listed them; one it does not read says so.</summary>
+    [TestMethod]
+    public void TheSourcesAreRead()
+    {
+        var sources = (Sources)EngineMessage.Parse(Line("engine-sources.json"));
+        Assert.AreEqual("Agents", sources.Title);
+        Assert.AreEqual("claude-code", sources.Items[0].Id);
+        Assert.IsTrue(sources.Items[0].Supported);
+        var antigravity = sources.Items.Single(s => s.Id == "antigravity");
+        Assert.IsFalse(antigravity.Supported);
+        Assert.IsFalse(antigravity.Detected);
+        Assert.AreEqual("Not supported on Windows", antigravity.Status);
+    }
+
     [TestMethod]
     public void TheEventsAreRead()
     {
@@ -212,6 +226,30 @@ public sealed class ProtocolTests
         var state = (State)EngineMessage.Parse(Line("engine-state.later.json"));
         Assert.IsTrue(state.Panel.Agents.Any(a => a.ResetText == "Pending update"));
         Assert.IsTrue(state.Panel.Sessions.Any(s => s.PhaseText == "Live status off"));
+        Assert.IsTrue(state.Panel.Sessions.Any(s => s.Phase == SessionPhase.Unverified && s.PhaseText == "Status out of date"));
+    }
+
+    /// <summary>1.4: each display placed as Core places it, and a drag's patch: the other displays as saved, this one's
+    /// edge and offset changed in Core's own encoding, a notch becoming the dock, the offset kept on the edge.</summary>
+    [TestMethod]
+    public void PlacementsAreReadAndADragPatchesScreens()
+    {
+        var state = (State)EngineMessage.Parse(Line("engine-state.demo.json"));
+        var a = state.Placements["DISPLAY-A"];
+        Assert.AreEqual(HudMode.Logos, a.Mode);
+        Assert.AreEqual(HudEdge.Top, a.Edge);
+        Assert.AreEqual(HudEdge.Left, state.Placements["DISPLAY-B"].Edge);
+        Assert.AreEqual(0.3, state.Placements["DISPLAY-B"].Offset, 1e-9);
+
+        var patch = JsonNode.Parse(ShellMessage.MovePlacement(state.Settings, "DISPLAY-A", a, HudEdge.Right, 1.7))!.AsObject();
+        var screens = patch["patch"]!["screens"]!.AsObject();
+        Assert.AreEqual("left", (string?)screens["DISPLAY-B"]!["edge"], "another display keeps its placement");
+        Assert.AreEqual("right", (string?)screens["DISPLAY-A"]!["edge"]);
+        Assert.AreEqual(1.0, (double)screens["DISPLAY-A"]!["offset"]!, "the offset stays on the edge");
+        Assert.AreEqual(a.Encoded.Count, screens["DISPLAY-A"]!.AsObject().Count, "the whole placement in Core's encoding");
+        var notch = a with { Mode = HudMode.Notch };
+        var dragged = JsonNode.Parse(ShellMessage.MovePlacement(state.Settings, "DISPLAY-A", notch, HudEdge.Bottom, 0.5))!;
+        Assert.AreEqual("logos", (string?)dragged["patch"]!["screens"]!["DISPLAY-A"]!["mode"], "a notch dragged becomes the dock");
     }
 
     [TestMethod]
@@ -223,6 +261,7 @@ public sealed class ProtocolTests
             ["shell-refresh.json"] = ShellMessage.Refresh(),
             ["shell-statistics.json"] = ShellMessage.Statistics(),
             ["shell-displays.json"] = ShellMessage.Displays([("DISPLAY-A", false)]),
+            ["shell-sources.json"] = ShellMessage.Sources(),
             ["shell-quit.json"] = ShellMessage.Quit(),
             ["shell-answer-allow.json"] = ShellMessage.Answer("demo-tests", ShellMessage.Decision.Allow),
             ["shell-answer-deny.json"] = ShellMessage.Answer("demo-tests", ShellMessage.Decision.Deny),

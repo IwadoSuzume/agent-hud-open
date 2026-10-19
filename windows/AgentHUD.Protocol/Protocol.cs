@@ -14,7 +14,7 @@ public sealed class ProtocolRejectedException(string message) : Exception(messag
 public static class ProtocolVersion
 {
     public const int Major = 1;
-    public const int Minor = 4;
+    public const int Minor = 5;
     /// <summary>The longest line either side takes.</summary>
     public const int LineLimit = 16 * 1024 * 1024;
 }
@@ -105,6 +105,13 @@ public sealed record StatisticsPeriod(string Period, string Label, string Total,
 /// <summary>The statistics window's Recent usage card (1.3), the engine's answer to a `statistics` request.</summary>
 public sealed record Statistics(DateTimeOffset? GeneratedAt, string Title, string Dimensions, IReadOnlyList<StatisticsPeriod> Periods);
 
+/// <summary>One client the build looks for (1.5): its name, mark, the engine's status words and detail, whether this
+/// build reads it at all, and whether it was found.</summary>
+public sealed record SourceItem(string Id, string Name, string Mark, string Detail, string Status, bool Supported, bool Detected);
+
+/// <summary>The clients the build looks for (1.5), the engine's answer to a `sources` request.</summary>
+public sealed record Sources(string Title, IReadOnlyList<SourceItem> Items);
+
 /// <summary>Reads one line from the engine.</summary>
 public static class EngineMessage
 {
@@ -142,6 +149,9 @@ public static class EngineMessage
             "state" => ParseState(message),
             "event" => ParseEvent(Obj(message, "event")),
             "statistics" => ParseStatistics(message),
+            "sources" => new Sources(Text(message, "title"), Arr(message, "sources").Select(s => new SourceItem(
+                Text(s, "id"), Text(s, "name"), Text(s, "mark"), Text(s, "detail"), Text(s, "status"), Bool(s, "supported"),
+                Bool(s, "detected"))).ToList()),
             var type => throw Rejected($"unknown type {type}"),
         };
     }
@@ -169,8 +179,8 @@ public static class EngineMessage
         Text(p, "mode") switch { "notch" => HudMode.Notch, "logos" => HudMode.Logos, "simple" => HudMode.Simple, var m => throw Rejected($"unknown mode {m}") },
         Text(p, "edge") switch { "top" => HudEdge.Top, "right" => HudEdge.Right, "bottom" => HudEdge.Bottom, "left" => HudEdge.Left,
                                  var e => throw Rejected($"unknown edge {e}") },
-        OptNumber(p, "offset") ?? 0.5, OptNumber(p, "logoSize") ?? 20, OptNumber(p, "logoEdgeDistance") ?? 2,
-        OptNumber(p, "gapScale") ?? 0.4, Bool(p, "showsLogos"), (JsonObject)p.DeepClone());
+        Number(p, "offset"), Number(p, "logoSize"), Number(p, "logoEdgeDistance"), Number(p, "gapScale"),
+        Bool(p, "showsLogos"), (JsonObject)p.DeepClone());
 
     static Statistics ParseStatistics(JsonObject message) => new(
         OptTime(message, "generatedAt"), Text(message, "title"), Text(message, "dimensions"),
@@ -276,6 +286,8 @@ public static class EngineMessage
 
     static int Int(JsonNode? node, string name) => checked((int)Long(node, name));
 
+    static double Number(JsonNode? node, string name) => Value(node, name, JsonValueKind.Number).GetValue<double>();
+
     static double? OptNumber(JsonNode? node, string name) =>
         Field(node, name) is null ? null : Value(node, name, JsonValueKind.Number).GetValue<double>();
 
@@ -326,6 +338,9 @@ public static class ShellMessage
         screens[key] = moved;
         return UpdateSettings(new JsonObject { ["screens"] = screens });
     }
+
+    /// <summary>1.5: the settings window asks which clients the build looks for; the engine answers with `sources`.</summary>
+    public static string Sources() => Line(new() { ["type"] = "sources" });
 
     /// <summary>1.3: the statistics window asks for its figures; the engine answers with `statistics`.</summary>
     public static string Statistics() => Line(new() { ["type"] = "statistics" });

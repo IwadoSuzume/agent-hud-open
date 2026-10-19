@@ -2,7 +2,8 @@
 
 What the Windows build does for each client, and the source each Windows-specific fact rests on (TASK.md §3, §7.2).
 A fact without a source is not used: the client, or that part of it, is **not supported on Windows**, Core treats it
-as absent (`PlatformSupport`, so it is neither read nor given hooks), and Settings says so (M7).
+as absent (`PlatformSupport`, so it is neither read nor given hooks), and the settings window's Agents list says so
+("Not supported on Windows"; protocol 1.5, D-053).
 
 Status: ✅ supported, tested on Windows with fixtures · 🔶 not supported on Windows (reason given) · ⏳ planned, with
 its milestone. State at M5 (2026-10-18). Hook forms per client: D-037, each run through its client's shell in

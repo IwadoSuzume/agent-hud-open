@@ -63,6 +63,10 @@ public final class EngineServer {
         case .displays(let listed):
             displays = listed
             if store != nil { scheduleState() }
+        case .sources:
+            guard let store else { return write(ShellProtocol.error("no hello yet")) }
+            // The demo lists the demo's clients, as its first-launch screen does, never what this machine has installed.
+            write(options.demo ? ShellSources.message(sources: DemoData.sources) : ShellSources.message(store: store))
         case .statistics:
             guard let store else { return write(ShellProtocol.error("no hello yet")) }
             write(ShellStatistics.message(store: store))
@@ -116,6 +120,11 @@ public final class EngineServer {
         self.store = store
         tracker = IslandEventTracker(startedAt: store.clock())
         write(helloMessage())
+
+        // The first start's live-status defaults, as the Desktop's start gives them (DesktopApplication.start): each
+        // client's live status on where it is found and supports it, and kept as the user set it afterwards.
+        let sources = options.demo ? DemoData.sources : ShellSources.resolve(ShellSources.detect(), report: store.report)
+        settings.update { $0.applyLiveStatusDefaults(sources: sources) }
 
         PermissionRequests.shared.holdTime = TimeInterval(settings.settings.approvalWaitMinutes * 60)
         if options.demo {

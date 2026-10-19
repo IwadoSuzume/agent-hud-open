@@ -21,6 +21,10 @@ public enum ShellStrings {
         "approval.needsApproval": ("等待批准", "Needs approval"),
         "approval.question": ("在问你问题", "Asks a question"),
         "approval.plan": ("有计划待审", "Has a plan to review"),
+        // The request's line at rest (PermissionAlertCompactView.status).
+        "approval.waitingShort": ("待批准", "Waiting"),
+        "approval.questionShort": ("待回答", "Question"),
+        "approval.planShort": ("计划待审", "Plan"),
         "alert.dismiss": ("知道了", "Dismiss"),
         "alert.viewStatistics": ("查看用量统计", "View usage statistics"),
         "reply.dismiss": ("关闭回复提醒", "Dismiss reply"),
@@ -63,6 +67,12 @@ public enum ShellStrings {
         "settings.waitNote": ("到时没回答的权限请求交还客户端，由它自己询问。",
                               "After this, an unanswered permission request goes back to the client's own prompt."),
     ]
+
+    /// Words the Windows build needs that the Desktop has no counterpart for, so no source check can hold them (D-053):
+    /// a client this build does not read.
+    static let windowsOnly: (zh: String, en: String) = ("Windows 暂不支持", "Not supported on Windows")
+
+    static var notSupported: String { L10n.text(windowsOnly.zh, windowsOnly.en) }
 
     /// Every string, in the resolved language (`L10n`), and the words made from Core's own values: each of the
     /// approval wait's choices (`Settings.approvalWaitChoices`) as GeneralPane names it, under `settings.wait.<minutes>`.

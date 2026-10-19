@@ -16,9 +16,6 @@ namespace AgentHUD;
 
 sealed class StatisticsWindow : Window
 {
-    static readonly uint[] Dark = [0xc084fc, 0x60a5fa, 0x2dd4bf, 0xfb923c, 0xf472b6, 0xa3e635];
-    static readonly uint[] Light = [0x9333ea, 0x2563eb, 0x0d9488, 0xea580c, 0xdb2777, 0x4d7c0f];
-
     readonly ShellModel model;
     readonly Action<string> send;
     DateTimeOffset? askedFor;
@@ -58,12 +55,8 @@ sealed class StatisticsWindow : Window
     Brush Ink => IsLight ? Brushes.Black : Brushes.White;
     Brush Secondary => new SolidColorBrush(IsLight ? Color.FromRgb(0x5F, 0x5F, 0x66) : Color.FromRgb(0x9A, 0x9A, 0xA0));
 
-    Brush Palette(int index)
-    {
-        var table = IsLight ? Light : Dark;
-        var rgb = table[((index % table.Length) + table.Length) % table.Length];
-        return new SolidColorBrush(Color.FromRgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb));
-    }
+    /// <summary>The Desktop's AgentPalette (DesktopColours) at Core's palette index.</summary>
+    Brush Palette(int index) => LevelBrush.Frozen(DesktopColours.PaletteColour(index, IsLight));
 
     void Draw()
     {

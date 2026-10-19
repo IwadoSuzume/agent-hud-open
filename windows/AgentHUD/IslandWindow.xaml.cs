@@ -42,6 +42,8 @@ public partial class IslandWindow : Window
         view = new IslandViewModel(model, placement, cards, events, monitor.Device);
         DataContext = view;
         Island.SizeChanged += (_, _) => PositionAlongSide();
+        // A display's scale changed: measure the displays again, as on a change of arrangement.
+        DpiChanged += (_, _) => ((App)Application.Current).DisplaysChanged();
         pointer = new DispatcherTimer(TimeSpan.FromMilliseconds(40), DispatcherPriority.Input, (_, _) => Track(), Dispatcher);
     }
 
@@ -79,17 +81,23 @@ public partial class IslandWindow : Window
 
     // Placement (1.4): where Core puts this display's HUD — the dock on an edge at a share of it — or, while it is being
     // dragged, where the pointer would drop it.
-    static readonly Placement Default = new(HudMode.Logos, HudEdge.Top, 0.5, 20, 2, 0.4, true, new System.Text.Json.Nodes.JsonObject());
     (HudEdge Edge, double Offset)? dragTarget;
     (HudEdge Edge, double Offset, Native.RECT Bounds, double Scale)? applied;
 
-    Placement Saved => model.State?.Placements.GetValueOrDefault(Monitor.Key) ?? Default;
+    /// <summary>Core's placement of this display; none until the engine has placed it, and then the HUD draws nothing
+    /// and cannot be dragged (no default of Core's is held here).</summary>
+    Placement? Saved => model.State?.Placements.GetValueOrDefault(Monitor.Key);
 
     /// <summary>The HUD on its edge: its rest docked there, the panel opening inward, the window along the edge at the
     /// offset (the island at the notch's place for a notch placement, which a Windows display only has if chosen).</summary>
     internal void ApplyPlacement(bool force = false)
     {
-        var saved = Saved;
+        if (Saved is not { } saved)
+        {
+            Island.Visibility = Visibility.Hidden;
+            return;
+        }
+        if (Island.Visibility == Visibility.Hidden && !aside) Island.Visibility = Visibility.Visible;
         // The drop is shown until the engine's state carries it.
         if (dragTarget is { } target && !dragging && saved.Edge == target.Edge && Math.Abs(saved.Offset - target.Offset) < 0.001)
             dragTarget = null;
@@ -148,7 +156,7 @@ public partial class IslandWindow : Window
 
     void OnRestDown(object sender, MouseButtonEventArgs e)
     {
-        if (!Native.GetCursorPos(out var at)) return;
+        if (Saved is null || !Native.GetCursorPos(out var at)) return;
         pressedAt = at;
         // Held from the press: the pointer leaves the drawn pixels at once, and a transparent pixel passes its moves on.
         RestPart.CaptureMouse();
@@ -176,12 +184,25 @@ public partial class IslandWindow : Window
     void OnRestUp(object sender, MouseButtonEventArgs e)
     {
         pressedAt = null;
+        // The drag ends before the capture goes, so that losing it here is no lost drag (OnRestCaptureLost).
+        var dropped = dragging;
+        dragging = false;
         RestPart.ReleaseMouseCapture();
+        if (!dropped) return;
+        if (dragTarget is { } target && model.State is { } state && Saved is { } saved)
+            send(ShellMessage.MovePlacement(state.Settings, Monitor.Key, saved, target.Edge, target.Offset));
+        e.Handled = true;
+    }
+
+    /// <summary>Capture lost mid-drag (Alt+Tab, a system prompt): the drag is dropped where it began, nothing is saved,
+    /// and the hover works again.</summary>
+    void OnRestCaptureLost(object sender, MouseEventArgs e)
+    {
+        pressedAt = null;
         if (!dragging) return;
         dragging = false;
-        if (dragTarget is { } target && model.State is { } state)
-            send(ShellMessage.MovePlacement(state.Settings, Monitor.Key, Saved, target.Edge, target.Offset));
-        e.Handled = true;
+        dragTarget = null;
+        ApplyPlacement(force: true);
     }
 
     void Track()
@@ -201,7 +222,9 @@ public partial class IslandWindow : Window
 
     void Feed(HoverEvent input)
     {
-        var next = hover.Reduce(input, model.Hover);
+        // Before the first state there is nothing to open; forcing (the snapshot) needs no delays.
+        var config = model.Hover ?? new HoverConfig(TimeSpan.Zero, TimeSpan.Zero);
+        var next = hover.Reduce(input, config);
         hover = next.Machine;
         deadline = next.Deadline;
         view.IsOpen = hover.IsOpen;
@@ -218,9 +241,13 @@ public partial class IslandWindow : Window
     /// <summary>A full-screen app holds this display: the HUD draws nothing, and every pixel passes its clicks on.</summary>
     internal void StepAside(bool aside)
     {
+        this.aside = aside;
+        if (Saved is null) return;
         var visibility = aside ? Visibility.Collapsed : Visibility.Visible;
         if (Island.Visibility != visibility) Island.Visibility = visibility;
     }
+
+    bool aside;
 
     /// <summary>For the snapshot: opens a request's card here, as a click on its line does.</summary>
     internal void OpenRequestForPicture(string requestId)

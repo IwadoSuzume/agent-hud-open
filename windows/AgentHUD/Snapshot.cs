@@ -31,8 +31,8 @@ static class Snapshot
                 return;
             }
             // The statistics window's figures come on request: asked once, and drawn when they have come.
-            if (!askedForStatistics) { askedForStatistics = true; send(ShellMessage.Statistics()); }
-            if (model.Statistics is null && DateTime.UtcNow - started < TimeSpan.FromSeconds(30)) return;
+            if (!askedForStatistics) { askedForStatistics = true; send(ShellMessage.Statistics()); send(ShellMessage.Sources()); }
+            if ((model.Statistics is null || model.Sources is null) && DateTime.UtcNow - started < TimeSpan.FromSeconds(30)) return;
             timer.Stop();
             try { Finish(app, Draw(islands.First(), folder, Feed(feed)), null); }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException
@@ -68,6 +68,7 @@ static class Snapshot
         var pictures = new List<(string Name, bool Resting, bool Usage, string? Request, HudEvent? Event, bool Open)>
         {
             ("island-rest", true, false, null, null, false), ("island-open", false, false, null, null, true),
+            ("island-request", false, false, null, null, false), ("card-edit", false, false, "demo-edit", null, true),
             ("island-usage", false, true, null, null, true),
             ("card-question", false, false, "demo-question", null, true), ("card-plan", false, false, "demo-plan", null, true),
         };

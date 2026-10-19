@@ -1,5 +1,5 @@
-// Presentation only: how a level the engine gave is coloured (the dark HUD's status colours, macOS's system green,
-// orange and red), how a share fills a bar, what is hidden when absent.
+// Presentation only: how a level the engine gave is coloured (the dark HUD's status colours, the Desktop's
+// StatusPalette), how a share fills a bar, what is hidden when absent.
 using System;
 using System.Globalization;
 using System.Windows;
@@ -11,14 +11,15 @@ namespace AgentHUD;
 
 sealed class LevelBrush : IValueConverter
 {
-    public static readonly SolidColorBrush Ok = Frozen(0x30, 0xD1, 0x58);
-    public static readonly SolidColorBrush Warning = Frozen(0xFF, 0x9F, 0x0A);
-    public static readonly SolidColorBrush Critical = Frozen(0xFF, 0x45, 0x3A);
-    public static readonly SolidColorBrush None = Frozen(0x8E, 0x8E, 0x93);
+    // The Desktop's StatusPalette on the dark HUD (DesktopColours, held to its source by a test).
+    public static readonly SolidColorBrush Ok = Frozen(AgentHUD.Shell.DesktopColours.Ok);
+    public static readonly SolidColorBrush Warning = Frozen(AgentHUD.Shell.DesktopColours.Warning);
+    public static readonly SolidColorBrush Critical = Frozen(AgentHUD.Shell.DesktopColours.Critical);
+    public static readonly SolidColorBrush None = Frozen(AgentHUD.Shell.DesktopColours.Idle);
 
-    static SolidColorBrush Frozen(byte r, byte g, byte b)
+    public static SolidColorBrush Frozen(uint rgb)
     {
-        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+        var brush = new SolidColorBrush(Color.FromRgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb));
         brush.Freeze();
         return brush;
     }

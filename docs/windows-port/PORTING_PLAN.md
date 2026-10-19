@@ -127,7 +127,7 @@ SKIPPED_TESTS.md (M3) with its reason and Windows counterpart.
 | --- | --- | --- |
 | Engine executable (`AgentHUDEngine`, Windows only) | `Sources/AgentHUDEngine` (hooks and `--mcp` M5; **done M6:** `--serve`, `Platform/Windows/Shell/EngineServe.swift`, `EngineServer.swift`) | M6 |
 | Versioned shell↔engine protocol + JSON Schema + shared fixtures | **done M6:** `docs/windows-port/PROTOCOL.md`, `windows/protocol/` (schema, fixtures), `ShellProtocol.swift`, `ShellStrings.swift`, `windows/AgentHUD.Protocol` (+ tests), `scripts/windows/check-protocol.py` (D-041, D-042) | M6 |
-| WPF shell, tests | `windows/AgentHUD`, `windows/AgentHUD.Tests` | M7 |
+| WPF shell, tests | `windows/AgentHUD`, `windows/AgentHUD.Shell`, `windows/AgentHUD.Shell.Tests` (D-045) | M7 |
 | Windows CI | `.github/workflows/windows.yml` | M1 |
 | Build/package script | `scripts/build-windows.ps1` | M8 |
 | Boundary check over `windows/`, new direct home reads in Core | `scripts/check-source-boundaries.py` | M3 (home), M7 (`windows/`) |

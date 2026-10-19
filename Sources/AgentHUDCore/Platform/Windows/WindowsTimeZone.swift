@@ -22,10 +22,24 @@ enum WindowsTimeZone {
         let key = withUnsafeBytes(of: info.TimeZoneKeyName) { raw in
             String(decoding: raw.bindMemory(to: UInt16.self).prefix { $0 != 0 }, as: UTF16.self)
         }
-        if let identifier = ianaIdentifier(forWindows: key), let zone = TimeZone(identifier: identifier) { return zone }
+        // With "Adjust for daylight saving time automatically" off, the clock keeps standard time all year: the zone's own
+        // rules would move it, so the offset alone is the zone.
+        if info.DynamicDaylightTimeDisabled == 0,
+           let identifier = ianaIdentifier(forWindows: key), let zone = adoptable(identifier) { return zone }
         // UTC = local + bias, in minutes; the daylight bias applies while daylight time is in force.
         let bias = Int(info.Bias) + (kind == DWORD(TIME_ZONE_ID_DAYLIGHT) ? Int(info.DaylightBias) : Int(info.StandardBias))
         return TimeZone(secondsFromGMT: -bias * 60) ?? TimeZone(secondsFromGMT: 0)!
+    }
+
+    /// The zone for an IANA identifier that Foundation can be given as its default. ICU names fixed-offset zones Foundation
+    /// does not list ("UTC" is `Etc/UTC`, "UTC-11" `Etc/GMT+11`), and Foundation traps when `Etc/UTC`, `Etc/UCT`,
+    /// `Etc/Universal` or `Etc/Zulu` becomes its default (measured, every Windows zone and every listed identifier tried,
+    /// M7 test round 1): an identifier it does not list that never changes its offset is that offset, the same clock;
+    /// one that does keep daylight time (`America/Indianapolis`) is kept, and takes the default.
+    static func adoptable(_ identifier: String) -> TimeZone? {
+        guard let zone = TimeZone(identifier: identifier) else { return nil }
+        if TimeZone.knownTimeZoneIdentifiers.contains(identifier) || zone.nextDaylightSavingTimeTransition != nil { return zone }
+        return TimeZone(secondsFromGMT: zone.secondsFromGMT())
     }
 
     /// The IANA identifier of a Windows zone name, or nil without the system's ICU or for a name it does not know.

@@ -112,7 +112,7 @@ jobs:
         run: scripts/windows/test.ps1
 
       - name: Shell smoke test (G5)
-        # The WPF shell against the release engine's demo data: three pictures and status 0 within 30 s.
+        # The WPF shell against the release engine's demo data: every picture smoke-shell.ps1 lists, and status 0 within 30 s.
         run: |
           $engine = Get-ChildItem .build -Recurse -Filter agenthud-engine.exe | Where-Object FullName -match 'release' | Select-Object -First 1
           if (-not $engine) { throw 'no release agenthud-engine.exe under .build' }

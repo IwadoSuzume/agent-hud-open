@@ -35,8 +35,9 @@ public partial class App : Application
         foreach (var island in islands)
         {
             var b = island.Monitor.Bounds;
-            var covers = FullScreen.Covers(new ScreenRect(covered.Left, covered.Top, covered.Right, covered.Bottom),
-                                           new ScreenRect(b.Left, b.Top, b.Right, b.Bottom));
+            var covers = FullScreen.IsFullScreen(new ScreenRect(covered.Left, covered.Top, covered.Right, covered.Bottom),
+                                                 front != IntPtr.Zero && Native.HasCaption(front),
+                                                 new ScreenRect(b.Left, b.Top, b.Right, b.Bottom));
             island.StepAside(!FullScreen.ShowsHud(covers, frontIsDesktopOrHud, island.View.HoldsRequest));
         }
     }
@@ -82,6 +83,14 @@ public partial class App : Application
                     Shutdown(2);
                     return;
             }
+        }
+
+        // The fixtures to draw are a test hook of the snapshot's, and nothing else takes them.
+        if (feedFolder is not null && snapshotFolder is null)
+        {
+            Console.Error.WriteLine("AgentHUD: --feed goes with --snapshot only");
+            Shutdown(2);
+            return;
         }
 
         try { engine = EngineConnection.Launch(enginePath, arguments); }
@@ -199,7 +208,10 @@ public partial class App : Application
         }
     }
 
-    void OnDisplaysChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(BuildIslands, DispatcherPriority.Background);
+    void OnDisplaysChanged(object? sender, EventArgs e) => DisplaysChanged();
+
+    /// <summary>Displays came, went, moved or changed their scale: the islands are made again from their measures.</summary>
+    internal void DisplaysChanged() => Dispatcher.BeginInvoke(BuildIslands, DispatcherPriority.Background);
 
     /// <summary>One island per display, made again when displays come, go or change (hot-plug, DPI, arrangement).</summary>
     void BuildIslands()
@@ -211,6 +223,9 @@ public partial class App : Application
             var area = new Native.RECT { Left = 0, Top = 0, Right = 1920, Bottom = 1080 };
             monitors.Add(new Native.Monitor(@"\\.\SNAPSHOT", area, area, 1.0, true, "SNAPSHOT"));
         }
+        // Nothing changed: an island placed on a display of another scale is told its new DPI, which asks again; placing
+        // them again would ask once more, for ever.
+        if (islands.Count == monitors.Count && monitors.All(m => islands.Any(i => i.Monitor == m))) return;
         foreach (var island in islands.Where(i => monitors.All(m => m.Device != i.Monitor.Device)).ToList())
         {
             island.Close();

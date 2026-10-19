@@ -72,7 +72,7 @@ public sealed class ShellTests
         var changes = 0;
         model.Changed += () => changes++;
         Assert.AreEqual("menu.quit", model.Text("menu.quit"), "before hello, the key itself");
-        Assert.AreEqual(TimeSpan.FromMilliseconds(400), model.Hover.HoverDelay, "Core's default before the first state");
+        Assert.IsNull(model.Hover, "no hover before the first state: the island draws nothing then");
         model.Apply(EngineMessage.Parse(Line("engine-hello.json")));
         model.Apply(EngineMessage.Parse(Line("engine-state.demo.json")));
         model.Apply(EngineMessage.Parse(Line("engine-event-completion.json")));

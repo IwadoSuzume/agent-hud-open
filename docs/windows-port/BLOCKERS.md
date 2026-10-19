@@ -1,6 +1,7 @@
 # Blockers
 
-Items a milestone could not finish within four review rounds (TASK.md §5.5): symptom, what was tried, suggestion.
+Items a milestone could not finish within four review rounds (TASK.md §5.5), and work the port leaves undone with
+no milestone left to own it (M7 review round 1): symptom, what was tried, suggestion.
 
 ## B-001 — CLOSED — M4 not approved after four rounds: two Windows implementations without tests (2026-10-18)
 
@@ -23,3 +24,25 @@ Items a milestone could not finish within four review rounds (TASK.md §5.5): sy
 - **Closed 2026-10-18** with M5's approval (`port-M5-approved`, `bb1ce7d`): `ProviderHTTPWindowsTests`,
   `WindowsCredentialsTests` and `WindowsHTTP.rules`' test run in Windows CI and locally (`reports/M5-tests-2.md`), and
   the M5 reviews judged B-001 resolved (`reports/M5-review-1.md`, `M5-review-2.md`).
+
+## B-002 — OPEN — The MCP agent-tools channel is not served on Windows (2026-10-18)
+
+- **Symptom.** `agenthud-engine --mcp` answers every agent tool with "Agent HUD's agent tools are off" while the engine
+  holds the lock (D-043). On macOS the Desktop serves the channel: its tools show things on the HUD and measure the
+  panel, which only the shell draws on Windows.
+- **Tried.** Nothing yet. M7 (the shell) was the planned owner in D-043. M7 round 1's review found it unowned, and
+  neither M8 (packaging) nor M9 (wrap-up) is the place for a new protocol direction.
+- **Suggestion.** Add a protocol minor version that carries the tool calls from the engine to the shell and their
+  results back. The engine keeps the MCP side (Core's `MCPAppChannel`); the shell only draws and measures. Then make
+  `--mcp` reach the running engine through its pipe (D-040), and test it with an MCP client fixture as the macOS tests
+  do.
+
+## B-003 — OPEN — The panel's session title and row token count are not shown on Windows (2026-10-18)
+
+- **Symptom.** The Desktop's hover panel titles a session with its short task and terminal
+  (`HoverPanelView.sessionTitle`), and each agent row shows its in/out token pair (`TokenFormat.inOut`). Protocol 1.4
+  carries neither, so the Windows panel shows the project and the row's figures without them (D-043, M6 round 3).
+- **Tried.** D-043 named M7 as the owner "when the shell's panel needs them". M7 round 1's review found it unowned.
+- **Suggestion.** Add both to a later minor version: `title` on `panel.sessions[]` and `tokensText` on
+  `panel.agents[]`, made by Core's own functions (moved from the Desktop into Core where they are Desktop-only), and
+  checked as 1.1's labels are. The shell only binds them.

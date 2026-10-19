@@ -7,7 +7,7 @@ import Foundation
 /// own rules and formatting; the shell recomputes nothing.
 public enum ShellProtocol {
     public static let major: Int64 = 1
-    public static let minor: Int64 = 4
+    public static let minor: Int64 = 5
     /// The longest line either side takes.
     public static let lineLimit = 16 * 1024 * 1024
 
@@ -194,6 +194,8 @@ public enum ShellProtocol {
         case refresh
         /// 1.3: the statistics window asks for its figures (`ShellStatistics`).
         case statistics
+        /// 1.5: the settings window asks which clients the build looks for and what it found (`ShellSources`).
+        case sources
         /// 1.4: the displays the shell draws on, each with its key; the state then places each.
         case displays([Display])
         case answer(id: String, Answer)
@@ -242,6 +244,7 @@ public enum ShellProtocol {
             return .hello(minor: minor, shellVersion: fields["shell"]?["version"].stringValue)
         case "refresh": return .refresh
         case "statistics": return .statistics
+        case "sources": return .sources
         case "displays":
             guard case .array(let listed)? = fields["displays"] else { throw Rejected(description: "displays without a list") }
             return .displays(try listed.map { item in

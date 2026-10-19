@@ -84,5 +84,30 @@
         </Grid>
       </StackPanel>
     </Border>
+
+    <!-- The clients the build looks for, as the engine found them; one this build does not read says so (TASK.md §3). -->
+    <TextBlock x:Name="SourcesTitle" Style="{StaticResource Section}" />
+    <Border Style="{StaticResource Group}">
+      <ItemsControl x:Name="SourcesList">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Grid Margin="0,7" Opacity="{Binding Opacity}">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="30" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Image Source="{Binding Image}" Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,1,0,0" />
+              <StackPanel Grid.Column="1">
+                <TextBlock Text="{Binding Item.Name}" />
+                <TextBlock Text="{Binding Item.Detail}" Style="{StaticResource Note}" />
+              </StackPanel>
+              <TextBlock Grid.Column="2" Text="{Binding Item.Status}" FontSize="11" Foreground="{DynamicResource Secondary}"
+                         VerticalAlignment="Top" Margin="0,2,0,0" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
   </StackPanel>
 </Window>

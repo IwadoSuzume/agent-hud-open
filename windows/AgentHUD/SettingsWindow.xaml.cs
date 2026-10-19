@@ -28,8 +28,19 @@ public partial class SettingsWindow : Window
         this.model = model;
         this.send = send;
         model.Changed += Refresh;
-        Closed += (_, _) => model.Changed -= Refresh;
+        model.SourcesChanged += ShowSources;
+        // Windows' light or dark app mode, followed as it changes (WM_SETTINGCHANGE), for the "system" appearance.
+        SystemEvents.UserPreferenceChanged += OnSystemPreference;
+        Closed += (_, _) =>
+        {
+            model.Changed -= Refresh;
+            model.SourcesChanged -= ShowSources;
+            SystemEvents.UserPreferenceChanged -= OnSystemPreference;
+        };
         Refresh();
+        ShowSources();
+        // The clients are looked for when the window opens (1.5): the engine probes their folders once, not with each state.
+        if (model.Hello is not null) send(ShellMessage.Sources());
     }
 
     void Refresh()
@@ -73,12 +84,31 @@ public partial class SettingsWindow : Window
                 .Select(s => new ComboBoxItem { Content = s.Value, Tag = int.Parse(s.Key["settings.wait.".Length..]) })
                 .OrderBy(i => (int)i.Tag).ToList();
             WaitChoice.ItemsSource = waits;
-            WaitChoice.SelectedItem = waits.FirstOrDefault(i => (int)i.Tag == model.IntSetting("approvalWaitMinutes", 10));
+            WaitChoice.SelectedItem = waits.FirstOrDefault(i => (int)i.Tag == model.IntSetting("approvalWaitMinutes", -1));
             WaitChoice.IsEnabled = Flag("clientHooks");
 
             Theme(appearance);
         }
         finally { updating = false; }
+    }
+
+    void OnSystemPreference(object? sender, UserPreferenceChangedEventArgs e) => Dispatcher.BeginInvoke(() =>
+    {
+        dark = null;
+        Theme(Setting("appearance") ?? "system");
+    });
+
+    void ShowSources()
+    {
+        SourcesTitle.Text = model.Sources?.Title ?? "";
+        SourcesList.ItemsSource = (model.Sources?.Items ?? []).Select(item => new SourceRow(item, Artwork.Mark(item.Mark))).ToList();
+    }
+
+    /// <summary>A client's row: dimmed when it was not found or this build does not read it, as the Desktop dims one it
+    /// did not detect.</summary>
+    sealed record SourceRow(SourceItem Item, ImageSource? Image)
+    {
+        public double Opacity => Item.Supported && Item.Detected ? 1 : 0.55;
     }
 
     string? Setting(string name) =>

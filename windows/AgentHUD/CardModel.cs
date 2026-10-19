@@ -12,8 +12,6 @@ using AgentHUD.Shell;
 
 namespace AgentHUD;
 
-enum CardKind { Plain, Question, Plan, PlanElsewhere }
-
 sealed class CardModel : INotifyPropertyChanged
 {
     readonly ShellModel model;
@@ -43,10 +41,8 @@ sealed class CardModel : INotifyPropertyChanged
     public ImageSource? Image => Artwork.Mark(Request.Mark);
     public string Initial => Request.Vendor.Length > 0 ? Request.Vendor[..1].ToUpperInvariant() : "?";
 
-    public CardKind Kind => Request.IsQuestion && Request.Questions.Count > 0 ? CardKind.Question
-                          : Request.IsPlan && Request.AnswersPlan ? CardKind.Plan
-                          : Request.IsPlan ? CardKind.PlanElsewhere
-                          : CardKind.Plain;
+    /// <summary>The Desktop's routing (CardRules).</summary>
+    public CardKind Kind => CardRules.Kind(Request);
     public bool IsPlain => Kind == CardKind.Plain;
     public bool IsQuestion => Kind == CardKind.Question;
     public bool IsPlan => Kind == CardKind.Plan;
@@ -62,11 +58,10 @@ sealed class CardModel : INotifyPropertyChanged
     public string Always => model.Text("approval.always");
     public bool OffersAlways => IsPlain && Request.AlwaysAllowRule is not null;
     public string? AlwaysRule => OffersAlways ? $"{model.Text("approval.alwaysAdds")} {Request.AlwaysAllowRule}" : null;
-    /// <summary>What an allow lets run, always beside the answers: the detail, or the change's lines.</summary>
-    public string? Subject => IsPlain ? Request.Detail ?? Diff : null;
-    string? Diff => Request.Removed is null && Request.Added is null ? null
-        : string.Join("\n", (Request.Removed ?? "").Split('\n').Where(l => l.Length > 0).Select(l => "- " + l)
-                              .Concat((Request.Added ?? "").Split('\n').Where(l => l.Length > 0).Select(l => "+ " + l)));
+    /// <summary>What an allow lets run, always beside the answers (CardRules): the change's lines, else the detail.</summary>
+    public IReadOnlyList<DiffLine> Diff => CardRules.Diff(Request);
+    public bool HasDiff => Diff.Count > 0;
+    public string? Detail => CardRules.Detail(Request);
 
     // A question.
     IReadOnlyList<Question> Questions => Request.Questions;

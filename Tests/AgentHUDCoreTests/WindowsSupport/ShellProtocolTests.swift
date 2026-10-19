@@ -125,6 +125,23 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
 
     /// 1.3: the statistics window's Recent usage card, as the Desktop's UsagePeriodsCard makes it from the demo's report:
     /// three periods, each with its total, cost and cache share and the models that spent the most.
+    /// 1.5: the clients the build looks for, as the settings window lists them: the demo's sources, and the clients
+    /// this build does not read, which say so.
+    func testTheSourcesAreTheSharedFixture() throws {
+        XCTAssertFalse(ShellSources.isSupported(SourceStatus(id: "zcode", name: "ZCode", detail: "", state: .notDetected)))
+        XCTAssertFalse(ShellSources.isSupported(SourceStatus(id: "antigravity", name: "Antigravity", detail: "", state: .installed)))
+        XCTAssertFalse(ShellSources.isSupported(SourceStatus(id: "grok-bot", name: "Grok Bot", detail: "", state: .installed)))
+        XCTAssertTrue(ShellSources.isSupported(SourceStatus(id: "claude-code", name: "Claude", detail: "", state: .installed)))
+        let unsupported = SourceStatus(id: "workbuddy", name: "WorkBuddy", detail: "Sessions", state: .installed, provider: "WorkBuddy")
+        let message = ShellSources.message(sources: DemoData.sources + [unsupported])
+        let listed = message["sources"].arrayValue ?? []
+        // The demo's Antigravity has no Windows location (PlatformSupport): it is listed and says so, as WorkBuddy does.
+        let unread = listed.filter { $0["supported"] == .bool(false) }
+        XCTAssertEqual(unread.map { $0["id"].stringValue }, ["antigravity", "workbuddy"])
+        XCTAssertTrue(unread.allSatisfy { $0["status"].stringValue == "Not supported on Windows" })
+        try assertMatches(message, "engine-sources.json")
+    }
+
     @MainActor
     func testTheStatisticsAreTheSharedFixture() throws {
         let agents = DemoData.everyAgent
@@ -196,6 +213,7 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
             "shell-update-settings.json": .updateSettings(["language": .string("zh-Hans"), "approvalWaitMinutes": .integer(5)]),
             "shell-statistics.json": .statistics,
             "shell-displays.json": .displays([.init(key: "DISPLAY-A", hasNotch: false)]),
+            "shell-sources.json": .sources,
         ]
         let present = Set(try FileManager.default.contentsOfDirectory(atPath: Self.fixtures.path).filter { $0.hasPrefix("shell-") })
         XCTAssertEqual(present, Set(expected.keys), "every shell fixture is checked here")
@@ -290,7 +308,7 @@ final class ShellProtocolTests: XCTestCase, @unchecked Sendable {
         // (the approval wait's choices) are held to the Desktop's the same way.
         let call = try NSRegularExpression(pattern: #"L10n\.text\("(?:[^()]|\([^()]*\))*\)"#)
         var calls: [String] = []
-        for file in ["ShellEventCopy.swift", "ShellStrings.swift", "ShellStatistics.swift"] {
+        for file in ["ShellEventCopy.swift", "ShellStrings.swift", "ShellStatistics.swift", "ShellSources.swift"] {
             let text = try String(contentsOf: Self.root.appendingPathComponent("Sources/AgentHUDCore/Platform/Windows/Shell/\(file)"),
                                   encoding: .utf8)
             calls += call.matches(in: text, range: NSRange(text.startIndex..., in: text)).compactMap { Range($0.range, in: text).map { String(text[$0]) } }
